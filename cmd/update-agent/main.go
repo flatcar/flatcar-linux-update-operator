@@ -19,6 +19,8 @@ var (
 
 	reapTimeout = flag.Int("grace-period", 600,
 		"Period of time in seconds given to a pod to terminate when rebooting for an update")
+	rebootWait = flag.Int("reboot-wait", 0,
+		"Period of time in seconds waiting after last pod deletion for reboot")
 )
 
 func main() {
@@ -44,8 +46,10 @@ func main() {
 	}
 
 	rt := time.Duration(*reapTimeout) * time.Second
+	rw := time.Duration(*rebootWait) * time.Second
 
-	a, err := agent.New(*node, rt)
+	klog.Infof("Waiting %v for reboot", rw)
+	a, err := agent.New(*node, rt, rw)
 	if err != nil {
 		klog.Fatalf("Failed to initialize %s: %v", os.Args[0], err)
 	}
