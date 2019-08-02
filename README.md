@@ -1,11 +1,11 @@
-# Container Linux Update Operator
+# Flatcar Linux Update Operator
 
-Container Linux Update Operator is a node reboot controller for Kubernetes running
-Container Linux images. When a reboot is needed after updating the system via
+Flatcar Linux Update Operator is a node reboot controller for Kubernetes running
+Flatcar Linux images. When a reboot is needed after updating the system via
 [update_engine](https://github.com/coreos/update_engine), the operator will
 drain the node before rebooting it.
 
-Container Linux Update Operator fulfills the same purpose as
+Flatcar Linux Update Operator fulfills the same purpose as
 [locksmith](https://github.com/coreos/locksmith), but has better integration
 with Kubernetes by explicitly marking a node as unschedulable and deleting pods
 on the node before rebooting.
@@ -14,7 +14,7 @@ on the node before rebooting.
 
 [Original proposal](https://docs.google.com/document/d/1DHiB2UDBYRU6QSa2e9mCNla1qBivZDqYjBVn_DvzDWc/edit#)
 
-Container Linux Update Operator is divided into two parts: `update-operator` and `update-agent`.
+Flatcar Linux Update Operator is divided into two parts: `update-operator` and `update-agent`.
 
 `update-agent` runs as a DaemonSet on each node, waiting for a `UPDATE_STATUS_UPDATED_NEED_REBOOT` signal via D-Bus from `update_engine`.
 It will indicate via [node annotations](./pkg/constants/constants.go) that it needs a reboot.
@@ -26,7 +26,7 @@ Currently, `update-operator` only reboots one node at a time.
 
 ## Requirements
 
-- A Kubernetes cluster (>= 1.6) running on Container Linux
+- A Kubernetes cluster (>= 1.6) running on Flatcar Linux
 - The `update-engine.service` systemd unit on each machine should be unmasked, enabled and started in systemd
 - The `locksmithd.service` systemd unit on each machine should be masked and stopped in systemd
 

@@ -16,10 +16,10 @@ import (
 	"k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 
-	"github.com/coreos/container-linux-update-operator/pkg/constants"
-	"github.com/coreos/container-linux-update-operator/pkg/drain"
-	"github.com/coreos/container-linux-update-operator/pkg/k8sutil"
-	"github.com/coreos/container-linux-update-operator/pkg/updateengine"
+	"github.com/kinvolk/flatcar-linux-update-operator/pkg/constants"
+	"github.com/kinvolk/flatcar-linux-update-operator/pkg/drain"
+	"github.com/kinvolk/flatcar-linux-update-operator/pkg/k8sutil"
+	"github.com/kinvolk/flatcar-linux-update-operator/pkg/updateengine"
 )
 
 type Klocksmith struct {
@@ -97,8 +97,8 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 	madeUnschedulableAnnotation, madeUnschedulableAnnotationExists := node.Annotations[constants.AnnotationAgentMadeUnschedulable]
 	makeSchedulable := madeUnschedulableAnnotation == constants.True
 
-	// set coreos.com/update1/reboot-in-progress=false and
-	// coreos.com/update1/reboot-needed=false
+	// set flatcar-linux.net/update1/reboot-in-progress=false and
+	// flatcar-linux.net/update1/reboot-needed=false
 	anno := map[string]string{
 		constants.AnnotationRebootInProgress: constants.False,
 		constants.AnnotationRebootNeeded:     constants.False,
@@ -261,7 +261,7 @@ func (k *Klocksmith) updateStatusCallback(s updateengine.Status) {
 	}, wait.NeverStop)
 }
 
-// setInfoLabels labels our node with helpful info about Container Linux.
+// setInfoLabels labels our node with helpful info about Flatcar Linux.
 func (k *Klocksmith) setInfoLabels() error {
 	vi, err := k8sutil.GetVersionInfo()
 	if err != nil {

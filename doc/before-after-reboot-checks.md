@@ -19,9 +19,9 @@ command:
 ## Before and After Reboot Labels
 
 The `update-operator` labels nodes that are about to reboot with
-`container-linux-update.v1.coreos.com/before-reboot=true` and labels nodes which
+`flatcar-linux-update.v1.flatcar-linux.net/before-reboot=true` and labels nodes which
 have just completed rebooting (but are not yet marked as scheduable) with
-`container-linux-update.v1.coreos.com/after-reboot=true`. If you've required
+`flatcar-linux-update.v1.flatcar-linux.net/after-reboot=true`. If you've required
 before or after reboot annotations, `update-operator` will wait until all
 the respective annotations are applied before proceeding.
 
@@ -40,7 +40,7 @@ or after-reboot labels.
 ```
 spec:
   nodeSelector:
-    container-linux-update.v1.coreos.com/before-reboot: "true"
+    flatcar-linux-update.v1.flatcar-linux.net/before-reboot: "true"
 ```
 
 Be sure your image can handle being rescheduled to a node on which it has

@@ -4,7 +4,7 @@ go:
   - 1.8.x
   - 1.9.x
 
-go_import_path: github.com/coreos/container-linux-update-operator
+go_import_path: github.com/kinvolk/flatcar-linux-update-operator
 
 script:
 - make

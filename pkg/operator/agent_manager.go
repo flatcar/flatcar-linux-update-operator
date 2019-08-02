@@ -11,16 +11,16 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 
-	"github.com/coreos/container-linux-update-operator/pkg/constants"
-	"github.com/coreos/container-linux-update-operator/pkg/k8sutil"
-	"github.com/coreos/container-linux-update-operator/pkg/version"
+	"github.com/kinvolk/flatcar-linux-update-operator/pkg/constants"
+	"github.com/kinvolk/flatcar-linux-update-operator/pkg/k8sutil"
+	"github.com/kinvolk/flatcar-linux-update-operator/pkg/version"
 )
 
 var (
-	daemonsetName = "container-linux-update-agent-ds"
+	daemonsetName = "flatcar-linux-update-agent-ds"
 
 	managedByOperatorLabels = map[string]string{
-		"managed-by": "container-linux-update-operator",
+		"managed-by": "flatcar-linux-update-operator",
 		"app":        agentDefaultAppName,
 	}
 
@@ -37,7 +37,7 @@ var (
 	)
 )
 
-// legacyLabeler finds Container Linux nodes lacking the update-agent enabled
+// legacyLabeler finds Flatcar Linux nodes lacking the update-agent enabled
 // label and adds the label set "true" so nodes opt-in to running update-agent.
 //
 // Important: This behavior supports clusters which may have nodes that do not
@@ -46,7 +46,7 @@ var (
 // the label. Retain this behavior to support upgrades of Tectonic clusters
 // created at 1.6.
 func (k *Kontroller) legacyLabeler() {
-	glog.V(6).Infof("Starting Container Linux node auto-labeler")
+	glog.V(6).Infof("Starting Flatcar Linux node auto-labeler")
 
 	nodelist, err := k.nc.List(v1meta.ListOptions{})
 	if err != nil {
@@ -56,9 +56,9 @@ func (k *Kontroller) legacyLabeler() {
 
 	// match nodes that don't have an update-agent label
 	nodesMissingLabel := k8sutil.FilterNodesByRequirement(nodelist.Items, updateAgentLabelMissing)
-	// match nodes that identify as Container Linux
+	// match nodes that identify as Flatcar Linux
 	nodesToLabel := k8sutil.FilterContainerLinuxNodes(nodesMissingLabel)
-	glog.V(6).Infof("Found Container Linux nodes to label: %+v", nodelist.Items)
+	glog.V(6).Infof("Found Flatcar Linux nodes to label: %+v", nodelist.Items)
 
 	for _, node := range nodesToLabel {
 		glog.Infof("Setting label 'agent=true' on %q", node.Name)

@@ -9,8 +9,8 @@ import (
 	"github.com/coreos/pkg/flagutil"
 	"github.com/golang/glog"
 
-	"github.com/coreos/container-linux-update-operator/pkg/agent"
-	"github.com/coreos/container-linux-update-operator/pkg/version"
+	"github.com/kinvolk/flatcar-linux-update-operator/pkg/agent"
+	"github.com/kinvolk/flatcar-linux-update-operator/pkg/version"
 )
 
 var (

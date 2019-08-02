@@ -19,8 +19,8 @@ import (
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
 
-	"github.com/coreos/container-linux-update-operator/pkg/constants"
-	"github.com/coreos/container-linux-update-operator/pkg/k8sutil"
+	"github.com/kinvolk/flatcar-linux-update-operator/pkg/constants"
+	"github.com/kinvolk/flatcar-linux-update-operator/pkg/k8sutil"
 	"github.com/coreos/locksmith/pkg/timeutil"
 )
 
@@ -30,10 +30,10 @@ const (
 	leaderElectionEventSourceComponent = "update-operator-leader-election"
 	// agentDefaultAppName is the label value for the 'app' key that agents are
 	// expected to be labeled with.
-	agentDefaultAppName = "container-linux-update-agent"
+	agentDefaultAppName = "flatcar-linux-update-agent"
 	maxRebootingNodes   = 1
 
-	leaderElectionResourceName = "container-linux-update-operator-lock"
+	leaderElectionResourceName = "flatcar-linux-update-operator-lock"
 
 	// Arbitrarily copied from KVO
 	leaderElectionLease = 90 * time.Second
@@ -100,7 +100,7 @@ type Kontroller struct {
 	// It will be set to the namespace the operator is running in automatically.
 	namespace string
 
-	// auto-label Container Linux nodes for migration compatability
+	// auto-label Flatcar Linux nodes for migration compatability
 	autoLabelContainerLinux bool
 
 	// reboot window
@@ -200,7 +200,7 @@ func (k *Kontroller) Run(stop <-chan struct{}) error {
 		return err
 	}
 
-	// start Container Linux node auto-labeler
+	// start Flatcar Linux node auto-labeler
 	if k.autoLabelContainerLinux {
 		go wait.Until(k.legacyLabeler, reconciliationPeriod, stop)
 	}
