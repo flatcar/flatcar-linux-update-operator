@@ -1,5 +1,5 @@
 # Reboot windows
-The CLUO `update-operator` can be configured to only reboot nodes during certain timeframes.
+The FLUO `update-operator` can be configured to only reboot nodes during certain timeframes.
 Pre-reboot checks are prevented from running as well.
 
 ## Configuring update-operator

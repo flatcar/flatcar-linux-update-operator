@@ -1,6 +1,6 @@
 # Before and After Reboot Checks
 
-CLUO can require custom node annotations before a node is allowed to reboot or
+FLUO can require custom node annotations before a node is allowed to reboot or
 before a node is allowed to become schedulable after a reboot. 
 
 ## Configuring `update-operator`

@@ -1,8 +1,8 @@
 # Node Labels and Annotations
 
-The CLUO `update-operator` and `update-agent` manage a set of node labels and annotations to coordinate reboots among nodes receiving `update_engine` updates. CLUO label and annotation names are prefixed with "flatcar-linux-update.v1.flatcar-linux.net/" to avoid conflicts.
+The FLUO `update-operator` and `update-agent` manage a set of node labels and annotations to coordinate reboots among nodes receiving `update_engine` updates. FLUO label and annotation names are prefixed with "flatcar-linux-update.v1.flatcar-linux.net/" to avoid conflicts.
 
-A few labels may be set directly by admins to customize behavior. These are called out below. Other CLUO labels and annotations reflect coordinated state changes and should **not** be directly modified.
+A few labels may be set directly by admins to customize behavior. These are called out below. Other FLUO labels and annotations reflect coordinated state changes and should **not** be directly modified.
 
 ## Update Operator (Coordinator)
 
@@ -19,7 +19,7 @@ A few labels may be set directly by admins to customize behavior. These are call
 | name      | example    | setter | description |
 |-----------|------------|--------|-------------|
 | reboot-ok | true/false | update-operator | Annotates nodes the `update-operator` has permitted to reboot |
-| reboot-paused  | true/false | admin | May be set to true by an admin so the `update-operator` will ignore a node. Note that CLUO only coordinates reboots, `update_engine` still installs updates which are applied when a node reboots (e.g. powerloss). |
+| reboot-paused  | true/false | admin | May be set to true by an admin so the `update-operator` will ignore a node. Note that FLUO only coordinates reboots, `update_engine` still installs updates which are applied when a node reboots (e.g. powerloss). |
 
 ## Update Agent
 
