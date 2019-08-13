@@ -1,7 +1,7 @@
 apiVersion: extensions/v1beta1
 kind: DaemonSet
 metadata:
-  name: container-linux-update-agent
+  name: flatcar-linux-update-agent
   namespace: reboot-coordinator
 spec:
   updateStrategy:
@@ -11,11 +11,11 @@ spec:
   template:
     metadata:
       labels:
-        app: container-linux-update-agent
+        app: flatcar-linux-update-agent
     spec:
       containers:
       - name: update-agent
-        image: quay.io/coreos/container-linux-update-operator:v0.7.0
+        image: quay.io/kinvolk/flatcar-linux-update-operator:v0.7.0
         command:
         - "/bin/update-agent"
         volumeMounts:

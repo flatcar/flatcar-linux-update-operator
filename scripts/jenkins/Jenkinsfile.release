@@ -6,7 +6,7 @@ properties([
     parameters([
         string(name: 'TAG',
                defaultValue: 'v0.0.0',
-               description: 'CLUO tag to release'),
+               description: 'FLUO tag to release'),
     ])
 ])
 
@@ -19,9 +19,9 @@ node('docker') {
             $class: 'GitSCM',
             branches: [[name: params.TAG]],
             extensions: [[$class: 'RelativeTargetDirectory',
-            relativeTargetDir: 'container-linux-update-operator'],
+            relativeTargetDir: 'flatcar-linux-update-operator'],
             [$class: 'CleanBeforeCheckout']],
-            userRemoteConfigs: [[url: "https://github.com/coreos/container-linux-update-operator.git", name: 'origin']]
+            userRemoteConfigs: [[url: "https://github.com/kinvolk/flatcar-linux-update-operator.git", name: 'origin']]
         ]
     }
 
@@ -33,7 +33,7 @@ node('docker') {
                     export HOME="${WORKSPACE}"
                     docker login --username "$DOCKER_USER" --password "$DOCKER_PASS" quay.io
 
-                    cd container-linux-update-operator
+                    cd flatcar-linux-update-operator
 
                     VERSION=${TAG} \
                         PUSH_IMAGE=true \

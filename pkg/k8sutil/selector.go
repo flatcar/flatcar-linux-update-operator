@@ -47,12 +47,12 @@ func FilterNodesByRequirement(nodes []v1api.Node, req *labels.Requirement) []v1a
 }
 
 // FilterContainerLinuxNodes filters a list of nodes and returns nodes with a
-// Container Linux OSImage, as reported by the node's /etc/os-release.
+// Flatcar Linux OSImage, as reported by the node's /etc/os-release.
 func FilterContainerLinuxNodes(nodes []v1api.Node) []v1api.Node {
 	var matches []v1api.Node
 
 	for _, node := range nodes {
-		if strings.HasPrefix(node.Status.NodeInfo.OSImage, "Container Linux") {
+		if strings.HasPrefix(node.Status.NodeInfo.OSImage, "Flatcar Linux") {
 			matches = append(matches, node)
 		}
 	}

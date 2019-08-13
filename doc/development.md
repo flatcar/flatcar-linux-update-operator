@@ -27,7 +27,7 @@ make image
 Push a development image to a personal image repository to test it on a cluster. You may need to run `sudo docker login quay.io` if you haven't already.
 
 ```
-make docker-push IMAGE_REPO=quay.io/USERNAME/container-linux-update-operator
+make docker-push IMAGE_REPO=quay.io/USERNAME/flatcar-linux-update-operator
 ```
 
 Switch your personal repository to be public so images can be pulled.
@@ -36,12 +36,12 @@ Switch your personal repository to be public so images can be pulled.
 
 ### Cluster
 
-Deploy a Container Linux Kubernetes cluster that satisfies the [requirements](README.md#requirements).
+Deploy a Flatcar Linux Kubernetes cluster that satisfies the [requirements](README.md#requirements).
 
 * [QEMU/KVM](https://github.com/coreos/matchbox/tree/master/examples/terraform/bootkube-install)
 * [Tectonic](https://github.com/coreos/tectonic-installer)
 
-In particular, be sure to mask `locksmithd.service` on every Container Linux node.
+In particular, be sure to mask `locksmithd.service` on every Flatcar Linux node.
 
 ```
 sudo systemctl mask locksmithd.service --now
@@ -60,10 +60,10 @@ kubectl apply -f examples/deploy -R
 Verify the `update-operator` is able to acquire a leader lock.
 
 ```sh
-$ kubectl logs container-linux-update-operator-1096583598-x1m6t -n kube-system
+$ kubectl logs flatcar-linux-update-operator-1096583598-x1m6t -n kube-system
 I0622 18:42:13.594217       1 main.go:46] /bin/update-operator running
 I0622 18:42:13.791474       1 leaderelection.go:179] attempting to acquire leader lease...
-I0622 18:42:13.840638       1 leaderelection.go:189] successfully acquired lease kube-system/container-linux-update-operator-lock```
+I0622 18:42:13.840638       1 leaderelection.go:189] successfully acquired lease kube-system/flatcar-linux-update-operator-lock```
 ```
 
 **update-agent**
@@ -74,24 +74,24 @@ Watch the logs of the `update-agent` pod on a particular node.
 
 ```
 $ kubectl get pods -o wide -n kube-system
-$ kubectl logs container-linux-update-agent-ds-0h36z -f -n kube-system
+$ kubectl logs flatcar-linux-update-agent-ds-0h36z -f -n kube-system
 I0622 20:06:08.888033       1 main.go:42] /bin/update-agent running
 I0622 20:06:08.888174       1 agent.go:117] Setting info labels
 I0622 20:06:08.978089       1 agent.go:123] Marking node as schedulable
-I0622 20:06:08.994266       1 agent.go:134] Setting annotations map[string]string{"container-linux-update.v1.coreos.com/reboot-in-progress":"false", "container-linux-update.v1.coreos.com/reboot-needed":"false"}
+I0622 20:06:08.994266       1 agent.go:134] Setting annotations map[string]string{"flatcar-linux-update.v1.flatcar-linux.net/reboot-in-progress":"false", "flatcar-linux-update.v1.flatcar-linux.net/reboot-needed":"false"}
 I0622 20:06:09.016814       1 agent.go:149] Waiting for ok-to-reboot from controller...
 I0622 20:06:09.017977       1 agent.go:211] Beginning to watch update_engine status
 I0622 20:06:09.023410       1 agent.go:68] Updating status
 ```
 
-Send a fake 'need reboot' signal, as though `update-engine.service` had requested a reboot or actually check for a Container Linux update (if cluster was deployed with older version).
+Send a fake 'need reboot' signal, as though `update-engine.service` had requested a reboot or actually check for a Flatcar Linux update (if cluster was deployed with older version).
 
 ```sh
 $ ssh core@node.example.com
 $ locksmithctl send-need-reboot
 ```
 
-Alternately, check for a Container Linux update if the cluster was deployed with an older version of Container Linux.
+Alternately, check for a Flatcar Linux update if the cluster was deployed with an older version of Flatcar Linux.
 
 ```sh
 $ ssh core@node.example.com

@@ -10,7 +10,7 @@ spec:
         app: example-before-reboot-check
     spec:
       nodeSelector:
-        container-linux-update.v1.coreos.com/before-reboot: "true"
+        flatcar-linux-update.v1.flatcar-linux.net/before-reboot: "true"
       tolerations:
       - key: node-role.kubernetes.io/master
         operator: Exists
@@ -20,7 +20,7 @@ spec:
         image: quay.io/stephen_demos/kube-annotate:latest
         command:
         - "/bin/kube-annotate"
-        - "container-linux-update.v1.coreos.com/before-reboot-test"
+        - "flatcar-linux-update.v1.flatcar-linux.net/before-reboot-test"
         - "true"
         env:
         - name: NODE

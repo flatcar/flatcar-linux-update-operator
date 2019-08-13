@@ -5,10 +5,10 @@ VERSION=$(shell ./build/git-version.sh)
 RELEASE_VERSION=$(shell cat VERSION)
 COMMIT=$(shell git rev-parse HEAD)
 
-REPO=github.com/coreos/container-linux-update-operator
+REPO=github.com/kinvolk/flatcar-linux-update-operator
 LD_FLAGS="-w -X $(REPO)/pkg/version.Version=$(RELEASE_VERSION) -X $(REPO)/pkg/version.Commit=$(COMMIT)"
 
-IMAGE_REPO?=quay.io/coreos/container-linux-update-operator
+IMAGE_REPO?=quay.io/kinvolk/flatcar-linux-update-operator
 
 all: bin/update-agent bin/update-operator
 

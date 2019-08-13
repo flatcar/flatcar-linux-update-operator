@@ -1,4 +1,4 @@
-package: github.com/coreos/container-linux-update-operator
+package: github.com/kinvolk/flatcar-linux-update-operator
 import:
 - package: github.com/blang/semver
   version: 31b736133b98f26d5e078ec9eb591666edfd091f

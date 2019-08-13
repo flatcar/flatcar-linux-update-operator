@@ -8,7 +8,7 @@ const (
 	False = "false"
 
 	// Prefix used by all label and annotation keys.
-	Prefix = "container-linux-update.v1.coreos.com/"
+	Prefix = "flatcar-linux-update.v1.flatcar-linux.net/"
 
 	// Key set to "true" by the update-agent when a reboot is requested.
 	AnnotationRebootNeeded = Prefix + "reboot-needed"
@@ -73,11 +73,11 @@ const (
 
 	// Label set to "true" on nodes where update-agent pods should be scheduled.
 	// This applies only when update-operator is run with the flag
-	// auto-label-container-linux=true
+	// auto-label-flatcar-linux=true
 	LabelUpdateAgentEnabled = Prefix + "agent"
 
 	// AgentVersion is the key used to indicate the
-	// container-linux-update-operator's agent's version.
+	// flatcar-linux-update-operator's agent's version.
 	// The value is a semver-parseable string. It should be present on each agent
 	// pod, as well as on the daemonset that manages them.
 	AgentVersion = Prefix + "agent-version"
