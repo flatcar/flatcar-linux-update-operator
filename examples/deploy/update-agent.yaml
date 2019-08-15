@@ -21,10 +21,10 @@ spec:
         volumeMounts:
           - mountPath: /var/run/dbus
             name: var-run-dbus
-          - mountPath: /etc/coreos
-            name: etc-coreos
-          - mountPath: /usr/share/coreos
-            name: usr-share-coreos
+          - mountPath: /etc/flatcar
+            name: etc-flatcar
+          - mountPath: /usr/share/flatcar
+            name: usr-share-flatcar
           - mountPath: /etc/os-release
             name: etc-os-release
         env:
@@ -45,12 +45,12 @@ spec:
       - name: var-run-dbus
         hostPath:
           path: /var/run/dbus
-      - name: etc-coreos
+      - name: etc-flatcar
         hostPath:
-          path: /etc/coreos
-      - name: usr-share-coreos
+          path: /etc/flatcar
+      - name: usr-share-flatcar
         hostPath:
-          path: /usr/share/coreos
+          path: /usr/share/flatcar
       - name: etc-os-release
         hostPath:
           path: /etc/os-release

@@ -27,9 +27,9 @@ A few labels may be set directly by admins to customize behavior. These are call
 
 | name | example | setter           | description |
 |------|---------|------------------|-------------|
-| id   | coreos  |  update-agent    | Reflects the ID in `/etc/os-release` |
+| id   | flatcar |  update-agent    | Reflects the ID in `/etc/os-release` |
 | version | 1497.7.0 | update-agent | Reflects the VERSION in `/etc/os-release` |
-| group | stable | update-agent     | Reflects the GROUP in `/usr/share/coreos/update.conf` or `/etc/coreos/update.conf` |
+| group | stable | update-agent     | Reflects the GROUP in `/usr/share/flatcar/update.conf` or `/etc/flatcar/update.conf` |
 | reboot-needed | true | update-agent | Reflects the reboot-needed annotation |
 
 **Annotations**

@@ -64,8 +64,8 @@ const (
 	LabelID = Prefix + "id"
 
 	// Key set by the update-agent to the value of "GROUP" in
-	// /usr/share/coreos/update.conf, overridden by the value of "GROUP" in
-	// /etc/coreos/update.conf.
+	// /usr/share/flatcar/update.conf, overridden by the value of "GROUP" in
+	// /etc/flatcar/update.conf.
 	LabelGroup = Prefix + "group"
 
 	// Key set by the update-agent to the value of "VERSION" in /etc/os-release.

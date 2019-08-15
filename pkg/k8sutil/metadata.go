@@ -16,8 +16,8 @@ import (
 )
 
 const (
-	updateConfPath         = "/usr/share/coreos/update.conf"
-	updateConfOverridePath = "/etc/coreos/update.conf"
+	updateConfPath         = "/usr/share/flatcar/update.conf"
+	updateConfOverridePath = "/etc/flatcar/update.conf"
 	osReleasePath          = "/etc/os-release"
 )
 
