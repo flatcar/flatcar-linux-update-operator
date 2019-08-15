@@ -19,9 +19,9 @@ import (
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
 
+	"github.com/coreos/locksmith/pkg/timeutil"
 	"github.com/kinvolk/flatcar-linux-update-operator/pkg/constants"
 	"github.com/kinvolk/flatcar-linux-update-operator/pkg/k8sutil"
-	"github.com/coreos/locksmith/pkg/timeutil"
 )
 
 const (
@@ -177,9 +177,9 @@ func New(config Config) (*Kontroller, error) {
 	}
 
 	return &Kontroller{
-		kc: kc,
-		nc: nc,
-		er: er,
+		kc:                          kc,
+		nc:                          nc,
+		er:                          er,
 		beforeRebootAnnotations:     config.BeforeRebootAnnotations,
 		afterRebootAnnotations:      config.AfterRebootAnnotations,
 		leaderElectionClient:        leaderElectionClient,
