@@ -388,7 +388,7 @@ func (k *Kontroller) checkBeforeReboot() error {
 				delete(node.Labels, constants.LabelBeforeReboot)
 				// cleanup the before-reboot annotations
 				for _, annotation := range k.beforeRebootAnnotations {
-					glog.V(4).Info("Deleting annotation %q from node %q", annotation, node.Name)
+					glog.V(4).Infof("Deleting annotation %q from node %q", annotation, node.Name)
 					delete(node.Annotations, annotation)
 				}
 				node.Annotations[constants.AnnotationOkToReboot] = constants.True
@@ -424,7 +424,7 @@ func (k *Kontroller) checkAfterReboot() error {
 				delete(node.Labels, constants.LabelAfterReboot)
 				// cleanup the after-reboot annotations
 				for _, annotation := range k.afterRebootAnnotations {
-					glog.V(4).Info("Deleting annotation %q from node %q", annotation, node.Name)
+					glog.V(4).Infof("Deleting annotation %q from node %q", annotation, node.Name)
 					delete(node.Annotations, annotation)
 				}
 				node.Annotations[constants.AnnotationOkToReboot] = constants.False
