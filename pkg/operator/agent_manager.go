@@ -192,12 +192,12 @@ func agentDaemonsetSpec(repo string) *v1beta1.DaemonSet {
 									MountPath: "/var/run/dbus",
 								},
 								{
-									Name:      "etc-coreos",
-									MountPath: "/etc/coreos",
+									Name:      "etc-flatcar",
+									MountPath: "/etc/flatcar",
 								},
 								{
-									Name:      "usr-share-coreos",
-									MountPath: "/usr/share/coreos",
+									Name:      "usr-share-flatcar",
+									MountPath: "/usr/share/flatcar",
 								},
 								{
 									Name:      "etc-os-release",
@@ -234,18 +234,18 @@ func agentDaemonsetSpec(repo string) *v1beta1.DaemonSet {
 							},
 						},
 						{
-							Name: "etc-coreos",
+							Name: "etc-flatcar",
 							VolumeSource: v1.VolumeSource{
 								HostPath: &v1.HostPathVolumeSource{
-									Path: "/etc/coreos",
+									Path: "/etc/flatcar",
 								},
 							},
 						},
 						{
-							Name: "usr-share-coreos",
+							Name: "usr-share-flatcar",
 							VolumeSource: v1.VolumeSource{
 								HostPath: &v1.HostPathVolumeSource{
-									Path: "/usr/share/coreos",
+									Path: "/usr/share/flatcar",
 								},
 							},
 						},
