@@ -1,7 +1,8 @@
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRole
 metadata:
-  name: reboot-coordinator
+  name: flatcar-linux-update-operator
+  namespace: reboot-coordinator
 rules:
   - apiGroups:
       - ""
@@ -43,3 +44,11 @@ rules:
       - daemonsets
     verbs:
       - get
+  - apiGroups:
+      - policy
+    resourceNames:
+      - flatcar-linux-update-operator
+    resources:
+      - podsecuritypolicies
+    verbs:
+      - use
