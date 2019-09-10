@@ -27,7 +27,7 @@ make image
 Push a development image to a personal image repository to test it on a cluster. You may need to run `sudo docker login quay.io` if you haven't already.
 
 ```
-make docker-push IMAGE_REPO=quay.io/USERNAME/flatcar-linux-update-operator
+make image-push IMAGE_REPO=quay.io/USERNAME/flatcar-linux-update-operator
 ```
 
 Switch your personal repository to be public so images can be pulled.
