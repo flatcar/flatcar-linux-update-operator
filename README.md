@@ -12,8 +12,6 @@ on the node before rebooting.
 
 ## Design
 
-[Original proposal](https://docs.google.com/document/d/1DHiB2UDBYRU6QSa2e9mCNla1qBivZDqYjBVn_DvzDWc/edit#)
-
 Flatcar Linux Update Operator is divided into two parts: `update-operator` and `update-agent`.
 
 `update-agent` runs as a DaemonSet on each node, waiting for a `UPDATE_STATUS_UPDATED_NEED_REBOOT` signal via D-Bus from `update_engine`.
