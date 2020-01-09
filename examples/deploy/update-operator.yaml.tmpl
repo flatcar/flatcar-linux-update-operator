@@ -5,6 +5,9 @@ metadata:
   namespace: reboot-coordinator
 spec:
   replicas: 1
+  selector:
+    matchLabels:
+      app: flatcar-linux-update-operator
   template:
     metadata:
       labels:
