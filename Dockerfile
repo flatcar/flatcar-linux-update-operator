@@ -16,6 +16,6 @@ RUN apk add -U ca-certificates
 COPY --from=builder /go/src/github.com/kinvolk/flatcar-linux-update-operator/bin/update-agent /bin/
 COPY --from=builder /go/src/github.com/kinvolk/flatcar-linux-update-operator/bin/update-operator /bin/
 
-USER nobody
+USER 65534:65534
 
 ENTRYPOINT ["/bin/update-agent"]
