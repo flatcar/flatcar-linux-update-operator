@@ -1,4 +1,4 @@
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: flatcar-linux-update-agent
@@ -8,11 +8,15 @@ spec:
     type: RollingUpdate
     rollingUpdate:
       maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: flatcar-linux-update-agent
   template:
     metadata:
       labels:
         app: flatcar-linux-update-agent
     spec:
+      serviceAccountName: flatcar-linux-update-operator-sa
       containers:
       - name: update-agent
         image: quay.io/kinvolk/flatcar-linux-update-operator:v${VERSION}
@@ -21,12 +25,16 @@ spec:
         volumeMounts:
           - mountPath: /var/run/dbus
             name: var-run-dbus
+            readOnly: false
           - mountPath: /etc/flatcar
             name: etc-flatcar
+            readOnly: true
           - mountPath: /usr/share/flatcar
             name: usr-share-flatcar
+            readOnly: true
           - mountPath: /etc/os-release
             name: etc-os-release
+            readOnly: true
         env:
         # read by update-agent as the node name to manage reboots for
         - name: UPDATE_AGENT_NODE
