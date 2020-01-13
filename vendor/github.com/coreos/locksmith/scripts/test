@@ -1,0 +1,26 @@
+#!/bin/bash -e
+
+ORG_PATH="github.com/coreos"
+REPO_PATH="${ORG_PATH}/locksmith"
+
+PKGS=$(cd "gopath/src/${REPO_PATH}" && go list ./... | grep -v vendor)
+FMT_DIRS=$(ls -d */ | grep -v vendor)
+LINTABLE=$(cd "gopath/src/${REPO_PATH}" && go list ./... | grep -v vendor)
+
+echo "Running tests..."
+go test $PKGS -cover
+
+echo "Running vet..."
+go vet $PKGS
+
+echo "Running gofmt..."
+fmtRes=$(gofmt -l $FMT_DIRS)
+if [[ -n "${fmtRes}" ]]; then
+	echo -e "gofmt checking failed:\n${fmtRes}"
+	exit 2
+fi
+
+echo "Running golint..."
+echo $LINTABLE | xargs -n 1 golint || true
+
+echo "Success"

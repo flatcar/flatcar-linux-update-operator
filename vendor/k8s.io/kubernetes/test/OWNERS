@@ -1,0 +1,47 @@
+reviewers:
+  - bowei
+  - deads2k
+  - enisoc
+  - erictune
+  - fabianofranz # for test/e2e/kubectl.go
+  - foxish # for test/e2e/network-partition.go
+  - gmarek
+  - janetkuo
+  - kow3ns # for test/e2e/statefulset.go
+  - krousey
+  - liggitt
+  - madhusudancs
+  - marun
+  - mikedanese
+  - ncdc
+  - pwittrock # for test/e2e/kubectl.go
+  - saad-ali
+  - smarterclayton
+  - soltysh
+  - sig-testing-reviewers
+  - sttts
+  - zmerlynn
+approvers:
+  - bowei # for test/e2e/{dns*,network}.go
+  - deads2k
+  - enisoc
+  - eparis
+  - erictune
+  - fabianofranz # for test/e2e/kubectl.go
+  - foxish # for test/e2e/network-partition.go
+  - gmarek
+  - janetkuo
+  - kow3ns # for test/e2e/statefulset.go
+  - krousey
+  - liggitt
+  - madhusudancs
+  - marun
+  - mikedanese
+  - ncdc
+  - pwittrock # for test/e2e/kubectl.go
+  - saad-ali
+  - sig-testing-approvers
+  - smarterclayton
+  - soltysh
+  - sttts
+  - zmerlynn
