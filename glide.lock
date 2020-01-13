@@ -1,5 +1,5 @@
-hash: c37ee93abf878a85942264770fa4775e32b0e759b9bd72eb020c0e7ff5c3eb6c
-updated: 2020-01-13T13:25:16.654521439Z
+hash: 89440498333cb96b5f591b3cd8fa59e7e5f4546f78fcdb582224d7a839198865
+updated: 2020-01-13T13:38:14.938214817Z
 imports:
 - name: github.com/blang/semver
   version: 31b736133b98f26d5e078ec9eb591666edfd091f
@@ -20,7 +20,7 @@ imports:
   subpackages:
   - spew
 - name: github.com/docker/distribution
-  version: cd27f179f2c10c5d300e6d09025b538c475b0d51
+  version: 3f7fa41272784c4442697efffeff001a6f1b9857
   subpackages:
   - digest
   - reference

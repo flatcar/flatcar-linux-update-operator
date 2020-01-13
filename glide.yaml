@@ -19,7 +19,7 @@ import:
   subpackages:
   - spew
 - package: github.com/docker/distribution
-  version: cd27f179f2c10c5d300e6d09025b538c475b0d51
+  version: 3f7fa41272784c4442697efffeff001a6f1b9857
   subpackages:
   - digest
   - reference
