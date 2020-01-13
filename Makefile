@@ -22,7 +22,7 @@ release-bin:
 test:
 	go test -v $(REPO)/pkg/...
 
-image: release-bin
+image:
 	@$(DOCKER_CMD) build --rm=true -t $(IMAGE_REPO):$(VERSION) .
 
 image-push: image
