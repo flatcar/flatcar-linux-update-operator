@@ -8,7 +8,6 @@ import (
 	v1meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/kubernetes"
-	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 // GetPodsForDeletion finds pods on the given node that are candidates for
@@ -30,7 +29,7 @@ func GetPodsForDeletion(kc kubernetes.Interface, node string) (pods []v1.Pod, er
 	for _, pod := range podList.Items {
 
 		// skip mirror pods
-		if _, ok := pod.Annotations[kubelettypes.ConfigMirrorAnnotationKey]; ok {
+		if _, ok := pod.Annotations[v1.MirrorPodAnnotationKey]; ok {
 			continue
 		}
 
@@ -71,7 +70,7 @@ func getOwnerDaemonset(kc kubernetes.Interface, pod v1.Pod) (interface{}, error)
 func getDaemonsetController(kc kubernetes.Interface, namespace string, controllerRef *v1meta.OwnerReference) (interface{}, error) {
 	switch controllerRef.Kind {
 	case "DaemonSet":
-		return kc.ExtensionsV1beta1().DaemonSets(namespace).Get(controllerRef.Name, v1meta.GetOptions{})
+		return kc.AppsV1().DaemonSets(namespace).Get(controllerRef.Name, v1meta.GetOptions{})
 	}
 	return nil, fmt.Errorf("Unknown controller kind %q", controllerRef.Kind)
 }

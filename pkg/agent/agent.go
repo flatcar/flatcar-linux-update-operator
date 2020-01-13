@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"sync"
 	"time"
+	"context"
 
 	"github.com/coreos/go-systemd/login1"
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	watchtools "k8s.io/client-go/tools/watch"
 	v1meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -319,7 +321,8 @@ func (k *Klocksmith) waitForOkToReboot() error {
 
 	// hopefully 24 hours is enough time between indicating we need a
 	// reboot and the controller telling us to do it
-	ev, err := watch.Until(time.Hour*24, watcher, k8sutil.NodeAnnotationCondition(shouldRebootSelector))
+	ctx, _ := watchtools.ContextWithOptionalTimeout(context.Background(), time.Hour*24)
+	ev, err := watchtools.UntilWithoutRetry(ctx, watcher, k8sutil.NodeAnnotationCondition(shouldRebootSelector))
 	if err != nil {
 		return fmt.Errorf("waiting for annotation %q failed: %v", constants.AnnotationOkToReboot, err)
 	}
@@ -363,7 +366,9 @@ func (k *Klocksmith) waitForNotOkToReboot() error {
 	// true' vs '== False'; due to the operator matching on '== True', and not
 	// going out of its way to convert '' => 'False', checking the exact inverse
 	// of what the operator checks is the correct thing to do.
-	ev, err := watch.Until(time.Hour*24, watcher, watch.ConditionFunc(func(event watch.Event) (bool, error) {
+	ctx, _ := watchtools.ContextWithOptionalTimeout(context.Background(), time.Hour*24)
+
+	ev, err := watchtools.UntilWithoutRetry(ctx, watcher, watchtools.ConditionFunc(func(event watch.Event) (bool, error) {
 		switch event.Type {
 		case watch.Error:
 			return false, fmt.Errorf("error watching node: %v", event.Object)
