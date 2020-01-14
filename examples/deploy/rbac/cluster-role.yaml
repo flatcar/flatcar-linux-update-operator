@@ -102,7 +102,7 @@ rules:
   - apiGroups:
       - policy
     resourceNames:
-      - flatcar-linux-update-operator
+      - flatcar-linux-update-agent
     resources:
       - podsecuritypolicies
     verbs:
