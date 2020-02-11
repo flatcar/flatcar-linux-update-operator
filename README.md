@@ -32,6 +32,16 @@ To unmask a service, run `systemctl unmask <name>`.
 To enable a service, run `systemctl enable <name>`.
 To start/stop a service, run `systemctl start <name>` or `systemctl stop <name>` respectively.
 
+or using a [Container Linux Config](https://docs.flatcar-linux.org/os/provisioning/#container-linux-config) file:
+```
+systemd:
+  units:
+    - name: locksmithd.service
+      mask: true
+    - name: update-engine.service
+      enabled: true
+```
+
 ## Usage
 
 Create the `update-operator` deployment and `update-agent` daemonset.
