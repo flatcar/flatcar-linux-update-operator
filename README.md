@@ -1,7 +1,7 @@
 # Flatcar Linux Update Operator
 
 Flatcar Linux Update Operator is a node reboot controller for Kubernetes running
-Flatcar Linux images. When a reboot is needed after updating the system via
+Flatcar Container Linux images. When a reboot is needed after updating the system via
 [update_engine](https://github.com/coreos/update_engine), the operator will
 drain the node before rebooting it.
 
@@ -24,7 +24,7 @@ Currently, `update-operator` only reboots one node at a time.
 
 ## Requirements
 
-- A Kubernetes cluster (>= 1.6) running on Flatcar Linux
+- A Kubernetes cluster (>= 1.6) running on Flatcar Container Linux
 - The `update-engine.service` systemd unit on each machine should be unmasked, enabled and started in systemd
 - The `locksmithd.service` systemd unit on each machine should be masked and stopped in systemd
 
