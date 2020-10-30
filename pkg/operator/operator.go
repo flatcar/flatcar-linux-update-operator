@@ -101,7 +101,7 @@ type Kontroller struct {
 	// It will be set to the namespace the operator is running in automatically.
 	namespace string
 
-	// auto-label Flatcar Linux nodes for migration compatability
+	// auto-label Flatcar Container Linux nodes for migration compatability
 	autoLabelContainerLinux bool
 
 	// reboot window
@@ -201,7 +201,7 @@ func (k *Kontroller) Run(stop <-chan struct{}) error {
 		return err
 	}
 
-	// start Flatcar Linux node auto-labeler
+	// start Flatcar Container Linux node auto-labeler
 	if k.autoLabelContainerLinux {
 		go wait.Until(k.legacyLabeler, reconciliationPeriod, stop)
 	}

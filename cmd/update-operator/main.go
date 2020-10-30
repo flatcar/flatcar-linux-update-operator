@@ -18,7 +18,7 @@ var (
 	beforeRebootAnnotations flagutil.StringSliceFlag
 	afterRebootAnnotations  flagutil.StringSliceFlag
 	kubeconfig              = flag.String("kubeconfig", "", "Path to a kubeconfig file. Default to the in-cluster config if not provided.")
-	autoLabelContainerLinux = flag.Bool("auto-label-flatcar-linux", false, "Auto-label Flatcar Linux nodes with agent=true (convenience)")
+	autoLabelContainerLinux = flag.Bool("auto-label-flatcar-linux", false, "Auto-label Flatcar Container Linux nodes with agent=true (convenience)")
 	rebootWindowStart       = flag.String("reboot-window-start", "", "Day of week ('Sun', 'Mon', ...; optional) and time of day at which the reboot window starts. E.g. 'Mon 14:00', '11:00'")
 	rebootWindowLength      = flag.String("reboot-window-length", "", "Length of the reboot window. E.g. '1h30m'")
 	printVersion            = flag.Bool("version", false, "Print version and exit")

@@ -36,12 +36,12 @@ Switch your personal repository to be public so images can be pulled.
 
 ### Cluster
 
-Deploy a Flatcar Linux Kubernetes cluster that satisfies the [requirements](README.md#requirements).
+Deploy a Flatcar Container Linux Kubernetes cluster that satisfies the [requirements](README.md#requirements).
 
 * [QEMU/KVM](https://github.com/coreos/matchbox/tree/master/examples/terraform/bootkube-install)
 * [Tectonic](https://github.com/coreos/tectonic-installer)
 
-In particular, be sure to mask `locksmithd.service` on every Flatcar Linux node.
+In particular, be sure to mask `locksmithd.service` on every Flatcar Container Linux node.
 
 ```
 sudo systemctl mask locksmithd.service --now
@@ -84,14 +84,14 @@ I0622 20:06:09.017977       1 agent.go:211] Beginning to watch update_engine sta
 I0622 20:06:09.023410       1 agent.go:68] Updating status
 ```
 
-Send a fake 'need reboot' signal, as though `update-engine.service` had requested a reboot or actually check for a Flatcar Linux update (if cluster was deployed with older version).
+Send a fake 'need reboot' signal, as though `update-engine.service` had requested a reboot or actually check for a Flatcar Container Linux update (if cluster was deployed with older version).
 
 ```sh
 $ ssh core@node.example.com
 $ locksmithctl send-need-reboot
 ```
 
-Alternately, check for a Flatcar Linux update if the cluster was deployed with an older version of Flatcar Linux.
+Alternately, check for a Flatcar Container Linux update if the cluster was deployed with an older version of Flatcar Container Linux.
 
 ```sh
 $ ssh core@node.example.com
