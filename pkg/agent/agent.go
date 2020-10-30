@@ -263,7 +263,7 @@ func (k *Klocksmith) updateStatusCallback(s updateengine.Status) {
 	}, wait.NeverStop)
 }
 
-// setInfoLabels labels our node with helpful info about Flatcar Linux.
+// setInfoLabels labels our node with helpful info about Flatcar Container Linux.
 func (k *Klocksmith) setInfoLabels() error {
 	vi, err := k8sutil.GetVersionInfo()
 	if err != nil {
