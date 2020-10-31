@@ -349,7 +349,8 @@ func (k *Kontroller) cleanupState() error {
 			// still wants to reboot
 			if _, exists := node.Labels[constants.LabelBeforeReboot]; exists {
 				if !wantsRebootSelector.Matches(fields.Set(node.Annotations)) {
-					klog.Warningf("Node %v no longer wanted to reboot while we were trying to label it so: %v", node.Name, node.Annotations)
+					klog.Warningf("Node %v no longer wanted to reboot while we were trying to label it so: %v",
+						node.Name, node.Annotations)
 					delete(node.Labels, constants.LabelBeforeReboot)
 					for _, annotation := range k.beforeRebootAnnotations {
 						delete(node.Annotations, annotation)
@@ -479,7 +480,9 @@ func (k *Kontroller) markBeforeReboot() error {
 		for _, n := range rebootingNodes {
 			klog.Infof("Found node %q still rebooting, waiting", n.Name)
 		}
+
 		klog.Infof("Found %d (of max %d) rebooting nodes; waiting for completion", len(rebootingNodes), maxRebootingNodes)
+
 		return nil
 	}
 

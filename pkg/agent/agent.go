@@ -108,7 +108,9 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 	labels := map[string]string{
 		constants.LabelRebootNeeded: constants.False,
 	}
+
 	klog.Infof("Setting annotations %#v", anno)
+
 	if err := k8sutil.SetNodeAnnotationsLabels(k.nc, k.node, anno, labels); err != nil {
 		return err
 	}
@@ -149,6 +151,7 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 			// time to reboot
 			break
 		}
+
 		klog.Warningf("error waiting for an ok-to-reboot: %v", err)
 	}
 

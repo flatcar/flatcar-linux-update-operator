@@ -5,7 +5,7 @@ import (
 
 	"github.com/blang/semver"
 	v1apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	v1meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
@@ -58,6 +58,7 @@ func (k *Kontroller) legacyLabeler() {
 	nodesMissingLabel := k8sutil.FilterNodesByRequirement(nodelist.Items, updateAgentLabelMissing)
 	// match nodes that identify as Flatcar Container Linux
 	nodesToLabel := k8sutil.FilterContainerLinuxNodes(nodesMissingLabel)
+
 	klog.V(6).Infof("Found Flatcar Container Linux nodes to label: %+v", nodelist.Items)
 
 	for _, node := range nodesToLabel {
