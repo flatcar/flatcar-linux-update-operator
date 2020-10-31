@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	"github.com/blang/semver"
-	"github.com/golang/glog"
+	"k8s.io/klog/v2"
 )
 
 var (
@@ -23,7 +23,7 @@ var Semver semver.Version
 func init() {
 	v, err := semver.Parse(Version)
 	if err != nil {
-		glog.Fatalf("invalid build of update operator; version.Version must be set at compile "+
+		klog.Fatalf("invalid build of update operator; version.Version must be set at compile "+
 			"time to a valid semver value. %v could not parse: %v", Version, err)
 	}
 	Semver = v

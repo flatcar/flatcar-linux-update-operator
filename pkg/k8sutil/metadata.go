@@ -7,13 +7,13 @@ import (
 	"os"
 	"strings"
 
-	"github.com/golang/glog"
 	v1api "k8s.io/api/core/v1"
 	v1meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/watch"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	watchtools "k8s.io/client-go/tools/watch"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -191,7 +191,7 @@ func getUpdateMap() (map[string]string, error) {
 	// if present and readable, this file has overrides
 	econf, err := os.Open(updateConfOverridePath)
 	if err != nil {
-		glog.Infof("Skipping missing update.conf: %v", err)
+		klog.Infof("Skipping missing update.conf: %v", err)
 	}
 
 	b, err = ioutil.ReadAll(econf)

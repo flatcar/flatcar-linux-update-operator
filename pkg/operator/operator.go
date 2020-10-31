@@ -6,7 +6,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/golang/glog"
 	v1api "k8s.io/api/core/v1"
 	v1meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -19,6 +18,7 @@ import (
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog/v2"
 
 	"github.com/coreos/locksmith/pkg/timeutil"
 	"github.com/kinvolk/flatcar-linux-update-operator/pkg/constants"
@@ -212,17 +212,17 @@ func (k *Kontroller) Run(stop <-chan struct{}) error {
 		// create or update the update-agent daemonset
 		err := k.runDaemonsetUpdate(k.agentImageRepo)
 		if err != nil {
-			glog.Errorf("unable to ensure managed agents are ready: %v", err)
+			klog.Errorf("unable to ensure managed agents are ready: %v", err)
 			return err
 		}
 	}
 
-	glog.V(5).Info("starting controller")
+	klog.V(5).Info("starting controller")
 
 	// call the process loop each period, until stop is closed
 	wait.Until(k.process, reconciliationPeriod, stop)
 
-	glog.V(5).Info("stopping controller")
+	klog.V(5).Info("stopping controller")
 	return nil
 }
 
@@ -264,11 +264,11 @@ func (k *Kontroller) withLeaderElection() error {
 			RetryPeriod:   leaderElectionLease / 3,
 			Callbacks: leaderelection.LeaderCallbacks{
 				OnStartedLeading: func(ctx context.Context) { // was: func(stop <-chan struct{
-					glog.V(5).Info("started leading")
+					klog.V(5).Info("started leading")
 					waitLeading <- struct{}{}
 				},
 				OnStoppedLeading: func() {
-					glog.Fatalf("leaderelection lost")
+					klog.Fatalf("leaderelection lost")
 				},
 			},
 		})
@@ -280,15 +280,15 @@ func (k *Kontroller) withLeaderElection() error {
 
 // process performs the reconcilitation to coordinate reboots.
 func (k *Kontroller) process() {
-	glog.V(4).Info("Going through a loop cycle")
+	klog.V(4).Info("Going through a loop cycle")
 
 	// first make sure that all of our nodes are in a well-defined state with
 	// respect to our annotations and labels, and if they are not, then try to
 	// fix them.
-	glog.V(4).Info("Cleaning up node state")
+	klog.V(4).Info("Cleaning up node state")
 	err := k.cleanupState()
 	if err != nil {
-		glog.Errorf("Failed to cleanup node state: %v", err)
+		klog.Errorf("Failed to cleanup node state: %v", err)
 		return
 	}
 
@@ -296,19 +296,19 @@ func (k *Kontroller) process() {
 	// annotations are set. if all annotations are set to true then remove the
 	// after-reboot=true label and set reboot-ok=false, telling the agent that
 	// the reboot has completed.
-	glog.V(4).Info("Checking if configured after-reboot annotations are set to true")
+	klog.V(4).Info("Checking if configured after-reboot annotations are set to true")
 	err = k.checkAfterReboot()
 	if err != nil {
-		glog.Errorf("Failed to check after reboot: %v", err)
+		klog.Errorf("Failed to check after reboot: %v", err)
 		return
 	}
 
 	// find nodes which just rebooted but haven't run after-reboot checks.
 	// remove after-reboot annotations and add the after-reboot=true label.
-	glog.V(4).Info("Labeling rebooted nodes with after-reboot label")
+	klog.V(4).Info("Labeling rebooted nodes with after-reboot label")
 	err = k.markAfterReboot()
 	if err != nil {
-		glog.Errorf("Failed to update recently rebooted nodes: %v", err)
+		klog.Errorf("Failed to update recently rebooted nodes: %v", err)
 		return
 	}
 
@@ -316,19 +316,19 @@ func (k *Kontroller) process() {
 	// annotations are set. if all annotations are set to true then remove the
 	// before-reboot=true label and set reboot=ok=true, telling the agent it's
 	// time to reboot.
-	glog.V(4).Info("Checking if configured before-reboot annotations are set to true")
+	klog.V(4).Info("Checking if configured before-reboot annotations are set to true")
 	err = k.checkBeforeReboot()
 	if err != nil {
-		glog.Errorf("Failed to check before reboot: %v", err)
+		klog.Errorf("Failed to check before reboot: %v", err)
 		return
 	}
 
 	// take some number of the rebootable nodes. remove before-reboot
 	// annotations and add the before-reboot=true label.
-	glog.V(4).Info("Labeling rebootable nodes with before-reboot label")
+	klog.V(4).Info("Labeling rebootable nodes with before-reboot label")
 	err = k.markBeforeReboot()
 	if err != nil {
-		glog.Errorf("Failed to update rebootable nodes: %v", err)
+		klog.Errorf("Failed to update rebootable nodes: %v", err)
 		return
 	}
 }
@@ -349,7 +349,7 @@ func (k *Kontroller) cleanupState() error {
 			// still wants to reboot
 			if _, exists := node.Labels[constants.LabelBeforeReboot]; exists {
 				if !wantsRebootSelector.Matches(fields.Set(node.Annotations)) {
-					glog.Warningf("Node %v no longer wanted to reboot while we were trying to label it so: %v", node.Name, node.Annotations)
+					klog.Warningf("Node %v no longer wanted to reboot while we were trying to label it so: %v", node.Name, node.Annotations)
 					delete(node.Labels, constants.LabelBeforeReboot)
 					for _, annotation := range k.beforeRebootAnnotations {
 						delete(node.Annotations, annotation)
@@ -383,13 +383,13 @@ func (k *Kontroller) checkBeforeReboot() error {
 
 	for _, n := range preRebootNodes {
 		if hasAllAnnotations(n, k.beforeRebootAnnotations) {
-			glog.V(4).Infof("Deleting label %q for %q", constants.LabelBeforeReboot, n.Name)
-			glog.V(4).Infof("Setting annotation %q to true for %q", constants.AnnotationOkToReboot, n.Name)
+			klog.V(4).Infof("Deleting label %q for %q", constants.LabelBeforeReboot, n.Name)
+			klog.V(4).Infof("Setting annotation %q to true for %q", constants.AnnotationOkToReboot, n.Name)
 			err = k8sutil.UpdateNodeRetry(k.nc, n.Name, func(node *v1api.Node) {
 				delete(node.Labels, constants.LabelBeforeReboot)
 				// cleanup the before-reboot annotations
 				for _, annotation := range k.beforeRebootAnnotations {
-					glog.V(4).Infof("Deleting annotation %q from node %q", annotation, node.Name)
+					klog.V(4).Infof("Deleting annotation %q from node %q", annotation, node.Name)
 					delete(node.Annotations, annotation)
 				}
 				node.Annotations[constants.AnnotationOkToReboot] = constants.True
@@ -419,13 +419,13 @@ func (k *Kontroller) checkAfterReboot() error {
 
 	for _, n := range postRebootNodes {
 		if hasAllAnnotations(n, k.afterRebootAnnotations) {
-			glog.V(4).Infof("Deleting label %q for %q", constants.LabelAfterReboot, n.Name)
-			glog.V(4).Infof("Setting annotation %q to false for %q", constants.AnnotationOkToReboot, n.Name)
+			klog.V(4).Infof("Deleting label %q for %q", constants.LabelAfterReboot, n.Name)
+			klog.V(4).Infof("Setting annotation %q to false for %q", constants.AnnotationOkToReboot, n.Name)
 			err = k8sutil.UpdateNodeRetry(k.nc, n.Name, func(node *v1api.Node) {
 				delete(node.Labels, constants.LabelAfterReboot)
 				// cleanup the after-reboot annotations
 				for _, annotation := range k.afterRebootAnnotations {
-					glog.V(4).Infof("Deleting annotation %q from node %q", annotation, node.Name)
+					klog.V(4).Infof("Deleting annotation %q from node %q", annotation, node.Name)
 					delete(node.Annotations, annotation)
 				}
 				node.Annotations[constants.AnnotationOkToReboot] = constants.False
@@ -461,7 +461,7 @@ func (k *Kontroller) markBeforeReboot() error {
 		period := k.rebootWindow.Previous(time.Now())
 		// check if we are inside the reboot window
 		if !(period.End.After(time.Now())) {
-			glog.V(4).Info("We are outside the reboot window; not labeling rebootable nodes for now")
+			klog.V(4).Info("We are outside the reboot window; not labeling rebootable nodes for now")
 			return nil
 		}
 	}
@@ -477,9 +477,9 @@ func (k *Kontroller) markBeforeReboot() error {
 	// Verify the number of currently rebooting nodes is less than the the maximum number
 	if len(rebootingNodes) >= maxRebootingNodes {
 		for _, n := range rebootingNodes {
-			glog.Infof("Found node %q still rebooting, waiting", n.Name)
+			klog.Infof("Found node %q still rebooting, waiting", n.Name)
 		}
-		glog.Infof("Found %d (of max %d) rebooting nodes; waiting for completion", len(rebootingNodes), maxRebootingNodes)
+		klog.Infof("Found %d (of max %d) rebooting nodes; waiting for completion", len(rebootingNodes), maxRebootingNodes)
 		return nil
 	}
 
@@ -502,14 +502,14 @@ func (k *Kontroller) markBeforeReboot() error {
 	}
 
 	// set before-reboot=true for the chosen nodes
-	glog.Infof("Found %d nodes that need a reboot", len(chosenNodes))
+	klog.Infof("Found %d nodes that need a reboot", len(chosenNodes))
 	for _, n := range chosenNodes {
 		err = k.mark(n.Name, constants.LabelBeforeReboot, k.beforeRebootAnnotations)
 		if err != nil {
 			return fmt.Errorf("Failed to label node for before reboot checks: %v", err)
 		}
 		if len(k.beforeRebootAnnotations) > 0 {
-			glog.Infof("Waiting for before-reboot annotations on node %q: %v", n.Name, k.beforeRebootAnnotations)
+			klog.Infof("Waiting for before-reboot annotations on node %q: %v", n.Name, k.beforeRebootAnnotations)
 		}
 	}
 
@@ -535,7 +535,7 @@ func (k *Kontroller) markAfterReboot() error {
 	// also filter out any nodes that are already labeled with after-reboot=true
 	justRebootedNodes = k8sutil.FilterNodesByRequirement(justRebootedNodes, notAfterRebootReq)
 
-	glog.Infof("Found %d rebooted nodes", len(justRebootedNodes))
+	klog.Infof("Found %d rebooted nodes", len(justRebootedNodes))
 
 	// for all the nodes which just rebooted, remove any old annotations and add the after-reboot=true label
 	for _, n := range justRebootedNodes {
@@ -544,7 +544,7 @@ func (k *Kontroller) markAfterReboot() error {
 			return fmt.Errorf("Failed to label node for after reboot checks: %v", err)
 		}
 		if len(k.afterRebootAnnotations) > 0 {
-			glog.Infof("Waiting for after-reboot annotations on node %q: %v", n.Name, k.afterRebootAnnotations)
+			klog.Infof("Waiting for after-reboot annotations on node %q: %v", n.Name, k.afterRebootAnnotations)
 		}
 	}
 
@@ -552,8 +552,8 @@ func (k *Kontroller) markAfterReboot() error {
 }
 
 func (k *Kontroller) mark(nodeName string, label string, annotations []string) error {
-	glog.V(4).Infof("Deleting annotations %v for %q", annotations, nodeName)
-	glog.V(4).Infof("Setting label %q to %q for node %q", label, constants.True, nodeName)
+	klog.V(4).Infof("Deleting annotations %v for %q", annotations, nodeName)
+	klog.V(4).Infof("Setting label %q to %q for node %q", label, constants.True, nodeName)
 	err := k8sutil.UpdateNodeRetry(k.nc, nodeName, func(node *v1api.Node) {
 		for _, annotation := range annotations {
 			delete(node.Annotations, annotation)

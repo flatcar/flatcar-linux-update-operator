@@ -7,7 +7,7 @@ import (
 	"strconv"
 
 	"github.com/coreos/pkg/flagutil"
-	"github.com/golang/glog"
+	"k8s.io/klog/v2"
 
 	"github.com/kinvolk/flatcar-linux-update-operator/pkg/k8sutil"
 	"github.com/kinvolk/flatcar-linux-update-operator/pkg/operator"
@@ -33,15 +33,16 @@ func main() {
 	flag.Var(&afterRebootAnnotations, "after-reboot-annotations", "List of comma-separated Kubernetes node annotations that must be set to 'true' before a node is marked schedulable and the operator lock is released")
 	flag.Var(&analyticsEnabled, "analytics", "Send analytics to Google Analytics")
 
+	klog.InitFlags(nil)
 	flag.Set("logtostderr", "true")
 	flag.Parse()
 
 	if err := flagutil.SetFlagsFromEnv(flag.CommandLine, "UPDATE_OPERATOR"); err != nil {
-		glog.Fatalf("Failed to parse environment variables: %v", err)
+		klog.Fatalf("Failed to parse environment variables: %v", err)
 	}
 
 	if analyticsEnabled.present {
-		glog.Warning("Use of -analytics is deprecated and will be removed. Google Analytics will not be enabled.")
+		klog.Warning("Use of -analytics is deprecated and will be removed. Google Analytics will not be enabled.")
 	}
 
 	// respect KUBECONFIG without the prefix as well
@@ -55,13 +56,13 @@ func main() {
 	}
 
 	if *manageAgent {
-		glog.Warning("Use of -manage-agent=true is deprecated and will be removed in the future")
+		klog.Warning("Use of -manage-agent=true is deprecated and will be removed in the future")
 	}
 
 	// create Kubernetes client (clientset)
 	client, err := k8sutil.GetClient(*kubeconfig)
 	if err != nil {
-		glog.Fatalf("Failed to create Kubernetes client: %v", err)
+		klog.Fatalf("Failed to create Kubernetes client: %v", err)
 	}
 
 	// update-operator
@@ -76,17 +77,17 @@ func main() {
 		RebootWindowLength:      *rebootWindowLength,
 	})
 	if err != nil {
-		glog.Fatalf("Failed to initialize %s: %v", os.Args[0], err)
+		klog.Fatalf("Failed to initialize %s: %v", os.Args[0], err)
 	}
 
-	glog.Infof("%s running", os.Args[0])
+	klog.Infof("%s running", os.Args[0])
 
 	// Run operator until the stop channel is closed
 	stop := make(chan struct{})
 	defer close(stop)
 
 	if err := o.Run(stop); err != nil {
-		glog.Fatalf("Error while running %s: %v", os.Args[0], err)
+		klog.Fatalf("Error while running %s: %v", os.Args[0], err)
 	}
 }
 
