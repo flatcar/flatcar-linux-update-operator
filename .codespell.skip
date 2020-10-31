@@ -1,0 +1,4 @@
+./.git
+./vendor
+./bin
+./go.sum
