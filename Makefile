@@ -1,4 +1,4 @@
-.PHONY:	all release-bin image clean test vendor
+.PHONY:	all release-bin image clean test vendor ci
 export CGO_ENABLED:=0
 
 VERSION=$(shell ./build/git-version.sh)
@@ -33,3 +33,5 @@ vendor:
 
 clean:
 	rm -rf bin
+
+ci: all test
