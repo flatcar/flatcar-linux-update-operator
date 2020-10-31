@@ -23,7 +23,7 @@ var Semver semver.Version
 func init() {
 	v, err := semver.Parse(Version)
 	if err != nil {
-		glog.Fatalf("invalid build of update operator; version.Version must be set at compiletime to a valid semver value. %v could not parse: %v", Version, err)
+		glog.Fatalf("invalid build of update operator; version.Version must be set at compile time to a valid semver value. %v could not parse: %v", Version, err)
 	}
 	Semver = v
 }

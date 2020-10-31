@@ -101,7 +101,7 @@ type Kontroller struct {
 	// It will be set to the namespace the operator is running in automatically.
 	namespace string
 
-	// auto-label Flatcar Container Linux nodes for migration compatability
+	// auto-label Flatcar Container Linux nodes for migration compatibility
 	autoLabelContainerLinux bool
 
 	// reboot window
@@ -116,7 +116,7 @@ type Kontroller struct {
 type Config struct {
 	// Kubernetesc client
 	Client kubernetes.Interface
-	// migration compatability
+	// migration compatibility
 	AutoLabelContainerLinux bool
 	// annotations to look for before and after reboots
 	BeforeRebootAnnotations []string
@@ -193,7 +193,7 @@ func New(config Config) (*Kontroller, error) {
 	}, nil
 }
 
-// Run starts the operator reconcilitation proces and runs until the stop
+// Run starts the operator reconcilitation process and runs until the stop
 // channel is closed.
 func (k *Kontroller) Run(stop <-chan struct{}) error {
 	err := k.withLeaderElection()
@@ -206,7 +206,7 @@ func (k *Kontroller) Run(stop <-chan struct{}) error {
 		go wait.Until(k.legacyLabeler, reconciliationPeriod, stop)
 	}
 
-	// Before doing anytihng else, make sure the associated agent daemonset is
+	// Before doing anything else, make sure the associated agent daemonset is
 	// ready if it's our responsibility.
 	if k.manageAgent && k.agentImageRepo != "" {
 		// create or update the update-agent daemonset
