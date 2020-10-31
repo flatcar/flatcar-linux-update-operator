@@ -29,8 +29,7 @@ image-push: image
 	@$(DOCKER_CMD) push $(IMAGE_REPO):$(VERSION)
 
 vendor:
-	glide update --strip-vendor
-	glide-vc --use-lock-file --no-tests --only-code
+	go mod vendor
 
 clean:
 	rm -rf bin
