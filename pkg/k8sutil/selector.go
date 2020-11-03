@@ -9,7 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 )
 
-// NewRequirementOrDie wraps a call to NewRequirement and panics if the Requirment
+// NewRequirementOrDie wraps a call to NewRequirement and panics if the Requirement
 // cannot be created. It is intended for use in variable initializations only.
 func NewRequirementOrDie(key string, op selection.Operator, vals []string) *labels.Requirement {
 	req, err := labels.NewRequirement(key, op, vals)
