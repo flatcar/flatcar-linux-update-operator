@@ -260,8 +260,12 @@ func (k *Kontroller) withLeaderElection() error {
 		leaderelection.RunOrDie(context.TODO(), leaderelection.LeaderElectionConfig{
 			Lock:          resLock,
 			LeaseDuration: leaderElectionLease,
+			//nolint:gomnd // Set renew deadline to 2/3rd of the lease duration to give
+			//             // controller enough time to renew the lease.
 			RenewDeadline: leaderElectionLease * 2 / 3,
-			RetryPeriod:   leaderElectionLease / 3,
+			//nolint:gomnd // Retry duration is usually around 1/10th of lease duration,
+			//             // but given low dynamics of FLUO, 1/3rd should also be fine.
+			RetryPeriod: leaderElectionLease / 3,
 			Callbacks: leaderelection.LeaderCallbacks{
 				OnStartedLeading: func(ctx context.Context) { // was: func(stop <-chan struct{
 					klog.V(5).Info("started leading")
