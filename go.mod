@@ -30,4 +30,5 @@ require (
 	k8s.io/utils v0.0.0-20200109141947-94aeca20bf09 // indirect
 )
 
+// Force using specific version of client-go matching other K8s packages.
 replace k8s.io/client-go => k8s.io/client-go v0.17.0
