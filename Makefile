@@ -20,7 +20,7 @@ release-bin:
 	./build/build-release.sh
 
 test:
-	go test -mod=vendor -v ./pkg/...
+	go test -mod=vendor -v ./...
 
 image:
 	@$(DOCKER_CMD) build --rm=true -t $(IMAGE_REPO):$(VERSION) .
