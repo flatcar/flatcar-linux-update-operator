@@ -1,4 +1,4 @@
-.PHONY:	all build build-test image clean test vendor ci lint-bin codespell
+.PHONY:	all build build-test generate image clean test vendor ci lint-bin codespell
 export CGO_ENABLED:=0
 
 VERSION=$(shell ./build/git-version.sh)
@@ -24,6 +24,9 @@ build-test:
 
 test:
 	go test -mod=vendor -v ./...
+
+generate:
+	go generate -mod=vendor -v -x ./...
 
 image:
 	@$(DOCKER_CMD) build --rm=true -t $(IMAGE_REPO):$(VERSION) .
