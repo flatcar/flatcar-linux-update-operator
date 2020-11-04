@@ -1,4 +1,5 @@
-FROM golang:1.13-alpine3.10 as builder
+FROM golang:1.13-alpine3.12 as builder
+
 MAINTAINER Kinvolk
 
 RUN apk add -U make git
@@ -9,7 +10,8 @@ COPY . .
 
 RUN make bin/update-agent bin/update-operator
 
-FROM alpine:3.10
+FROM alpine:3.12
+
 MAINTAINER Kinvolk
 
 RUN apk add -U ca-certificates
