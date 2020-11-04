@@ -14,13 +14,13 @@ IMAGE_REPO?=quay.io/kinvolk/flatcar-linux-update-operator
 all: bin/update-agent bin/update-operator
 
 bin/%:
-	go build -o $@ -ldflags $(LD_FLAGS) -mod=vendor $(REPO)/cmd/$*
+	go build -o $@ -ldflags $(LD_FLAGS) -mod=vendor ./cmd/$*
 
 release-bin:
 	./build/build-release.sh
 
 test:
-	go test -mod=vendor -v $(REPO)/pkg/...
+	go test -mod=vendor -v ./pkg/...
 
 image:
 	@$(DOCKER_CMD) build --rm=true -t $(IMAGE_REPO):$(VERSION) .
