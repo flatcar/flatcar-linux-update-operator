@@ -11,7 +11,7 @@ LD_FLAGS="-w -X $(REPO)/pkg/version.Version=$(RELEASE_VERSION) -X $(REPO)/pkg/ve
 DOCKER_CMD ?= docker
 IMAGE_REPO?=quay.io/kinvolk/flatcar-linux-update-operator
 
-all: bin/update-agent bin/update-operator
+all: build test lint-bin
 
 bin/%:
 	go build -o $@ -ldflags $(LD_FLAGS) -mod=vendor ./cmd/$*
@@ -37,7 +37,7 @@ vendor:
 clean:
 	rm -rf bin
 
-ci: all test
+ci: build test
 
 lint-bin: build build-test
 	@if [ "$$(git config --get diff.noprefix)" = "true" ]; then printf "\n\ngolangci-lint has a bug and can't run with the current git configuration: 'diff.noprefix' is set to 'true'. To override this setting for this repository, run the following command:\n\n'git config diff.noprefix false'\n\nFor more details, see https://github.com/golangci/golangci-lint/issues/948.\n\n\n"; exit 1; fi
