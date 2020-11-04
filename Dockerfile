@@ -4,7 +4,7 @@ MAINTAINER Kinvolk
 
 RUN apk add -U make git
 
-WORKDIR /go/src/github.com/kinvolk/flatcar-linux-update-operator
+WORKDIR /usr/src/github.com/kinvolk/flatcar-linux-update-operator
 
 COPY . .
 
