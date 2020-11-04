@@ -4,12 +4,12 @@ import (
 	"fmt"
 
 	"github.com/blang/semver"
-	"github.com/golang/glog"
-	"k8s.io/api/core/v1"
 	v1apps "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
 	v1meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/klog/v2"
 
 	"github.com/kinvolk/flatcar-linux-update-operator/pkg/constants"
 	"github.com/kinvolk/flatcar-linux-update-operator/pkg/k8sutil"
@@ -46,11 +46,11 @@ var (
 // the label. Retain this behavior to support upgrades of Tectonic clusters
 // created at 1.6.
 func (k *Kontroller) legacyLabeler() {
-	glog.V(6).Infof("Starting Flatcar Container Linux node auto-labeler")
+	klog.V(6).Infof("Starting Flatcar Container Linux node auto-labeler")
 
 	nodelist, err := k.nc.List(v1meta.ListOptions{})
 	if err != nil {
-		glog.Infof("Failed listing nodes %v", err)
+		klog.Infof("Failed listing nodes %v", err)
 		return
 	}
 
@@ -58,12 +58,13 @@ func (k *Kontroller) legacyLabeler() {
 	nodesMissingLabel := k8sutil.FilterNodesByRequirement(nodelist.Items, updateAgentLabelMissing)
 	// match nodes that identify as Flatcar Container Linux
 	nodesToLabel := k8sutil.FilterContainerLinuxNodes(nodesMissingLabel)
-	glog.V(6).Infof("Found Flatcar Container Linux nodes to label: %+v", nodelist.Items)
+
+	klog.V(6).Infof("Found Flatcar Container Linux nodes to label: %+v", nodelist.Items)
 
 	for _, node := range nodesToLabel {
-		glog.Infof("Setting label 'agent=true' on %q", node.Name)
+		klog.Infof("Setting label 'agent=true' on %q", node.Name)
 		if err := k8sutil.SetNodeLabels(k.nc, node.Name, enableUpdateAgentLabel); err != nil {
-			glog.Errorf("Failed setting label 'agent=true' on %q", node.Name)
+			klog.Errorf("Failed setting label 'agent=true' on %q", node.Name)
 		}
 	}
 }
@@ -96,7 +97,7 @@ func (k *Kontroller) runDaemonsetUpdate(agentImageRepo string) error {
 	// There should only be one daemonset since we use a well-known name and
 	// patch it each time rather than creating new ones.
 	if len(agentDaemonsets.Items) > 1 {
-		glog.Errorf("only expected one daemonset managed by operator; found %+v", agentDaemonsets.Items)
+		klog.Errorf("only expected one daemonset managed by operator; found %+v", agentDaemonsets.Items)
 		return fmt.Errorf("only expected one daemonset managed by operator; found %v", len(agentDaemonsets.Items))
 	}
 
@@ -110,7 +111,7 @@ func (k *Kontroller) runDaemonsetUpdate(agentImageRepo string) error {
 		}
 		dsSemver = ver
 	} else {
-		glog.Errorf("managed daemonset did not have a version annotation: %+v", agentDS)
+		klog.Errorf("managed daemonset did not have a version annotation: %+v", agentDS)
 		return fmt.Errorf("managed daemonset did not have a version annotation")
 	}
 
@@ -125,13 +126,13 @@ func (k *Kontroller) runDaemonsetUpdate(agentImageRepo string) error {
 			OrphanDependents: &falseVal, // Cascading delete
 		})
 		if err != nil {
-			glog.Errorf("could not delete old daemonset %+v: %v", agentDS, err)
+			klog.Errorf("could not delete old daemonset %+v: %v", agentDS, err)
 			return err
 		}
 
 		err = k.createAgentDamonset(agentImageRepo)
 		if err != nil {
-			glog.Errorf("could not create new daemonset: %v", err)
+			klog.Errorf("could not create new daemonset: %v", err)
 			return err
 		}
 	}

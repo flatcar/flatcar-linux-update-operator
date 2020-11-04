@@ -9,7 +9,6 @@ require (
 	github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f
 	github.com/godbus/dbus v4.1.0+incompatible
 	github.com/gogo/protobuf v1.3.1 // indirect
-	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 	github.com/golang/groupcache v0.0.0-20191227052852-215e87163ea7 // indirect
 	github.com/golang/mock v1.3.1
 	github.com/google/go-cmp v0.4.0 // indirect
@@ -28,6 +27,7 @@ require (
 	k8s.io/api v0.17.0
 	k8s.io/apimachinery v0.17.0
 	k8s.io/client-go v11.0.0+incompatible
+	k8s.io/klog/v2 v2.4.0
 	k8s.io/utils v0.0.0-20200109141947-94aeca20bf09 // indirect
 )
 

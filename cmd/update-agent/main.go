@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/coreos/pkg/flagutil"
-	"github.com/golang/glog"
+	"k8s.io/klog/v2"
 
 	"github.com/kinvolk/flatcar-linux-update-operator/pkg/agent"
 	"github.com/kinvolk/flatcar-linux-update-operator/pkg/version"
@@ -20,11 +20,12 @@ var (
 )
 
 func main() {
+	klog.InitFlags(nil)
 	flag.Set("logtostderr", "true")
 	flag.Parse()
 
 	if err := flagutil.SetFlagsFromEnv(flag.CommandLine, "UPDATE_AGENT"); err != nil {
-		glog.Fatalf("Failed to parse environment variables: %v", err)
+		klog.Fatalf("Failed to parse environment variables: %v", err)
 	}
 
 	if *printVersion {
@@ -33,16 +34,16 @@ func main() {
 	}
 
 	if *node == "" {
-		glog.Fatal("-node is required")
+		klog.Fatal("-node is required")
 	}
 
 	rt := time.Duration(*reapTimeout) * time.Second
 	a, err := agent.New(*node, rt)
 	if err != nil {
-		glog.Fatalf("Failed to initialize %s: %v", os.Args[0], err)
+		klog.Fatalf("Failed to initialize %s: %v", os.Args[0], err)
 	}
 
-	glog.Infof("%s running", os.Args[0])
+	klog.Infof("%s running", os.Args[0])
 
 	// Run agent until the stop channel is closed
 	stop := make(chan struct{})
