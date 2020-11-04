@@ -202,10 +202,11 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 	// TODO(mischief): explicitly don't terminate self? we'll probably just be a
 	// mirror pod or daemonset anyway..
 	klog.Infof("Deleting %d pods", len(pods))
-	deleteOptions := &v1meta.DeleteOptions{}
+
 	for _, pod := range pods {
 		klog.Infof("Terminating pod %q...", pod.Name)
-		if err := k.kc.CoreV1().Pods(pod.Namespace).Delete(pod.Name, deleteOptions); err != nil {
+
+		if err := k.kc.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, v1meta.DeleteOptions{}); err != nil {
 			klog.Errorf("failed terminating pod %q: %v", pod.Name, err)
 			// Continue anyways, the reboot should terminate it
 		}
@@ -304,7 +305,7 @@ func (k *Klocksmith) watchUpdateStatus(update func(s updateengine.Status), stop 
 
 // waitForOkToReboot waits for both 'ok-to-reboot' and 'needs-reboot' to be true.
 func (k *Klocksmith) waitForOkToReboot() error {
-	n, err := k.nc.Get(k.node, v1meta.GetOptions{})
+	n, err := k.nc.Get(context.TODO(), k.node, v1meta.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to get self node (%q): %v", k.node, err)
 	}
@@ -314,7 +315,7 @@ func (k *Klocksmith) waitForOkToReboot() error {
 	}
 
 	// XXX: set timeout > 0?
-	watcher, err := k.nc.Watch(v1meta.ListOptions{
+	watcher, err := k.nc.Watch(context.TODO(), v1meta.ListOptions{
 		FieldSelector:   fields.OneTermEqualSelector("metadata.name", n.Name).String(),
 		ResourceVersion: n.ResourceVersion,
 	})
@@ -344,7 +345,7 @@ func (k *Klocksmith) waitForOkToReboot() error {
 }
 
 func (k *Klocksmith) waitForNotOkToReboot() error {
-	n, err := k.nc.Get(k.node, v1meta.GetOptions{})
+	n, err := k.nc.Get(context.TODO(), k.node, v1meta.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to get self node (%q): %v", k.node, err)
 	}
@@ -354,7 +355,7 @@ func (k *Klocksmith) waitForNotOkToReboot() error {
 	}
 
 	// XXX: set timeout > 0?
-	watcher, err := k.nc.Watch(v1meta.ListOptions{
+	watcher, err := k.nc.Watch(context.TODO(), v1meta.ListOptions{
 		FieldSelector:   fields.OneTermEqualSelector("metadata.name", n.Name).String(),
 		ResourceVersion: n.ResourceVersion,
 	})
@@ -423,7 +424,7 @@ func (k *Klocksmith) getPodsForDeletion() ([]v1.Pod, error) {
 // waitForPodDeletion waits for a pod to be deleted
 func (k *Klocksmith) waitForPodDeletion(pod v1.Pod) error {
 	return wait.PollImmediate(defaultPollInterval, k.reapTimeout, func() (bool, error) {
-		p, err := k.kc.CoreV1().Pods(pod.Namespace).Get(pod.Name, v1meta.GetOptions{})
+		p, err := k.kc.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, v1meta.GetOptions{})
 		if errors.IsNotFound(err) || (p != nil && p.ObjectMeta.UID != pod.ObjectMeta.UID) {
 			klog.Infof("Deleted pod %q", pod.Name)
 			return true, nil

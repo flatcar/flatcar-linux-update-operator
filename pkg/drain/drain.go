@@ -1,6 +1,7 @@
 package drain
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/api/core/v1"
@@ -16,7 +17,7 @@ import (
 // https://github.com/kubernetes/kubernetes/blob/v1.5.4/pkg/kubectl/cmd/drain.go#L234-L245
 // See DrainOptions.getPodsForDeletion and callees.
 func GetPodsForDeletion(kc kubernetes.Interface, node string) (pods []v1.Pod, err error) {
-	podList, err := kc.CoreV1().Pods(v1.NamespaceAll).List(v1meta.ListOptions{
+	podList, err := kc.CoreV1().Pods(v1.NamespaceAll).List(context.TODO(), v1meta.ListOptions{
 		FieldSelector: fields.SelectorFromSet(fields.Set{"spec.nodeName": node}).String(),
 	})
 	if err != nil {
@@ -70,7 +71,7 @@ func getOwnerDaemonset(kc kubernetes.Interface, pod v1.Pod) (interface{}, error)
 func getDaemonsetController(kc kubernetes.Interface, namespace string, controllerRef *v1meta.OwnerReference) (interface{}, error) {
 	switch controllerRef.Kind {
 	case "DaemonSet":
-		return kc.AppsV1().DaemonSets(namespace).Get(controllerRef.Name, v1meta.GetOptions{})
+		return kc.AppsV1().DaemonSets(namespace).Get(context.TODO(), controllerRef.Name, v1meta.GetOptions{})
 	}
 	return nil, fmt.Errorf("Unknown controller kind %q", controllerRef.Kind)
 }

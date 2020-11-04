@@ -342,7 +342,7 @@ func (k *Kontroller) process() {
 // If there is an error getting the list of nodes or updating any of them, an
 // error is immediately returned.
 func (k *Kontroller) cleanupState() error {
-	nodelist, err := k.nc.List(v1meta.ListOptions{})
+	nodelist, err := k.nc.List(context.TODO(), v1meta.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("Failed listing nodes: %v", err)
 	}
@@ -379,7 +379,7 @@ func (k *Kontroller) cleanupState() error {
 // If there is an error getting the list of nodes or updating any of them, an
 // error is immediately returned.
 func (k *Kontroller) checkBeforeReboot() error {
-	nodelist, err := k.nc.List(v1meta.ListOptions{})
+	nodelist, err := k.nc.List(context.TODO(), v1meta.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("Failed listing nodes: %v", err)
 	}
@@ -415,7 +415,7 @@ func (k *Kontroller) checkBeforeReboot() error {
 // If there is an error getting the list of nodes or updating any of them, an
 // error is immediately returned.
 func (k *Kontroller) checkAfterReboot() error {
-	nodelist, err := k.nc.List(v1meta.ListOptions{})
+	nodelist, err := k.nc.List(context.TODO(), v1meta.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("Failed listing nodes: %v", err)
 	}
@@ -455,7 +455,7 @@ func (k *Kontroller) checkAfterReboot() error {
 // If there is an error getting the list of nodes or updating any of them, an
 // error is immediately returned.
 func (k *Kontroller) markBeforeReboot() error {
-	nodelist, err := k.nc.List(v1meta.ListOptions{})
+	nodelist, err := k.nc.List(context.TODO(), v1meta.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("Failed listing nodes: %v", err)
 	}
@@ -532,7 +532,7 @@ func (k *Kontroller) markBeforeReboot() error {
 // If there is an error getting the list of nodes or updating any of them, an
 // error is immediately returned.
 func (k *Kontroller) markAfterReboot() error {
-	nodelist, err := k.nc.List(v1meta.ListOptions{})
+	nodelist, err := k.nc.List(context.TODO(), v1meta.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("Failed listing nodes: %v", err)
 	}
