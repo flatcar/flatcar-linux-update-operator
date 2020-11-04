@@ -1,4 +1,4 @@
-.PHONY:	all image clean test vendor ci lint-bin codespell
+.PHONY:	all build build-test image clean test vendor ci lint-bin codespell
 export CGO_ENABLED:=0
 
 VERSION=$(shell ./build/git-version.sh)
@@ -15,6 +15,12 @@ all: bin/update-agent bin/update-operator
 
 bin/%:
 	go build -o $@ -ldflags $(LD_FLAGS) -mod=vendor ./cmd/$*
+
+build:
+	go build -ldflags $(LD_FLAGS) -mod=vendor ./cmd/...
+
+build-test:
+	go test -run=nonexistent -mod=vendor ./...
 
 test:
 	go test -mod=vendor -v ./...
