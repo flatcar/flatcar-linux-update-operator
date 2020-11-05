@@ -63,7 +63,7 @@ func New() (*Client, error) {
 
 	c.object = c.conn.Object("com.coreos.update1", dbus.ObjectPath(dbusPath))
 
-	// Setup the filter for the StatusUpdate signals
+	// Setup the filter for the StatusUpdate signals.
 	match := fmt.Sprintf("type='signal',interface='%s',member='%s'", dbusInterface, dbusMember)
 
 	call := c.conn.BusObject().Call("org.freedesktop.DBus.AddMatch", 0, match)
@@ -90,7 +90,7 @@ func (c *Client) Close() error {
 // get the initial status and send it on the rcvr channel before receiving
 // starts.
 func (c *Client) ReceiveStatuses(rcvr chan Status, stop <-chan struct{}) {
-	// if there is an error getting the current status, ignore it and just
+	// If there is an error getting the current status, ignore it and just
 	// move onto the main loop.
 	st, _ := c.getStatus()
 	rcvr <- st
@@ -119,7 +119,7 @@ func (c *Client) RebootNeededSignal(rcvr chan Status, stop <-chan struct{}) {
 	}
 }
 
-// getStatus gets the current status from update_engine
+// getStatus gets the current status from update_engine.
 func (c *Client) getStatus() (Status, error) {
 	call := c.object.Call(dbusInterface+".GetStatus", 0)
 	if call.Err != nil {
