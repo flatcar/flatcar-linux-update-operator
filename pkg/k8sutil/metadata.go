@@ -30,6 +30,7 @@ func NodeAnnotationCondition(selector fields.Selector) watchtools.ConditionFunc 
 		switch event.Type {
 		case watch.Modified:
 			node := event.Object.(*v1api.Node)
+
 			return selector.Matches(fields.Set(node.Annotations)), nil
 		}
 
@@ -40,6 +41,7 @@ func NodeAnnotationCondition(selector fields.Selector) watchtools.ConditionFunc 
 // GetNodeRetry gets a node object, retrying up to DefaultBackoff number of times if it fails
 func GetNodeRetry(nc v1core.NodeInterface, node string) (*v1api.Node, error) {
 	var apiNode *v1api.Node
+
 	err := RetryOnError(DefaultBackoff, func() error {
 		n, getErr := nc.Get(context.TODO(), node, v1meta.GetOptions{})
 		if getErr != nil {
@@ -47,6 +49,7 @@ func GetNodeRetry(nc v1core.NodeInterface, node string) (*v1api.Node, error) {
 		}
 
 		apiNode = n
+
 		return nil
 	})
 
@@ -68,6 +71,7 @@ func UpdateNodeRetry(nc v1core.NodeInterface, node string, f func(*v1api.Node)) 
 		f(n)
 
 		_, err := nc.Update(context.TODO(), n, v1meta.UpdateOptions{})
+
 		return err
 	})
 	if err != nil {
@@ -141,6 +145,7 @@ func Unschedulable(nc v1core.NodeInterface, node string, sched bool) error {
 
 	if err := RetryOnConflict(DefaultBackoff, func() (err error) {
 		n, err = nc.Update(context.TODO(), n, v1meta.UpdateOptions{})
+
 		return
 	}); err != nil {
 		return fmt.Errorf("unable to set 'Unschedulable' property of node %q to %t: %v", node, sched, err)
@@ -182,7 +187,9 @@ func getUpdateMap() (map[string]string, error) {
 	}
 
 	b, err := ioutil.ReadAll(uconf)
+
 	uconf.Close()
+
 	if err != nil {
 		return nil, err
 	}
@@ -196,7 +203,9 @@ func getUpdateMap() (map[string]string, error) {
 	}
 
 	b, err = ioutil.ReadAll(econf)
+
 	econf.Close()
+
 	if err == nil {
 		splitNewlineEnv(infomap, string(b))
 	}
@@ -214,8 +223,11 @@ func getReleaseMap() (map[string]string, error) {
 	}
 
 	defer osrelease.Close()
+
 	b, err := ioutil.ReadAll(osrelease)
+
 	osrelease.Close()
+
 	if err != nil {
 		return nil, err
 	}

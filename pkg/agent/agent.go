@@ -35,12 +35,10 @@ type Klocksmith struct {
 
 const defaultPollInterval = 10 * time.Second
 
-var (
-	shouldRebootSelector = fields.Set(map[string]string{
-		constants.AnnotationOkToReboot:   constants.True,
-		constants.AnnotationRebootNeeded: constants.True,
-	}).AsSelector()
-)
+var shouldRebootSelector = fields.Set(map[string]string{
+	constants.AnnotationOkToReboot:   constants.True,
+	constants.AnnotationRebootNeeded: constants.True,
+}).AsSelector()
 
 func New(node string, reapTimeout time.Duration) (*Klocksmith, error) {
 	// set up kubernetes in-cluster client
@@ -84,11 +82,13 @@ func (k *Klocksmith) Run(stop <-chan struct{}) {
 // the stop channel is closed.
 func (k *Klocksmith) process(stop <-chan struct{}) error {
 	klog.Info("Setting info labels")
+
 	if err := k.setInfoLabels(); err != nil {
 		return fmt.Errorf("failed to set node info: %v", err)
 	}
 
 	klog.Info("Checking annotations")
+
 	node, err := k8sutil.GetNodeRetry(k.nc, k.node)
 	if err != nil {
 		return err
@@ -124,6 +124,7 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 	if makeSchedulable {
 		// we are schedulable now.
 		klog.Info("Marking node as schedulable")
+
 		if err := k8sutil.Unschedulable(k.nc, k.node, false); err != nil {
 			return err
 		}
@@ -133,6 +134,7 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 		}
 
 		klog.Infof("Setting annotations %#v", anno)
+
 		if err := k8sutil.SetNodeAnnotations(k.nc, k.node, anno); err != nil {
 			return err
 		}
@@ -146,6 +148,7 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 	// block until constants.AnnotationOkToReboot is set
 	for {
 		klog.Infof("Waiting for ok-to-reboot from controller...")
+
 		err := k.waitForOkToReboot()
 		if err == nil {
 			// time to reboot
@@ -156,10 +159,12 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 	}
 
 	klog.Info("Checking if node is already unschedulable")
+
 	node, err = k8sutil.GetNodeRetry(k.nc, k.node)
 	if err != nil {
 		return err
 	}
+
 	alreadyUnschedulable := node.Spec.Unschedulable
 
 	// set constants.AnnotationRebootInProgress and drain self
@@ -172,6 +177,7 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 	}
 
 	klog.Infof("Setting annotations %#v", anno)
+
 	if err := k8sutil.SetNodeAnnotations(k.nc, k.node, anno); err != nil {
 		return err
 	}
@@ -185,6 +191,7 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 
 	if !alreadyUnschedulable {
 		klog.Info("Marking node as unschedulable")
+
 		if err := k8sutil.Unschedulable(k.nc, k.node, true); err != nil {
 			return err
 		}
@@ -193,6 +200,7 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 	}
 
 	klog.Info("Getting pod list for deletion")
+
 	pods, err := k.getPodsForDeletion()
 	if err != nil {
 		return err
@@ -207,23 +215,28 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 		klog.Infof("Terminating pod %q...", pod.Name)
 
 		if err := k.kc.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{}); err != nil {
-			klog.Errorf("failed terminating pod %q: %v", pod.Name, err)
 			// Continue anyways, the reboot should terminate it
+			klog.Errorf("failed terminating pod %q: %v", pod.Name, err)
 		}
 	}
 
 	// wait for the pods to delete completely.
 	wg := sync.WaitGroup{}
+
 	for _, pod := range pods {
 		wg.Add(1)
+
 		go func(pod corev1.Pod) {
 			klog.Infof("Waiting for pod %q to terminate", pod.Name)
+
 			if err := k.waitForPodDeletion(pod); err != nil {
 				klog.Errorf("Skipping wait on pod %q: %v", pod.Name, err)
 			}
+
 			wg.Done()
 		}(pod)
 	}
+
 	wg.Wait()
 
 	klog.Info("Node drained, rebooting")
@@ -233,6 +246,7 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 
 	// cross fingers
 	sleepOrDone(24*7*time.Hour, stop)
+
 	return nil
 }
 
@@ -253,6 +267,7 @@ func (k *Klocksmith) updateStatusCallback(s updateengine.Status) {
 	// indicate we need a reboot
 	if s.CurrentOperation == updateengine.UpdateStatusUpdatedNeedReboot {
 		klog.Info("Indicating a reboot is needed")
+
 		anno[constants.AnnotationRebootNeeded] = constants.True
 		labels[constants.LabelRebootNeeded] = constants.True
 	}
@@ -260,6 +275,7 @@ func (k *Klocksmith) updateStatusCallback(s updateengine.Status) {
 	wait.PollUntil(defaultPollInterval, func() (bool, error) {
 		if err := k8sutil.SetNodeAnnotationsLabels(k.nc, k.node, anno, labels); err != nil {
 			klog.Errorf("Failed to set annotation %q: %v", constants.AnnotationStatus, err)
+
 			return false, nil
 		}
 
@@ -326,6 +342,7 @@ func (k *Klocksmith) waitForOkToReboot() error {
 	// hopefully 24 hours is enough time between indicating we need a
 	// reboot and the controller telling us to do it
 	ctx, _ := watchtools.ContextWithOptionalTimeout(context.Background(), time.Hour*24)
+
 	ev, err := watchtools.UntilWithoutRetry(ctx, watcher, k8sutil.NodeAnnotationCondition(shouldRebootSelector))
 	if err != nil {
 		return fmt.Errorf("waiting for annotation %q failed: %v", constants.AnnotationOkToReboot, err)
@@ -384,6 +401,7 @@ func (k *Klocksmith) waitForNotOkToReboot() error {
 		if no.Annotations[constants.AnnotationOkToReboot] != constants.True {
 			return true, nil
 		}
+
 		return false, nil
 	}))
 	if err != nil {
@@ -423,6 +441,7 @@ func (k *Klocksmith) waitForPodDeletion(pod corev1.Pod) error {
 		p, err := k.kc.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		if errors.IsNotFound(err) || (p != nil && p.ObjectMeta.UID != pod.ObjectMeta.UID) {
 			klog.Infof("Deleted pod %q", pod.Name)
+
 			return true, nil
 		}
 

@@ -16,6 +16,7 @@ func NewRequirementOrDie(key string, op selection.Operator, vals []string) *labe
 	if err != nil {
 		panic(err)
 	}
+
 	return req
 }
 
@@ -43,6 +44,7 @@ func FilterNodesByRequirement(nodes []corev1.Node, req *labels.Requirement) []co
 			matches = append(matches, node)
 		}
 	}
+
 	return matches
 }
 

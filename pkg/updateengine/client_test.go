@@ -50,9 +50,12 @@ func TestRebootNeededSignal(t *testing.T) {
 	}
 	r := make(chan Status)
 	s := make(chan struct{})
+
 	var done bool
+
 	go func() {
 		c.RebootNeededSignal(r, s)
+
 		done = true
 	}()
 
@@ -60,6 +63,7 @@ func TestRebootNeededSignal(t *testing.T) {
 		t.Fatal("RebootNeededSignal stopped prematurely")
 	}
 	c.ch <- makeSig(UpdateStatusUpdatedNeedReboot)
+
 	if done {
 		t.Fatal("RebootNeededSignal stopped prematurely")
 	}

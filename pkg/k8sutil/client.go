@@ -15,6 +15,7 @@ func GetClient(path string) (*kubernetes.Clientset, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get Kubernetes client config: %v", err)
 	}
+
 	return kubernetes.NewForConfig(conf)
 }
 

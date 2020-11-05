@@ -101,6 +101,7 @@ func (o *optValue) Set(s string) error {
 	v, err := strconv.ParseBool(s)
 	o.value = v
 	o.present = true
+
 	return err
 }
 

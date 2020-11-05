@@ -52,6 +52,7 @@ func (k *Kontroller) legacyLabeler() {
 	nodelist, err := k.nc.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		klog.Infof("Failed listing nodes %v", err)
+
 		return
 	}
 
@@ -64,6 +65,7 @@ func (k *Kontroller) legacyLabeler() {
 
 	for _, node := range nodesToLabel {
 		klog.Infof("Setting label 'agent=true' on %q", node.Name)
+
 		if err := k8sutil.SetNodeLabels(k.nc, node.Name, enableUpdateAgentLabel); err != nil {
 			klog.Errorf("Failed setting label 'agent=true' on %q", node.Name)
 		}
@@ -99,20 +101,24 @@ func (k *Kontroller) runDaemonsetUpdate(agentImageRepo string) error {
 	// patch it each time rather than creating new ones.
 	if len(agentDaemonsets.Items) > 1 {
 		klog.Errorf("only expected one daemonset managed by operator; found %+v", agentDaemonsets.Items)
+
 		return fmt.Errorf("only expected one daemonset managed by operator; found %v", len(agentDaemonsets.Items))
 	}
 
 	agentDS := agentDaemonsets.Items[0]
 
 	var dsSemver semver.Version
+
 	if dsVersion, ok := agentDS.Annotations[constants.AgentVersion]; ok {
 		ver, err := semver.Parse(dsVersion)
 		if err != nil {
 			return fmt.Errorf("agent daemonset had version annotation, but it was not valid semver: %v[%v] = %v", agentDS.Name, constants.AgentVersion, dsVersion)
 		}
+
 		dsSemver = ver
 	} else {
 		klog.Errorf("managed daemonset did not have a version annotation: %+v", agentDS)
+
 		return fmt.Errorf("managed daemonset did not have a version annotation")
 	}
 
@@ -123,17 +129,20 @@ func (k *Kontroller) runDaemonsetUpdate(agentImageRepo string) error {
 		// painful to do correctly. In addition, doing it correctly doesn't add too
 		// much value unless we have corresponding detection/rollback logic.
 		falseVal := false
+
 		err := k.kc.AppsV1().DaemonSets(k.namespace).Delete(context.TODO(), agentDS.Name, metav1.DeleteOptions{
 			OrphanDependents: &falseVal, // Cascading delete
 		})
 		if err != nil {
 			klog.Errorf("could not delete old daemonset %+v: %v", agentDS, err)
+
 			return err
 		}
 
 		err = k.createAgentDamonset(agentImageRepo)
 		if err != nil {
 			klog.Errorf("could not create new daemonset: %v", err)
+
 			return err
 		}
 	}
@@ -158,6 +167,7 @@ func agentDaemonsetSpec(repo string) *appsv1.DaemonSet {
 	for k, v := range managedByOperatorLabels {
 		versionedSelector[k] = v
 	}
+
 	versionedSelector[constants.AgentVersion] = version.Version
 
 	return &appsv1.DaemonSet{

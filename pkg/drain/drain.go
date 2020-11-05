@@ -28,7 +28,6 @@ func GetPodsForDeletion(kc kubernetes.Interface, node string) (pods []corev1.Pod
 	// exception, skip mirror pods and daemonset pods with an existing
 	// daemonset (since the daemonset owner would recreate them anyway).
 	for _, pod := range podList.Items {
-
 		// skip mirror pods
 		if _, ok := pod.Annotations[corev1.MirrorPodAnnotationKey]; ok {
 			continue
@@ -50,6 +49,7 @@ func getOwnerDaemonset(kc kubernetes.Interface, pod corev1.Pod) (interface{}, er
 	if len(pod.OwnerReferences) == 0 {
 		return nil, fmt.Errorf("pod %q has no owner objects", pod.Name)
 	}
+
 	for _, ownerRef := range pod.OwnerReferences {
 		// skip pod if it is owned by an existing daemonset
 		if ownerRef.Kind == "DaemonSet" {
@@ -58,6 +58,7 @@ func getOwnerDaemonset(kc kubernetes.Interface, pod corev1.Pod) (interface{}, er
 				// daemonset owner exists
 				return ds, nil
 			}
+
 			if !errors.IsNotFound(err) {
 				return nil, fmt.Errorf("failed to get controller of pod %q: %v", pod.Name, err)
 			}
@@ -75,5 +76,6 @@ func getDaemonsetController(kc kubernetes.Interface, namespace string, controlle
 	case "DaemonSet":
 		return kc.AppsV1().DaemonSets(namespace).Get(context.TODO(), controllerRef.Name, metav1.GetOptions{})
 	}
+
 	return nil, fmt.Errorf("Unknown controller kind %q", controllerRef.Kind)
 }

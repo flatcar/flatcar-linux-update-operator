@@ -38,6 +38,7 @@ type Client struct {
 
 func New() (*Client, error) {
 	c := new(Client)
+
 	var err error
 
 	c.conn, err = dbus.SystemBusPrivate()
@@ -46,15 +47,18 @@ func New() (*Client, error) {
 	}
 
 	methods := []dbus.Auth{dbus.AuthExternal(strconv.Itoa(os.Getuid()))}
+
 	err = c.conn.Auth(methods)
 	if err != nil {
 		c.conn.Close()
+
 		return nil, err
 	}
 
 	err = c.conn.Hello()
 	if err != nil {
 		c.conn.Close()
+
 		return nil, err
 	}
 
@@ -78,6 +82,7 @@ func (c *Client) Close() error {
 	if c.conn != nil {
 		return c.conn.Close()
 	}
+
 	return nil
 }
 
@@ -121,6 +126,7 @@ func (c *Client) GetStatus() (Status, error) {
 	if call.Err != nil {
 		return Status{}, call.Err
 	}
+
 	return NewStatus(call.Body), nil
 }
 
@@ -128,5 +134,6 @@ func (c *Client) GetStatus() (Status, error) {
 // call - it returns immediately.
 func (c *Client) AttemptUpdate() error {
 	call := c.object.Call(dbusInterface+".AttemptUpdate", 0)
+
 	return call.Err
 }
