@@ -19,7 +19,6 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/kinvolk/flatcar-linux-update-operator/pkg/constants"
-	"github.com/kinvolk/flatcar-linux-update-operator/pkg/drain"
 	"github.com/kinvolk/flatcar-linux-update-operator/pkg/k8sutil"
 	"github.com/kinvolk/flatcar-linux-update-operator/pkg/updateengine"
 )
@@ -419,7 +418,7 @@ func (k *Klocksmith) waitForNotOkToReboot() error {
 }
 
 func (k *Klocksmith) getPodsForDeletion() ([]corev1.Pod, error) {
-	pods, err := drain.GetPodsForDeletion(k.kc, k.node)
+	pods, err := k8sutil.GetPodsForDeletion(k.kc, k.node)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get list of pods for deletion: %v", err)
 	}

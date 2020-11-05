@@ -1,4 +1,4 @@
-package drain
+package k8sutil
 
 import (
 	"context"
@@ -78,5 +78,5 @@ func getDaemonsetController(kc kubernetes.Interface, namespace string, controlle
 		return kc.AppsV1().DaemonSets(namespace).Get(context.TODO(), controllerRef.Name, metav1.GetOptions{})
 	}
 
-	return nil, fmt.Errorf("Unknown controller kind %q", controllerRef.Kind)
+	return nil, fmt.Errorf("unknown controller kind %q", controllerRef.Kind)
 }
