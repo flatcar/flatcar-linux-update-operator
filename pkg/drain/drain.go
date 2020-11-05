@@ -51,9 +51,11 @@ func getOwnerDaemonset(kc kubernetes.Interface, pod corev1.Pod) (interface{}, er
 	}
 
 	for _, ownerRef := range pod.OwnerReferences {
+		ownerRef := ownerRef
+
 		// skip pod if it is owned by an existing daemonset
 		if ownerRef.Kind == "DaemonSet" {
-			ds, err := getDaemonsetController(kc, pod.Namespace, &ownerRef)
+			ds, err := getDaemonsetController(kc, pod.Namespace, ownerRef)
 			if err == nil {
 				// daemonset owner exists
 				return ds, nil
@@ -71,7 +73,7 @@ func getOwnerDaemonset(kc kubernetes.Interface, pod corev1.Pod) (interface{}, er
 // Stripped down version of https://github.com/kubernetes/kubernetes/blob/1bc56825a2dff06f29663a024ee339c25e6e6280/pkg/kubectl/cmd/drain.go#L272
 //
 //nolint:lll
-func getDaemonsetController(kc kubernetes.Interface, namespace string, controllerRef *metav1.OwnerReference) (interface{}, error) {
+func getDaemonsetController(kc kubernetes.Interface, namespace string, controllerRef metav1.OwnerReference) (interface{}, error) {
 	if controllerRef.Kind == "DaemonSet" {
 		return kc.AppsV1().DaemonSets(namespace).Get(context.TODO(), controllerRef.Name, metav1.GetOptions{})
 	}
