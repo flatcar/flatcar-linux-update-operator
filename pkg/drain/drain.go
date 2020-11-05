@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	v1meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/kubernetes"
 )
@@ -16,8 +16,8 @@ import (
 // This code mimics pod filtering behavior in
 // https://github.com/kubernetes/kubernetes/blob/v1.5.4/pkg/kubectl/cmd/drain.go#L234-L245
 // See DrainOptions.getPodsForDeletion and callees.
-func GetPodsForDeletion(kc kubernetes.Interface, node string) (pods []v1.Pod, err error) {
-	podList, err := kc.CoreV1().Pods(v1.NamespaceAll).List(context.TODO(), v1meta.ListOptions{
+func GetPodsForDeletion(kc kubernetes.Interface, node string) (pods []corev1.Pod, err error) {
+	podList, err := kc.CoreV1().Pods(corev1.NamespaceAll).List(context.TODO(), metav1.ListOptions{
 		FieldSelector: fields.SelectorFromSet(fields.Set{"spec.nodeName": node}).String(),
 	})
 	if err != nil {
@@ -30,7 +30,7 @@ func GetPodsForDeletion(kc kubernetes.Interface, node string) (pods []v1.Pod, er
 	for _, pod := range podList.Items {
 
 		// skip mirror pods
-		if _, ok := pod.Annotations[v1.MirrorPodAnnotationKey]; ok {
+		if _, ok := pod.Annotations[corev1.MirrorPodAnnotationKey]; ok {
 			continue
 		}
 
@@ -46,7 +46,7 @@ func GetPodsForDeletion(kc kubernetes.Interface, node string) (pods []v1.Pod, er
 }
 
 // getOwnerDaemonset returns an existing DaemonSet owner if it exists.
-func getOwnerDaemonset(kc kubernetes.Interface, pod v1.Pod) (interface{}, error) {
+func getOwnerDaemonset(kc kubernetes.Interface, pod corev1.Pod) (interface{}, error) {
 	if len(pod.OwnerReferences) == 0 {
 		return nil, fmt.Errorf("pod %q has no owner objects", pod.Name)
 	}
@@ -68,10 +68,12 @@ func getOwnerDaemonset(kc kubernetes.Interface, pod v1.Pod) (interface{}, error)
 }
 
 // Stripped down version of https://github.com/kubernetes/kubernetes/blob/1bc56825a2dff06f29663a024ee339c25e6e6280/pkg/kubectl/cmd/drain.go#L272
-func getDaemonsetController(kc kubernetes.Interface, namespace string, controllerRef *v1meta.OwnerReference) (interface{}, error) {
+//
+//nolint:lll
+func getDaemonsetController(kc kubernetes.Interface, namespace string, controllerRef *metav1.OwnerReference) (interface{}, error) {
 	switch controllerRef.Kind {
 	case "DaemonSet":
-		return kc.AppsV1().DaemonSets(namespace).Get(context.TODO(), controllerRef.Name, v1meta.GetOptions{})
+		return kc.AppsV1().DaemonSets(namespace).Get(context.TODO(), controllerRef.Name, metav1.GetOptions{})
 	}
 	return nil, fmt.Errorf("Unknown controller kind %q", controllerRef.Kind)
 }

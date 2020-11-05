@@ -6,14 +6,14 @@ import (
 	"os"
 	"time"
 
-	v1api "k8s.io/api/core/v1"
-	v1meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
@@ -87,7 +87,7 @@ var (
 
 type Kontroller struct {
 	kc kubernetes.Interface
-	nc v1core.NodeInterface
+	nc corev1client.NodeInterface
 	er record.EventRecorder
 
 	// annotations to look for before and after reboots
@@ -142,8 +142,8 @@ func New(config Config) (*Kontroller, error) {
 
 	// create event emitter
 	broadcaster := record.NewBroadcaster()
-	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kc.CoreV1().Events("")})
-	er := broadcaster.NewRecorder(scheme.Scheme, v1api.EventSource{Component: eventSourceComponent})
+	broadcaster.StartRecordingToSink(&corev1client.EventSinkImpl{Interface: kc.CoreV1().Events("")})
+	er := broadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: eventSourceComponent})
 
 	leaderElectionClientConfig, err := rest.InClusterConfig()
 	if err != nil {
@@ -155,10 +155,11 @@ func New(config Config) (*Kontroller, error) {
 	}
 
 	leaderElectionBroadcaster := record.NewBroadcaster()
-	leaderElectionBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{
-		Interface: v1core.New(leaderElectionClient.CoreV1().RESTClient()).Events(""),
+	leaderElectionBroadcaster.StartRecordingToSink(&corev1client.EventSinkImpl{
+		Interface: corev1client.New(leaderElectionClient.CoreV1().RESTClient()).Events(""),
 	})
-	leaderElectionEventRecorder := leaderElectionBroadcaster.NewRecorder(scheme.Scheme, v1api.EventSource{
+
+	leaderElectionEventRecorder := leaderElectionBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{
 		Component: leaderElectionEventSourceComponent,
 	})
 
@@ -239,7 +240,7 @@ func (k *Kontroller) withLeaderElection() error {
 	}
 
 	resLock := &resourcelock.ConfigMapLock{
-		ConfigMapMeta: v1meta.ObjectMeta{
+		ConfigMapMeta: metav1.ObjectMeta{
 			Namespace: k.namespace,
 			Name:      leaderElectionResourceName,
 		},
@@ -342,13 +343,13 @@ func (k *Kontroller) process() {
 // If there is an error getting the list of nodes or updating any of them, an
 // error is immediately returned.
 func (k *Kontroller) cleanupState() error {
-	nodelist, err := k.nc.List(context.TODO(), v1meta.ListOptions{})
+	nodelist, err := k.nc.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("Failed listing nodes: %v", err)
 	}
 
 	for _, n := range nodelist.Items {
-		err = k8sutil.UpdateNodeRetry(k.nc, n.Name, func(node *v1api.Node) {
+		err = k8sutil.UpdateNodeRetry(k.nc, n.Name, func(node *corev1.Node) {
 			// make sure that nodes with the before-reboot label actually
 			// still wants to reboot
 			if _, exists := node.Labels[constants.LabelBeforeReboot]; exists {
@@ -379,7 +380,7 @@ func (k *Kontroller) cleanupState() error {
 // If there is an error getting the list of nodes or updating any of them, an
 // error is immediately returned.
 func (k *Kontroller) checkBeforeReboot() error {
-	nodelist, err := k.nc.List(context.TODO(), v1meta.ListOptions{})
+	nodelist, err := k.nc.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("Failed listing nodes: %v", err)
 	}
@@ -390,7 +391,7 @@ func (k *Kontroller) checkBeforeReboot() error {
 		if hasAllAnnotations(n, k.beforeRebootAnnotations) {
 			klog.V(4).Infof("Deleting label %q for %q", constants.LabelBeforeReboot, n.Name)
 			klog.V(4).Infof("Setting annotation %q to true for %q", constants.AnnotationOkToReboot, n.Name)
-			err = k8sutil.UpdateNodeRetry(k.nc, n.Name, func(node *v1api.Node) {
+			err = k8sutil.UpdateNodeRetry(k.nc, n.Name, func(node *corev1.Node) {
 				delete(node.Labels, constants.LabelBeforeReboot)
 				// cleanup the before-reboot annotations
 				for _, annotation := range k.beforeRebootAnnotations {
@@ -415,7 +416,7 @@ func (k *Kontroller) checkBeforeReboot() error {
 // If there is an error getting the list of nodes or updating any of them, an
 // error is immediately returned.
 func (k *Kontroller) checkAfterReboot() error {
-	nodelist, err := k.nc.List(context.TODO(), v1meta.ListOptions{})
+	nodelist, err := k.nc.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("Failed listing nodes: %v", err)
 	}
@@ -426,7 +427,7 @@ func (k *Kontroller) checkAfterReboot() error {
 		if hasAllAnnotations(n, k.afterRebootAnnotations) {
 			klog.V(4).Infof("Deleting label %q for %q", constants.LabelAfterReboot, n.Name)
 			klog.V(4).Infof("Setting annotation %q to false for %q", constants.AnnotationOkToReboot, n.Name)
-			err = k8sutil.UpdateNodeRetry(k.nc, n.Name, func(node *v1api.Node) {
+			err = k8sutil.UpdateNodeRetry(k.nc, n.Name, func(node *corev1.Node) {
 				delete(node.Labels, constants.LabelAfterReboot)
 				// cleanup the after-reboot annotations
 				for _, annotation := range k.afterRebootAnnotations {
@@ -455,7 +456,7 @@ func (k *Kontroller) checkAfterReboot() error {
 // If there is an error getting the list of nodes or updating any of them, an
 // error is immediately returned.
 func (k *Kontroller) markBeforeReboot() error {
-	nodelist, err := k.nc.List(context.TODO(), v1meta.ListOptions{})
+	nodelist, err := k.nc.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("Failed listing nodes: %v", err)
 	}
@@ -503,7 +504,7 @@ func (k *Kontroller) markBeforeReboot() error {
 	remainingRebootableCount := maxRebootingNodes - len(rebootingNodes)
 
 	// choose some number of nodes
-	chosenNodes := make([]*v1api.Node, 0, remainingRebootableCount)
+	chosenNodes := make([]*corev1.Node, 0, remainingRebootableCount)
 	for i := 0; i < remainingRebootableCount && i < len(rebootableNodes); i++ {
 		chosenNodes = append(chosenNodes, &rebootableNodes[i])
 	}
@@ -532,7 +533,7 @@ func (k *Kontroller) markBeforeReboot() error {
 // If there is an error getting the list of nodes or updating any of them, an
 // error is immediately returned.
 func (k *Kontroller) markAfterReboot() error {
-	nodelist, err := k.nc.List(context.TODO(), v1meta.ListOptions{})
+	nodelist, err := k.nc.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("Failed listing nodes: %v", err)
 	}
@@ -561,7 +562,7 @@ func (k *Kontroller) markAfterReboot() error {
 func (k *Kontroller) mark(nodeName string, label string, annotations []string) error {
 	klog.V(4).Infof("Deleting annotations %v for %q", annotations, nodeName)
 	klog.V(4).Infof("Setting label %q to %q for node %q", label, constants.True, nodeName)
-	err := k8sutil.UpdateNodeRetry(k.nc, nodeName, func(node *v1api.Node) {
+	err := k8sutil.UpdateNodeRetry(k.nc, nodeName, func(node *corev1.Node) {
 		for _, annotation := range annotations {
 			delete(node.Annotations, annotation)
 		}
@@ -574,7 +575,7 @@ func (k *Kontroller) mark(nodeName string, label string, annotations []string) e
 	return nil
 }
 
-func hasAllAnnotations(node v1api.Node, annotations []string) bool {
+func hasAllAnnotations(node corev1.Node, annotations []string) bool {
 	nodeAnnotations := node.GetAnnotations()
 	for _, annotation := range annotations {
 		value, ok := nodeAnnotations[annotation]

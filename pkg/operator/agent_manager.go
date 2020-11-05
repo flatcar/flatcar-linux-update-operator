@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	"github.com/blang/semver"
-	v1apps "k8s.io/api/apps/v1"
-	v1 "k8s.io/api/core/v1"
-	v1meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/klog/v2"
@@ -49,7 +49,7 @@ var (
 func (k *Kontroller) legacyLabeler() {
 	klog.V(6).Infof("Starting Flatcar Container Linux node auto-labeler")
 
-	nodelist, err := k.nc.List(context.TODO(), v1meta.ListOptions{})
+	nodelist, err := k.nc.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		klog.Infof("Failed listing nodes %v", err)
 		return
@@ -78,7 +78,7 @@ func (k *Kontroller) legacyLabeler() {
 // Furthermore, it's assumed that all future agent versions will be backwards
 // compatible, so if the agent's version is greater than ours, it's okay.
 func (k *Kontroller) runDaemonsetUpdate(agentImageRepo string) error {
-	agentDaemonsets, err := k.kc.AppsV1().DaemonSets(k.namespace).List(context.TODO(), v1meta.ListOptions{
+	agentDaemonsets, err := k.kc.AppsV1().DaemonSets(k.namespace).List(context.TODO(), metav1.ListOptions{
 		LabelSelector: labels.SelectorFromSet(labels.Set(managedByOperatorLabels)).String(),
 	})
 	if err != nil {
@@ -123,7 +123,7 @@ func (k *Kontroller) runDaemonsetUpdate(agentImageRepo string) error {
 		// painful to do correctly. In addition, doing it correctly doesn't add too
 		// much value unless we have corresponding detection/rollback logic.
 		falseVal := false
-		err := k.kc.AppsV1().DaemonSets(k.namespace).Delete(context.TODO(), agentDS.Name, v1meta.DeleteOptions{
+		err := k.kc.AppsV1().DaemonSets(k.namespace).Delete(context.TODO(), agentDS.Name, metav1.DeleteOptions{
 			OrphanDependents: &falseVal, // Cascading delete
 		})
 		if err != nil {
@@ -144,12 +144,13 @@ func (k *Kontroller) runDaemonsetUpdate(agentImageRepo string) error {
 func (k *Kontroller) createAgentDamonset(agentImageRepo string) error {
 	dsc := k.kc.AppsV1().DaemonSets(k.namespace)
 
-	_, err := dsc.Create(context.TODO(), agentDaemonsetSpec(agentImageRepo), v1meta.CreateOptions{})
+	_, err := dsc.Create(context.TODO(), agentDaemonsetSpec(agentImageRepo), metav1.CreateOptions{})
 
 	return err
 }
 
-func agentDaemonsetSpec(repo string) *v1apps.DaemonSet {
+//nolint:funlen
+func agentDaemonsetSpec(repo string) *appsv1.DaemonSet {
 	// Each agent daemonset includes the version of the agent in the selector.
 	// This ensures that the 'orphan adoption' logic doesn't kick in for these
 	// daemonsets.
@@ -159,39 +160,39 @@ func agentDaemonsetSpec(repo string) *v1apps.DaemonSet {
 	}
 	versionedSelector[constants.AgentVersion] = version.Version
 
-	return &v1apps.DaemonSet{
-		ObjectMeta: v1meta.ObjectMeta{
+	return &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:   daemonsetName,
 			Labels: managedByOperatorLabels,
 			Annotations: map[string]string{
 				constants.AgentVersion: version.Version,
 			},
 		},
-		Spec: v1apps.DaemonSetSpec{
-			Selector: &v1meta.LabelSelector{MatchLabels: versionedSelector},
-			Template: v1.PodTemplateSpec{
-				ObjectMeta: v1meta.ObjectMeta{
+		Spec: appsv1.DaemonSetSpec{
+			Selector: &metav1.LabelSelector{MatchLabels: versionedSelector},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:   agentDefaultAppName,
 					Labels: versionedSelector,
 					Annotations: map[string]string{
 						constants.AgentVersion: version.Version,
 					},
 				},
-				Spec: v1.PodSpec{
+				Spec: corev1.PodSpec{
 					// Update the master nodes too
-					Tolerations: []v1.Toleration{
+					Tolerations: []corev1.Toleration{
 						{
 							Key:      "node-role.kubernetes.io/master",
-							Operator: v1.TolerationOpExists,
-							Effect:   v1.TaintEffectNoSchedule,
+							Operator: corev1.TolerationOpExists,
+							Effect:   corev1.TaintEffectNoSchedule,
 						},
 					},
-					Containers: []v1.Container{
+					Containers: []corev1.Container{
 						{
 							Name:    "update-agent",
 							Image:   agentImageName(repo),
 							Command: agentCommand(),
-							VolumeMounts: []v1.VolumeMount{
+							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "var-run-dbus",
 									MountPath: "/var/run/dbus",
@@ -209,19 +210,19 @@ func agentDaemonsetSpec(repo string) *v1apps.DaemonSet {
 									MountPath: "/etc/os-release",
 								},
 							},
-							Env: []v1.EnvVar{
+							Env: []corev1.EnvVar{
 								{
 									Name: "UPDATE_AGENT_NODE",
-									ValueFrom: &v1.EnvVarSource{
-										FieldRef: &v1.ObjectFieldSelector{
+									ValueFrom: &corev1.EnvVarSource{
+										FieldRef: &corev1.ObjectFieldSelector{
 											FieldPath: "spec.nodeName",
 										},
 									},
 								},
 								{
 									Name: "POD_NAMESPACE",
-									ValueFrom: &v1.EnvVarSource{
-										FieldRef: &v1.ObjectFieldSelector{
+									ValueFrom: &corev1.EnvVarSource{
+										FieldRef: &corev1.ObjectFieldSelector{
 											FieldPath: "metadata.namespace",
 										},
 									},
@@ -229,35 +230,35 @@ func agentDaemonsetSpec(repo string) *v1apps.DaemonSet {
 							},
 						},
 					},
-					Volumes: []v1.Volume{
+					Volumes: []corev1.Volume{
 						{
 							Name: "var-run-dbus",
-							VolumeSource: v1.VolumeSource{
-								HostPath: &v1.HostPathVolumeSource{
+							VolumeSource: corev1.VolumeSource{
+								HostPath: &corev1.HostPathVolumeSource{
 									Path: "/var/run/dbus",
 								},
 							},
 						},
 						{
 							Name: "etc-flatcar",
-							VolumeSource: v1.VolumeSource{
-								HostPath: &v1.HostPathVolumeSource{
+							VolumeSource: corev1.VolumeSource{
+								HostPath: &corev1.HostPathVolumeSource{
 									Path: "/etc/flatcar",
 								},
 							},
 						},
 						{
 							Name: "usr-share-flatcar",
-							VolumeSource: v1.VolumeSource{
-								HostPath: &v1.HostPathVolumeSource{
+							VolumeSource: corev1.VolumeSource{
+								HostPath: &corev1.HostPathVolumeSource{
 									Path: "/usr/share/flatcar",
 								},
 							},
 						},
 						{
 							Name: "etc-os-release",
-							VolumeSource: v1.VolumeSource{
-								HostPath: &v1.HostPathVolumeSource{
+							VolumeSource: corev1.VolumeSource{
+								HostPath: &corev1.HostPathVolumeSource{
 									Path: "/etc/os-release",
 								},
 							},

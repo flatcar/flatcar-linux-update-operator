@@ -1,10 +1,11 @@
 package k8sutil
 
 import (
-	v1api "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
-func FilterPods(pods []v1api.Pod, filter func(*v1api.Pod) bool) (newpods []v1api.Pod) {
+// FilterPods filters given list of pods using given function.
+func FilterPods(pods []corev1.Pod, filter func(*corev1.Pod) bool) (newpods []corev1.Pod) {
 	for _, p := range pods {
 		if filter(&p) {
 			newpods = append(newpods, p)

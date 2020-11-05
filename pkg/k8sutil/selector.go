@@ -3,7 +3,7 @@ package k8sutil
 import (
 	"strings"
 
-	v1api "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
@@ -21,8 +21,8 @@ func NewRequirementOrDie(key string, op selection.Operator, vals []string) *labe
 
 // FilterNodesByAnnotation takes a node list and a field selector, and returns
 // a node list that matches the field selector.
-func FilterNodesByAnnotation(list []v1api.Node, sel fields.Selector) []v1api.Node {
-	var ret []v1api.Node
+func FilterNodesByAnnotation(list []corev1.Node, sel fields.Selector) []corev1.Node {
+	var ret []corev1.Node
 
 	for _, n := range list {
 		if sel.Matches(fields.Set(n.Annotations)) {
@@ -35,8 +35,8 @@ func FilterNodesByAnnotation(list []v1api.Node, sel fields.Selector) []v1api.Nod
 
 // FilterNodesByRequirement filters a list of nodes and returns nodes matching the
 // given label requirement.
-func FilterNodesByRequirement(nodes []v1api.Node, req *labels.Requirement) []v1api.Node {
-	var matches []v1api.Node
+func FilterNodesByRequirement(nodes []corev1.Node, req *labels.Requirement) []corev1.Node {
+	var matches []corev1.Node
 
 	for _, node := range nodes {
 		if req.Matches(labels.Set(node.Labels)) {
@@ -48,8 +48,8 @@ func FilterNodesByRequirement(nodes []v1api.Node, req *labels.Requirement) []v1a
 
 // FilterContainerLinuxNodes filters a list of nodes and returns nodes with a
 // Flatcar Container Linux OSImage, as reported by the node's /etc/os-release.
-func FilterContainerLinuxNodes(nodes []v1api.Node) []v1api.Node {
-	var matches []v1api.Node
+func FilterContainerLinuxNodes(nodes []corev1.Node) []corev1.Node {
+	var matches []corev1.Node
 
 	for _, node := range nodes {
 		if strings.HasPrefix(node.Status.NodeInfo.OSImage, "Flatcar Container Linux") {

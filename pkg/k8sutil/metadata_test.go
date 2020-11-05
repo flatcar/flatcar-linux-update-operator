@@ -9,13 +9,13 @@ import (
 	"github.com/golang/mock/gomock"
 
 	mock_v1 "github.com/kinvolk/flatcar-linux-update-operator/pkg/k8sutil/mocks"
-	v1api "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	v1meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-func atomicCounterIncrement(n *v1api.Node) {
+func atomicCounterIncrement(n *corev1.Node) {
 	counterAnno := "counter"
 	s := n.Annotations[counterAnno]
 	var i int
@@ -38,19 +38,19 @@ func TestUpdateNodeRetryHandlesConflict(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	mockNi := mock_v1.NewMockNodeInterface(ctrl)
-	mockNode := &v1api.Node{}
+	mockNode := &corev1.Node{}
 	mockNode.SetName("mock_node")
 	mockNode.SetNamespace("default")
 	mockNode.SetAnnotations(map[string]string{"counter": "20"})
 	mockNode.SetResourceVersion("20")
 
-	mockNi.EXPECT().Get(context.TODO(), "mock_node", v1meta.GetOptions{}).Return(mockNode, nil).AnyTimes()
+	mockNi.EXPECT().Get(context.TODO(), "mock_node", metav1.GetOptions{}).Return(mockNode, nil).AnyTimes()
 
 	// Conflict once; mock that a third party incremented the counter from '20'
 	// to '21' right after the node is returned
 	gomock.InOrder(
-		mockNi.EXPECT().Update(context.TODO(), mockNode, v1meta.UpdateOptions{}).Do(func(
-			ctx context.Context, n *v1api.Node, uo v1meta.UpdateOptions) {
+		mockNi.EXPECT().Update(context.TODO(), mockNode, metav1.UpdateOptions{}).Do(func(
+			ctx context.Context, n *corev1.Node, uo metav1.UpdateOptions) {
 			// Fake conflict; the counter was incremented elsewhere; resourceVersion is now 21
 			mockNode.SetAnnotations(map[string]string{"counter": "21"})
 			mockNode.SetResourceVersion("21")
@@ -58,7 +58,7 @@ func TestUpdateNodeRetryHandlesConflict(t *testing.T) {
 		).Return(mockNode, errors.NewConflict(schema.GroupResource{}, "mock_node", fmt.Errorf("err"))),
 
 		// And then the successful retry
-		mockNi.EXPECT().Update(context.TODO(), mockNode, v1meta.UpdateOptions{}).Return(mockNode, nil),
+		mockNi.EXPECT().Update(context.TODO(), mockNode, metav1.UpdateOptions{}).Return(mockNode, nil),
 	)
 
 	err := UpdateNodeRetry(mockNi, "mock_node", atomicCounterIncrement)
