@@ -49,7 +49,6 @@ linters:
     - ineffassign
     - interfacer
     - lll
-    - maligned
     - misspell
     - nakedret
     - nestif
@@ -77,3 +76,4 @@ linters:
     - godox
     - goerr113
     - exhaustivestruct
+    - maligned
