@@ -11,10 +11,10 @@ import (
 )
 
 var (
-	// Version is the semver of this code
+	// Version is the semver of this code.
 	Version = "UNKNOWN"
 
-	// Commit is the git commi tthis was built from
+	// Commit is the git commit this was built from.
 	Commit = "UNKNOWN"
 )
 
