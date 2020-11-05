@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/coreos/go-systemd/login1"
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -216,7 +216,7 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 	wg := sync.WaitGroup{}
 	for _, pod := range pods {
 		wg.Add(1)
-		go func(pod v1.Pod) {
+		go func(pod corev1.Pod) {
 			klog.Infof("Waiting for pod %q to terminate", pod.Name)
 			if err := k.waitForPodDeletion(pod); err != nil {
 				klog.Errorf("Skipping wait on pod %q: %v", pod.Name, err)
@@ -332,7 +332,7 @@ func (k *Klocksmith) waitForOkToReboot() error {
 	}
 
 	// sanity check
-	no, ok := ev.Object.(*v1.Node)
+	no, ok := ev.Object.(*corev1.Node)
 	if !ok {
 		panic("event contains a non-*api.Node object")
 	}
@@ -380,7 +380,7 @@ func (k *Klocksmith) waitForNotOkToReboot() error {
 			return false, fmt.Errorf("our node was deleted while we were waiting for ready")
 		}
 
-		no := event.Object.(*v1.Node)
+		no := event.Object.(*corev1.Node)
 		if no.Annotations[constants.AnnotationOkToReboot] != constants.True {
 			return true, nil
 		}
@@ -391,7 +391,7 @@ func (k *Klocksmith) waitForNotOkToReboot() error {
 	}
 
 	// sanity check
-	no := ev.Object.(*v1.Node)
+	no := ev.Object.(*corev1.Node)
 
 	if no.Annotations[constants.AnnotationOkToReboot] == constants.True {
 		panic("event did not contain annotation expected")
@@ -400,7 +400,7 @@ func (k *Klocksmith) waitForNotOkToReboot() error {
 	return nil
 }
 
-func (k *Klocksmith) getPodsForDeletion() ([]v1.Pod, error) {
+func (k *Klocksmith) getPodsForDeletion() ([]corev1.Pod, error) {
 	pods, err := drain.GetPodsForDeletion(k.kc, k.node)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get list of pods for deletion: %v", err)
@@ -410,7 +410,7 @@ func (k *Klocksmith) getPodsForDeletion() ([]v1.Pod, error) {
 	// critical components such as kube-scheduler and
 	// kube-controller-manager.
 
-	pods = k8sutil.FilterPods(pods, func(p *v1.Pod) bool {
+	pods = k8sutil.FilterPods(pods, func(p *corev1.Pod) bool {
 		if p.Namespace == "kube-system" {
 			return false
 		}
@@ -422,7 +422,7 @@ func (k *Klocksmith) getPodsForDeletion() ([]v1.Pod, error) {
 }
 
 // waitForPodDeletion waits for a pod to be deleted
-func (k *Klocksmith) waitForPodDeletion(pod v1.Pod) error {
+func (k *Klocksmith) waitForPodDeletion(pod corev1.Pod) error {
 	return wait.PollImmediate(defaultPollInterval, k.reapTimeout, func() (bool, error) {
 		p, err := k.kc.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		if errors.IsNotFound(err) || (p != nil && p.ObjectMeta.UID != pod.ObjectMeta.UID) {
