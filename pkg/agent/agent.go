@@ -411,11 +411,7 @@ func (k *Klocksmith) getPodsForDeletion() ([]corev1.Pod, error) {
 	// kube-controller-manager.
 
 	pods = k8sutil.FilterPods(pods, func(p *corev1.Pod) bool {
-		if p.Namespace == "kube-system" {
-			return false
-		}
-
-		return true
+		return p.Namespace != "kube-system"
 	})
 
 	return pods, nil
