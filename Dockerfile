@@ -1,20 +1,25 @@
-FROM golang:1.13-alpine3.10 as builder
+FROM golang:1.15-alpine3.12 as builder
+
 MAINTAINER Kinvolk
 
 RUN apk add -U make git
 
-WORKDIR /go/src/github.com/kinvolk/flatcar-linux-update-operator
+WORKDIR /usr/src/github.com/kinvolk/flatcar-linux-update-operator
 
 COPY . .
 
 RUN make bin/update-agent bin/update-operator
 
-FROM alpine:3.10
+FROM alpine:3.12
+
 MAINTAINER Kinvolk
 
 RUN apk add -U ca-certificates
-COPY --from=builder /go/src/github.com/kinvolk/flatcar-linux-update-operator/bin/update-agent /bin/
-COPY --from=builder /go/src/github.com/kinvolk/flatcar-linux-update-operator/bin/update-operator /bin/
+
+WORKDIR /bin
+
+COPY --from=builder /usr/src/github.com/kinvolk/flatcar-linux-update-operator/bin/update-agent .
+COPY --from=builder /usr/src/github.com/kinvolk/flatcar-linux-update-operator/bin/update-operator .
 
 USER 65534:65534
 
