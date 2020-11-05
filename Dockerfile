@@ -7,7 +7,7 @@ WORKDIR /go/src/github.com/kinvolk/flatcar-linux-update-operator
 
 COPY . .
 
-RUN make all
+RUN make bin/update-agent bin/update-operator
 
 FROM alpine:3.10
 MAINTAINER Kinvolk

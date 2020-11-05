@@ -7,10 +7,14 @@ issues:
   max-same-issues: 0
   max-issues-per-linter: 0
   exclude-rules:
-  # Ignore magic numbers in klog.V() calls until we clean them up.
-  - linters:
-      - gomnd
-    source: "klog.V\\("
+    # Ignore magic numbers in klog.V() calls until we clean them up.
+    - linters:
+        - gomnd
+      source: "klog.V\\("
+    # Ignore long generate commands.
+    - linters:
+        - lll
+      source: "^\\/\\/go:generate"
 
 # List for enabled linters can be generated for updates using the following command.
 # golangci-lint linters | grep -E '^\S+:' | cut -d: -f1 | sort | sed 's/^/    - /g' | grep -v -E "($(grep '^  disable:' -A 100 .golangci.yml  | grep -E '    - \S+$' | awk '{print $2}' | tr \\n '|' | sed 's/|$//g'))"

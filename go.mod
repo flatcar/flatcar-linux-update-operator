@@ -10,7 +10,7 @@ require (
 	github.com/godbus/dbus v4.1.0+incompatible
 	github.com/gogo/protobuf v1.3.1 // indirect
 	github.com/golang/groupcache v0.0.0-20191227052852-215e87163ea7 // indirect
-	github.com/golang/mock v1.3.1
+	github.com/golang/mock v1.4.4
 	github.com/google/go-cmp v0.4.0 // indirect
 	github.com/googleapis/gnostic v0.3.1 // indirect
 	github.com/hashicorp/golang-lru v0.5.3 // indirect

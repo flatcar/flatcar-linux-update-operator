@@ -1,4 +1,4 @@
-.PHONY:	all release-bin image clean test vendor ci lint-bin codespell
+.PHONY: all build build-test generate image clean test vendor ci lint-bin codespell check-working-tree-clean check-generate check-vendor check-tidy
 export CGO_ENABLED:=0
 
 VERSION=$(shell ./build/git-version.sh)
@@ -11,16 +11,22 @@ LD_FLAGS="-w -X $(REPO)/pkg/version.Version=$(RELEASE_VERSION) -X $(REPO)/pkg/ve
 DOCKER_CMD ?= docker
 IMAGE_REPO?=quay.io/kinvolk/flatcar-linux-update-operator
 
-all: bin/update-agent bin/update-operator
+all: build test lint-bin
 
 bin/%:
-	go build -o $@ -ldflags $(LD_FLAGS) -mod=vendor $(REPO)/cmd/$*
+	go build -o $@ -ldflags $(LD_FLAGS) -mod=vendor ./cmd/$*
 
-release-bin:
-	./build/build-release.sh
+build:
+	go build -ldflags $(LD_FLAGS) -mod=vendor ./cmd/...
+
+build-test:
+	go test -run=nonexistent -mod=vendor ./...
 
 test:
-	go test -mod=vendor -v $(REPO)/pkg/...
+	go test -mod=vendor -v ./...
+
+generate:
+	go generate -mod=vendor -v -x ./...
 
 image:
 	@$(DOCKER_CMD) build --rm=true -t $(IMAGE_REPO):$(VERSION) .
@@ -34,9 +40,22 @@ vendor:
 clean:
 	rm -rf bin
 
-ci: all test
+ci: check-generate check-vendor build test
 
-lint-bin:
+check-working-tree-clean:
+	@test -z "$$(git status --porcelain)" || (echo "Commit all changes before running this target"; exit 1)
+
+check-generate: check-working-tree-clean generate
+	@test -z "$$(git status --porcelain)" || (echo "Please run 'make generate' and commit generated changes."; git --no-pager diff; exit 1)
+
+check-vendor: check-working-tree-clean vendor
+	@test -z "$$(git status --porcelain)" || (echo "Please run 'make vendor' and commit generated changes."; git status; exit 1)
+
+check-tidy: check-working-tree-clean
+	go mod tidy
+	@test -z "$$(git status --porcelain)" || (echo "Please run 'go mod tidy' and commit generated changes."; git status; exit 1)
+
+lint-bin: build build-test
 	@if [ "$$(git config --get diff.noprefix)" = "true" ]; then printf "\n\ngolangci-lint has a bug and can't run with the current git configuration: 'diff.noprefix' is set to 'true'. To override this setting for this repository, run the following command:\n\n'git config diff.noprefix false'\n\nFor more details, see https://github.com/golangci/golangci-lint/issues/948.\n\n\n"; exit 1; fi
 	golangci-lint run --new-from-rev=$$(git merge-base $$(cat .git/resource/base_sha 2>/dev/null || echo "origin/master") HEAD) ./...
 
