@@ -3,31 +3,35 @@
 package constants
 
 const (
-	// Annotation values used by update-agent and update-operator
-	True  = "true"
+	// True is annotation value used by update-agent and update-operator.
+	True = "true"
+
+	// False is annotation value used by update-agent and update-operator.
 	False = "false"
 
 	// Prefix used by all label and annotation keys.
 	Prefix = "flatcar-linux-update.v1.flatcar-linux.net/"
 
-	// Key set to "true" by the update-agent when a reboot is requested.
+	// AnnotationRebootNeeded is a key set to "true" by the update-agent when a reboot is requested.
 	AnnotationRebootNeeded = Prefix + "reboot-needed"
-	LabelRebootNeeded      = Prefix + "reboot-needed"
 
-	// Key set to "true" by the update-agent when node-drain and reboot is
+	// LabelRebootNeeded is an label name set to "true" by the update-agent when a reboot is requested.
+	LabelRebootNeeded = Prefix + "reboot-needed"
+
+	// AnnotationRebootInProgress is a key set to "true" by the update-agent when node-drain and reboot is
 	// initiated.
 	AnnotationRebootInProgress = Prefix + "reboot-in-progress"
 
-	// Key set to "true" by the update-operator when an agent may proceed
+	// AnnotationOkToReboot is a key set to "true" by the update-operator when an agent may proceed
 	// with a node-drain and reboot.
 	AnnotationOkToReboot = Prefix + "reboot-ok"
 
-	// Key that may be set by the administrator to "true" to prevent
+	// AnnotationRebootPaused is a key that may be set by the administrator to "true" to prevent
 	// update-operator from considering a node for rebooting.  Never set by
 	// the update-agent or update-operator.
 	AnnotationRebootPaused = Prefix + "reboot-paused"
 
-	// Key set by the update-agent to the current operator status of update_agent.
+	// AnnotationStatus is a key set by the update-agent to the current operator status of update_agent.
 	//
 	// Possible values are:
 	//  - "UPDATE_STATUS_IDLE"
@@ -42,12 +46,13 @@ const (
 	// It is possible, but extremely unlike for it to be "unknown status".
 	AnnotationStatus = Prefix + "status"
 
-	// Key set by the update-agent to LAST_CHECKED_TIME reported by update_engine.
+	// AnnotationLastCheckedTime is a keyset by the update-agent to LAST_CHECKED_TIME reported
+	// by update_engine.
 	//
 	// It is zero if an update has never been checked for, or a UNIX timestamp.
 	AnnotationLastCheckedTime = Prefix + "last-checked-time"
 
-	// Key set by the update-agent to NEW_VERSION reported by update_engine.
+	// AnnotationNewVersion is a key set by the update-agent to NEW_VERSION reported by update_engine.
 	//
 	// It is an opaque string, but might be semver.
 	AnnotationNewVersion = Prefix + "new-version"
@@ -56,23 +61,26 @@ const (
 	// it was responsible for making node unschedulable.
 	AnnotationAgentMadeUnschedulable = Prefix + "agent-made-unschedulable"
 
-	// Keys set to true when the operator is waiting for configured annotation
+	// LabelBeforeReboot is a key set to true when the operator is waiting for configured annotation
 	// before and after the reboot respectively.
 	LabelBeforeReboot = Prefix + "before-reboot"
-	LabelAfterReboot  = Prefix + "after-reboot"
 
-	// Key set by the update-agent to the value of "ID" in /etc/os-release.
+	// LabelAfterReboot is a key set to true when the operator is waiting for configured annotation
+	// before and after the reboot respectively.
+	LabelAfterReboot = Prefix + "after-reboot"
+
+	// LabelID is a key set by the update-agent to the value of "ID" in /etc/os-release.
 	LabelID = Prefix + "id"
 
-	// Key set by the update-agent to the value of "GROUP" in
+	// LabelGroup is a key set by the update-agent to the value of "GROUP" in
 	// /usr/share/flatcar/update.conf, overridden by the value of "GROUP" in
 	// /etc/flatcar/update.conf.
 	LabelGroup = Prefix + "group"
 
-	// Key set by the update-agent to the value of "VERSION" in /etc/os-release.
+	// LabelVersion is a key set by the update-agent to the value of "VERSION" in /etc/os-release.
 	LabelVersion = Prefix + "version"
 
-	// Label set to "true" on nodes where update-agent pods should be scheduled.
+	// LabelUpdateAgentEnabled is a key set to "true" on nodes where update-agent pods should be scheduled.
 	// This applies only when update-operator is run with the flag
 	// auto-label-flatcar-linux=true
 	LabelUpdateAgentEnabled = Prefix + "agent"
