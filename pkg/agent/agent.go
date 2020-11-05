@@ -1,3 +1,7 @@
+// Package agent implements Flatcar Linux Update Operator agent, which role is to
+// run on every Flatcar Node on the cluster, watch update_engine for status updates,
+// propagate them to operator via Node labels and annotations and react on operator
+// decisions about when to drain a node and reboot to finish upgrade process.
 package agent
 
 import (

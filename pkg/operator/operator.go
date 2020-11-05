@@ -1,3 +1,4 @@
+// Package operator contains main implementation of Flatcar Linux Update Operator.
 package operator
 
 import (
