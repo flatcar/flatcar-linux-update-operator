@@ -92,7 +92,7 @@ func (c *Client) Close() error {
 func (c *Client) ReceiveStatuses(rcvr chan Status, stop <-chan struct{}) {
 	// if there is an error getting the current status, ignore it and just
 	// move onto the main loop.
-	st, _ := c.GetStatus()
+	st, _ := c.getStatus()
 	rcvr <- st
 
 	for {
@@ -119,8 +119,8 @@ func (c *Client) RebootNeededSignal(rcvr chan Status, stop <-chan struct{}) {
 	}
 }
 
-// GetStatus gets the current status from update_engine
-func (c *Client) GetStatus() (Status, error) {
+// getStatus gets the current status from update_engine
+func (c *Client) getStatus() (Status, error) {
 	call := c.object.Call(dbusInterface+".GetStatus", 0)
 	if call.Err != nil {
 		return Status{}, call.Err
