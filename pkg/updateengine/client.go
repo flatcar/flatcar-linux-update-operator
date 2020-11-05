@@ -23,11 +23,10 @@ import (
 )
 
 const (
-	dbusPath            = "/com/coreos/update1"
-	dbusInterface       = "com.coreos.update1.Manager"
-	dbusMember          = "StatusUpdate"
-	dbusMemberInterface = dbusInterface + "." + dbusMember
-	signalBuffer        = 32 // TODO(bp): What is a reasonable value here?
+	dbusPath      = "/com/coreos/update1"
+	dbusInterface = "com.coreos.update1.Manager"
+	dbusMember    = "StatusUpdate"
+	signalBuffer  = 32 // TODO(bp): What is a reasonable value here?
 )
 
 type Client struct {

@@ -26,7 +26,6 @@ import (
 )
 
 const (
-	eventReasonRebootFailed            = "RebootFailed"
 	eventSourceComponent               = "update-operator"
 	leaderElectionEventSourceComponent = "update-operator-leader-election"
 	// agentDefaultAppName is the label value for the 'app' key that agents are
