@@ -44,7 +44,7 @@ var DefaultBackoff = wait.Backoff{
 	Jitter:   0.1,
 }
 
-// RetryConflict executes the provided function repeatedly, retrying if the server returns a conflicting
+// RetryOnConflict executes the provided function repeatedly, retrying if the server returns a conflicting
 // write. Callers should preserve previous executions if they wish to retry changes. It performs an
 // exponential backoff.
 //
