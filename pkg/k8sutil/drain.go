@@ -62,7 +62,7 @@ func getOwnerDaemonset(kc kubernetes.Interface, pod corev1.Pod) (interface{}, er
 			}
 
 			if !errors.IsNotFound(err) {
-				return nil, fmt.Errorf("failed to get controller of pod %q: %v", pod.Name, err)
+				return nil, fmt.Errorf("failed to get controller of pod %q: %w", pod.Name, err)
 			}
 		}
 	}

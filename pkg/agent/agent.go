@@ -47,7 +47,7 @@ func New(node string, reapTimeout time.Duration) (*Klocksmith, error) {
 	// set up kubernetes in-cluster client
 	kc, err := k8sutil.GetClient("")
 	if err != nil {
-		return nil, fmt.Errorf("error creating kubernetes client: %v", err)
+		return nil, fmt.Errorf("error creating kubernetes client: %w", err)
 	}
 
 	// node interface
@@ -56,13 +56,13 @@ func New(node string, reapTimeout time.Duration) (*Klocksmith, error) {
 	// set up update_engine client
 	ue, err := updateengine.New()
 	if err != nil {
-		return nil, fmt.Errorf("error establishing connection to update_engine dbus: %v", err)
+		return nil, fmt.Errorf("error establishing connection to update_engine dbus: %w", err)
 	}
 
 	// set up login1 client for our eventual reboot
 	lc, err := login1.New()
 	if err != nil {
-		return nil, fmt.Errorf("error establishing connection to logind dbus: %v", err)
+		return nil, fmt.Errorf("error establishing connection to logind dbus: %w", err)
 	}
 
 	return &Klocksmith{node, kc, nc, ue, lc, reapTimeout}, nil
@@ -75,7 +75,7 @@ func (k *Klocksmith) Run(stop <-chan struct{}) {
 
 	// agent process should reboot the node, no need to loop
 	if err := k.process(stop); err != nil {
-		klog.Errorf("Error running agent process: %v", err)
+		klog.Errorf("Error running agent process: %w", err)
 	}
 
 	klog.V(5).Info("Stopping agent")
@@ -87,7 +87,7 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 	klog.Info("Setting info labels")
 
 	if err := k.setInfoLabels(); err != nil {
-		return fmt.Errorf("failed to set node info: %v", err)
+		return fmt.Errorf("failed to set node info: %w", err)
 	}
 
 	klog.Info("Checking annotations")
@@ -158,7 +158,7 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 			break
 		}
 
-		klog.Warningf("error waiting for an ok-to-reboot: %v", err)
+		klog.Warningf("error waiting for an ok-to-reboot: %w", err)
 	}
 
 	klog.Info("Checking if node is already unschedulable")
@@ -290,7 +290,7 @@ func (k *Klocksmith) updateStatusCallback(s updateengine.Status) {
 func (k *Klocksmith) setInfoLabels() error {
 	vi, err := k8sutil.GetVersionInfo()
 	if err != nil {
-		return fmt.Errorf("failed to get version info: %v", err)
+		return fmt.Errorf("failed to get version info: %w", err)
 	}
 
 	labels := map[string]string{
@@ -326,7 +326,7 @@ func (k *Klocksmith) watchUpdateStatus(update func(s updateengine.Status), stop 
 func (k *Klocksmith) waitForOkToReboot() error {
 	n, err := k.nc.Get(context.TODO(), k.node, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to get self node (%q): %v", k.node, err)
+		return fmt.Errorf("failed to get self node (%q): %w", k.node, err)
 	}
 
 	if n.Annotations[constants.AnnotationOkToReboot] == constants.True && n.Annotations[constants.AnnotationRebootNeeded] == constants.True {
@@ -339,7 +339,7 @@ func (k *Klocksmith) waitForOkToReboot() error {
 		ResourceVersion: n.ResourceVersion,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to watch self node (%q): %v", k.node, err)
+		return fmt.Errorf("failed to watch self node (%q): %w", k.node, err)
 	}
 
 	// hopefully 24 hours is enough time between indicating we need a
@@ -348,7 +348,7 @@ func (k *Klocksmith) waitForOkToReboot() error {
 
 	ev, err := watchtools.UntilWithoutRetry(ctx, watcher, k8sutil.NodeAnnotationCondition(shouldRebootSelector))
 	if err != nil {
-		return fmt.Errorf("waiting for annotation %q failed: %v", constants.AnnotationOkToReboot, err)
+		return fmt.Errorf("waiting for annotation %q failed: %w", constants.AnnotationOkToReboot, err)
 	}
 
 	// sanity check
@@ -367,7 +367,7 @@ func (k *Klocksmith) waitForOkToReboot() error {
 func (k *Klocksmith) waitForNotOkToReboot() error {
 	n, err := k.nc.Get(context.TODO(), k.node, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to get self node (%q): %v", k.node, err)
+		return fmt.Errorf("failed to get self node (%q): %w", k.node, err)
 	}
 
 	if n.Annotations[constants.AnnotationOkToReboot] != constants.True {
@@ -380,7 +380,7 @@ func (k *Klocksmith) waitForNotOkToReboot() error {
 		ResourceVersion: n.ResourceVersion,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to watch self node (%q): %v", k.node, err)
+		return fmt.Errorf("failed to watch self node (%q): %w", k.node, err)
 	}
 
 	// Within 24 hours of indicating we don't need a reboot we should be given a not-ok.
@@ -408,7 +408,7 @@ func (k *Klocksmith) waitForNotOkToReboot() error {
 		return false, nil
 	}))
 	if err != nil {
-		return fmt.Errorf("waiting for annotation %q failed: %v", constants.AnnotationOkToReboot, err)
+		return fmt.Errorf("waiting for annotation %q failed: %w", constants.AnnotationOkToReboot, err)
 	}
 
 	// sanity check
@@ -424,7 +424,7 @@ func (k *Klocksmith) waitForNotOkToReboot() error {
 func (k *Klocksmith) getPodsForDeletion() ([]corev1.Pod, error) {
 	pods, err := k8sutil.GetPodsForDeletion(k.kc, k.node)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get list of pods for deletion: %v", err)
+		return nil, fmt.Errorf("failed to get list of pods for deletion: %w", err)
 	}
 
 	// XXX: ignoring kube-system is a simple way to avoid eviciting

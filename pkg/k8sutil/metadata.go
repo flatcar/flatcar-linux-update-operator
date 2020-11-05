@@ -44,7 +44,7 @@ func GetNodeRetry(nc v1core.NodeInterface, node string) (*v1api.Node, error) {
 	err := RetryOnError(DefaultBackoff, func() error {
 		n, getErr := nc.Get(context.TODO(), node, v1meta.GetOptions{})
 		if getErr != nil {
-			return fmt.Errorf("failed to get node %q: %v", node, getErr)
+			return fmt.Errorf("failed to get node %q: %w", node, getErr)
 		}
 
 		apiNode = n
@@ -64,7 +64,7 @@ func UpdateNodeRetry(nc v1core.NodeInterface, node string, f func(*v1api.Node)) 
 	err := RetryOnConflict(DefaultBackoff, func() error {
 		n, getErr := nc.Get(context.TODO(), node, v1meta.GetOptions{})
 		if getErr != nil {
-			return fmt.Errorf("failed to get node %q: %v", node, getErr)
+			return fmt.Errorf("failed to get node %q: %w", node, getErr)
 		}
 
 		f(n)
@@ -75,7 +75,7 @@ func UpdateNodeRetry(nc v1core.NodeInterface, node string, f func(*v1api.Node)) 
 	})
 	if err != nil {
 		// may be conflict if max retries were hit
-		return fmt.Errorf("unable to update node %q: %v", node, err)
+		return fmt.Errorf("unable to update node %q: %w", node, err)
 	}
 
 	return nil
@@ -137,7 +137,7 @@ func DeleteNodeAnnotations(nc v1core.NodeInterface, node string, ks []string) er
 func Unschedulable(nc v1core.NodeInterface, node string, sched bool) error {
 	n, err := nc.Get(context.TODO(), node, v1meta.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to get node %q: %v", node, err)
+		return fmt.Errorf("failed to get node %q: %w", node, err)
 	}
 
 	n.Spec.Unschedulable = sched
@@ -147,7 +147,7 @@ func Unschedulable(nc v1core.NodeInterface, node string, sched bool) error {
 
 		return
 	}); err != nil {
-		return fmt.Errorf("unable to set 'Unschedulable' property of node %q to %t: %v", node, sched, err)
+		return fmt.Errorf("unable to set 'Unschedulable' property of node %q to %t: %w", node, sched, err)
 	}
 
 	return nil
@@ -198,7 +198,7 @@ func getUpdateMap() (map[string]string, error) {
 	// if present and readable, this file has overrides
 	econf, err := os.Open(updateConfOverridePath)
 	if err != nil {
-		klog.Infof("Skipping missing update.conf: %v", err)
+		klog.Infof("Skipping missing update.conf: %w", err)
 	}
 
 	b, err = ioutil.ReadAll(econf)
@@ -242,12 +242,12 @@ func getReleaseMap() (map[string]string, error) {
 func GetVersionInfo() (*VersionInfo, error) {
 	updateconf, err := getUpdateMap()
 	if err != nil {
-		return nil, fmt.Errorf("unable to get update configuration: %v", err)
+		return nil, fmt.Errorf("unable to get update configuration: %w", err)
 	}
 
 	osrelease, err := getReleaseMap()
 	if err != nil {
-		return nil, fmt.Errorf("unable to get os release info: %v", err)
+		return nil, fmt.Errorf("unable to get os release info: %w", err)
 	}
 
 	vi := &VersionInfo{
