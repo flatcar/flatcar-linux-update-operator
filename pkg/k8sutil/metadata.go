@@ -2,6 +2,7 @@ package k8sutil
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -40,7 +41,7 @@ func NodeAnnotationCondition(selector fields.Selector) watchtools.ConditionFunc 
 func GetNodeRetry(nc v1core.NodeInterface, node string) (*v1api.Node, error) {
 	var apiNode *v1api.Node
 	err := RetryOnError(DefaultBackoff, func() error {
-		n, getErr := nc.Get(node, v1meta.GetOptions{})
+		n, getErr := nc.Get(context.TODO(), node, v1meta.GetOptions{})
 		if getErr != nil {
 			return fmt.Errorf("failed to get node %q: %v", node, getErr)
 		}
@@ -59,14 +60,14 @@ func GetNodeRetry(nc v1core.NodeInterface, node string) (*v1api.Node, error) {
 // a retry is necessary.
 func UpdateNodeRetry(nc v1core.NodeInterface, node string, f func(*v1api.Node)) error {
 	err := RetryOnConflict(DefaultBackoff, func() error {
-		n, getErr := nc.Get(node, v1meta.GetOptions{})
+		n, getErr := nc.Get(context.TODO(), node, v1meta.GetOptions{})
 		if getErr != nil {
 			return fmt.Errorf("failed to get node %q: %v", node, getErr)
 		}
 
 		f(n)
 
-		_, err := nc.Update(n)
+		_, err := nc.Update(context.TODO(), n, v1meta.UpdateOptions{})
 		return err
 	})
 	if err != nil {
@@ -131,7 +132,7 @@ func DeleteNodeAnnotations(nc v1core.NodeInterface, node string, ks []string) er
 
 // Unschedulable marks node as schedulable or unschedulable according to sched.
 func Unschedulable(nc v1core.NodeInterface, node string, sched bool) error {
-	n, err := nc.Get(node, v1meta.GetOptions{})
+	n, err := nc.Get(context.TODO(), node, v1meta.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to get node %q: %v", node, err)
 	}
@@ -139,7 +140,7 @@ func Unschedulable(nc v1core.NodeInterface, node string, sched bool) error {
 	n.Spec.Unschedulable = sched
 
 	if err := RetryOnConflict(DefaultBackoff, func() (err error) {
-		n, err = nc.Update(n)
+		n, err = nc.Update(context.TODO(), n, v1meta.UpdateOptions{})
 		return
 	}); err != nil {
 		return fmt.Errorf("unable to set 'Unschedulable' property of node %q to %t: %v", node, sched, err)

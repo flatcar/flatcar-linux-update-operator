@@ -1,6 +1,7 @@
 package operator
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/blang/semver"
@@ -48,7 +49,7 @@ var (
 func (k *Kontroller) legacyLabeler() {
 	klog.V(6).Infof("Starting Flatcar Container Linux node auto-labeler")
 
-	nodelist, err := k.nc.List(v1meta.ListOptions{})
+	nodelist, err := k.nc.List(context.TODO(), v1meta.ListOptions{})
 	if err != nil {
 		klog.Infof("Failed listing nodes %v", err)
 		return
@@ -77,7 +78,7 @@ func (k *Kontroller) legacyLabeler() {
 // Furthermore, it's assumed that all future agent versions will be backwards
 // compatible, so if the agent's version is greater than ours, it's okay.
 func (k *Kontroller) runDaemonsetUpdate(agentImageRepo string) error {
-	agentDaemonsets, err := k.kc.AppsV1().DaemonSets(k.namespace).List(v1meta.ListOptions{
+	agentDaemonsets, err := k.kc.AppsV1().DaemonSets(k.namespace).List(context.TODO(), v1meta.ListOptions{
 		LabelSelector: labels.SelectorFromSet(labels.Set(managedByOperatorLabels)).String(),
 	})
 	if err != nil {
@@ -122,7 +123,7 @@ func (k *Kontroller) runDaemonsetUpdate(agentImageRepo string) error {
 		// painful to do correctly. In addition, doing it correctly doesn't add too
 		// much value unless we have corresponding detection/rollback logic.
 		falseVal := false
-		err := k.kc.AppsV1().DaemonSets(k.namespace).Delete(agentDS.Name, &v1meta.DeleteOptions{
+		err := k.kc.AppsV1().DaemonSets(k.namespace).Delete(context.TODO(), agentDS.Name, v1meta.DeleteOptions{
 			OrphanDependents: &falseVal, // Cascading delete
 		})
 		if err != nil {
@@ -141,7 +142,10 @@ func (k *Kontroller) runDaemonsetUpdate(agentImageRepo string) error {
 }
 
 func (k *Kontroller) createAgentDamonset(agentImageRepo string) error {
-	_, err := k.kc.AppsV1().DaemonSets(k.namespace).Create(agentDaemonsetSpec(agentImageRepo))
+	dsc := k.kc.AppsV1().DaemonSets(k.namespace)
+
+	_, err := dsc.Create(context.TODO(), agentDaemonsetSpec(agentImageRepo), v1meta.CreateOptions{})
+
 	return err
 }
 

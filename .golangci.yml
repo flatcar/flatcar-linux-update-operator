@@ -15,6 +15,10 @@ issues:
     - linters:
         - lll
       source: "^\\/\\/go:generate"
+    # Ignore missing non-pointer fields in v1meta options structs.
+    - linters:
+        - exhaustivestruct
+      source: "v1meta\\.(List|Get|Delete)Options"
 
 # List for enabled linters can be generated for updates using the following command.
 # golangci-lint linters | grep -E '^\S+:' | cut -d: -f1 | sort | sed 's/^/    - /g' | grep -v -E "($(grep '^  disable:' -A 100 .golangci.yml  | grep -E '    - \S+$' | awk '{print $2}' | tr \\n '|' | sed 's/|$//g'))"
