@@ -128,11 +128,3 @@ func (c *Client) GetStatus() (Status, error) {
 
 	return NewStatus(call.Body), nil
 }
-
-// AttemptUpdate will trigger an update if available. This is an asynchronous
-// call - it returns immediately.
-func (c *Client) AttemptUpdate() error {
-	call := c.object.Call(dbusInterface+".AttemptUpdate", 0)
-
-	return call.Err
-}
