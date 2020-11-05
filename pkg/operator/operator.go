@@ -133,7 +133,7 @@ type Config struct {
 func New(config Config) (*Kontroller, error) {
 	// kubernetes client
 	if config.Client == nil {
-		return nil, fmt.Errorf("Kubernetes client must not be nil")
+		return nil, fmt.Errorf("kubernetes client must not be nil")
 	}
 
 	kc := config.Client
@@ -175,7 +175,7 @@ func New(config Config) (*Kontroller, error) {
 	if config.RebootWindowStart != "" && config.RebootWindowLength != "" {
 		rw, err := timeutil.ParsePeriodic(config.RebootWindowStart, config.RebootWindowLength)
 		if err != nil {
-			return nil, fmt.Errorf("Error parsing reboot window: %s", err)
+			return nil, fmt.Errorf("parsing reboot window: %s", err)
 		}
 
 		rebootWindow = rw
@@ -361,7 +361,7 @@ func (k *Kontroller) process() {
 func (k *Kontroller) cleanupState() error {
 	nodelist, err := k.nc.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		return fmt.Errorf("Failed listing nodes: %v", err)
+		return fmt.Errorf("listing nodes: %v", err)
 	}
 
 	for _, n := range nodelist.Items {
@@ -380,7 +380,7 @@ func (k *Kontroller) cleanupState() error {
 			}
 		})
 		if err != nil {
-			return fmt.Errorf("Failed to cleanup node %q: %v", n.Name, err)
+			return fmt.Errorf("cleaning up node %q: %v", n.Name, err)
 		}
 	}
 
@@ -398,7 +398,7 @@ func (k *Kontroller) cleanupState() error {
 func (k *Kontroller) checkBeforeReboot() error {
 	nodelist, err := k.nc.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		return fmt.Errorf("Failed listing nodes: %v", err)
+		return fmt.Errorf("listing nodes: %v", err)
 	}
 
 	preRebootNodes := k8sutil.FilterNodesByRequirement(nodelist.Items, beforeRebootReq)
@@ -418,7 +418,7 @@ func (k *Kontroller) checkBeforeReboot() error {
 				node.Annotations[constants.AnnotationOkToReboot] = constants.True
 			})
 			if err != nil {
-				return fmt.Errorf("Failed to update node %q: %v", n.Name, err)
+				return fmt.Errorf("updating node %q: %v", n.Name, err)
 			}
 		}
 	}
@@ -435,7 +435,7 @@ func (k *Kontroller) checkBeforeReboot() error {
 func (k *Kontroller) checkAfterReboot() error {
 	nodelist, err := k.nc.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		return fmt.Errorf("Failed listing nodes: %v", err)
+		return fmt.Errorf("listing nodes: %v", err)
 	}
 
 	postRebootNodes := k8sutil.FilterNodesByRequirement(nodelist.Items, afterRebootReq)
@@ -455,7 +455,7 @@ func (k *Kontroller) checkAfterReboot() error {
 				node.Annotations[constants.AnnotationOkToReboot] = constants.False
 			})
 			if err != nil {
-				return fmt.Errorf("Failed to update node %q: %v", n.Name, err)
+				return fmt.Errorf("updating node %q: %v", n.Name, err)
 			}
 		}
 	}
@@ -476,7 +476,7 @@ func (k *Kontroller) checkAfterReboot() error {
 func (k *Kontroller) markBeforeReboot() error {
 	nodelist, err := k.nc.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		return fmt.Errorf("Failed listing nodes: %v", err)
+		return fmt.Errorf("listing nodes: %v", err)
 	}
 
 	// check if a reboot window is configured
@@ -534,7 +534,7 @@ func (k *Kontroller) markBeforeReboot() error {
 	for _, n := range chosenNodes {
 		err = k.mark(n.Name, constants.LabelBeforeReboot, k.beforeRebootAnnotations)
 		if err != nil {
-			return fmt.Errorf("Failed to label node for before reboot checks: %v", err)
+			return fmt.Errorf("labeling node for before reboot checks: %v", err)
 		}
 
 		if len(k.beforeRebootAnnotations) > 0 {
@@ -556,7 +556,7 @@ func (k *Kontroller) markBeforeReboot() error {
 func (k *Kontroller) markAfterReboot() error {
 	nodelist, err := k.nc.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		return fmt.Errorf("Failed listing nodes: %v", err)
+		return fmt.Errorf("listing nodes: %v", err)
 	}
 
 	// find nodes which just rebooted
@@ -570,7 +570,7 @@ func (k *Kontroller) markAfterReboot() error {
 	for _, n := range justRebootedNodes {
 		err = k.mark(n.Name, constants.LabelAfterReboot, k.afterRebootAnnotations)
 		if err != nil {
-			return fmt.Errorf("Failed to label node for after reboot checks: %v", err)
+			return fmt.Errorf("labeling node for after reboot checks: %v", err)
 		}
 
 		if len(k.afterRebootAnnotations) > 0 {
@@ -592,7 +592,7 @@ func (k *Kontroller) mark(nodeName string, label string, annotations []string) e
 		node.Labels[label] = constants.True
 	})
 	if err != nil {
-		return fmt.Errorf("Failed to set %q to %q on node %q: %v", label, constants.True, nodeName, err)
+		return fmt.Errorf("setting label %q to %q on node %q: %v", label, constants.True, nodeName, err)
 	}
 
 	return nil
