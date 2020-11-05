@@ -72,8 +72,7 @@ func getOwnerDaemonset(kc kubernetes.Interface, pod corev1.Pod) (interface{}, er
 //
 //nolint:lll
 func getDaemonsetController(kc kubernetes.Interface, namespace string, controllerRef *metav1.OwnerReference) (interface{}, error) {
-	switch controllerRef.Kind {
-	case "DaemonSet":
+	if controllerRef.Kind == "DaemonSet" {
 		return kc.AppsV1().DaemonSets(namespace).Get(context.TODO(), controllerRef.Name, metav1.GetOptions{})
 	}
 

@@ -27,8 +27,7 @@ const (
 // node being watched has an annotation of key equal to value.
 func NodeAnnotationCondition(selector fields.Selector) watchtools.ConditionFunc {
 	return func(event watch.Event) (bool, error) {
-		switch event.Type {
-		case watch.Modified:
+		if event.Type == watch.Modified {
 			node := event.Object.(*v1api.Node)
 
 			return selector.Matches(fields.Set(node.Annotations)), nil
