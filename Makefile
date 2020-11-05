@@ -1,4 +1,4 @@
-.PHONY:	all build build-test generate image clean test vendor ci lint-bin codespell check-working-tree-clean check-generate check-vendor check-tidy
+.PHONY: all build build-test generate image clean test vendor ci lint-bin codespell check-working-tree-clean check-generate check-vendor check-tidy
 export CGO_ENABLED:=0
 
 VERSION=$(shell ./build/git-version.sh)
