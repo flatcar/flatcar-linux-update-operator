@@ -9,12 +9,12 @@ import (
 	"github.com/coreos/go-systemd/login1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	v1meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/klog/v2"
 
@@ -27,7 +27,7 @@ import (
 type Klocksmith struct {
 	node        string
 	kc          kubernetes.Interface
-	nc          v1core.NodeInterface
+	nc          corev1client.NodeInterface
 	ue          *updateengine.Client
 	lc          *login1.Conn
 	reapTimeout time.Duration
@@ -206,7 +206,7 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 	for _, pod := range pods {
 		klog.Infof("Terminating pod %q...", pod.Name)
 
-		if err := k.kc.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, v1meta.DeleteOptions{}); err != nil {
+		if err := k.kc.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{}); err != nil {
 			klog.Errorf("failed terminating pod %q: %v", pod.Name, err)
 			// Continue anyways, the reboot should terminate it
 		}
@@ -305,7 +305,7 @@ func (k *Klocksmith) watchUpdateStatus(update func(s updateengine.Status), stop 
 
 // waitForOkToReboot waits for both 'ok-to-reboot' and 'needs-reboot' to be true.
 func (k *Klocksmith) waitForOkToReboot() error {
-	n, err := k.nc.Get(context.TODO(), k.node, v1meta.GetOptions{})
+	n, err := k.nc.Get(context.TODO(), k.node, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to get self node (%q): %v", k.node, err)
 	}
@@ -315,7 +315,7 @@ func (k *Klocksmith) waitForOkToReboot() error {
 	}
 
 	// XXX: set timeout > 0?
-	watcher, err := k.nc.Watch(context.TODO(), v1meta.ListOptions{
+	watcher, err := k.nc.Watch(context.TODO(), metav1.ListOptions{
 		FieldSelector:   fields.OneTermEqualSelector("metadata.name", n.Name).String(),
 		ResourceVersion: n.ResourceVersion,
 	})
@@ -345,7 +345,7 @@ func (k *Klocksmith) waitForOkToReboot() error {
 }
 
 func (k *Klocksmith) waitForNotOkToReboot() error {
-	n, err := k.nc.Get(context.TODO(), k.node, v1meta.GetOptions{})
+	n, err := k.nc.Get(context.TODO(), k.node, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to get self node (%q): %v", k.node, err)
 	}
@@ -355,7 +355,7 @@ func (k *Klocksmith) waitForNotOkToReboot() error {
 	}
 
 	// XXX: set timeout > 0?
-	watcher, err := k.nc.Watch(context.TODO(), v1meta.ListOptions{
+	watcher, err := k.nc.Watch(context.TODO(), metav1.ListOptions{
 		FieldSelector:   fields.OneTermEqualSelector("metadata.name", n.Name).String(),
 		ResourceVersion: n.ResourceVersion,
 	})
@@ -424,7 +424,7 @@ func (k *Klocksmith) getPodsForDeletion() ([]v1.Pod, error) {
 // waitForPodDeletion waits for a pod to be deleted
 func (k *Klocksmith) waitForPodDeletion(pod v1.Pod) error {
 	return wait.PollImmediate(defaultPollInterval, k.reapTimeout, func() (bool, error) {
-		p, err := k.kc.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, v1meta.GetOptions{})
+		p, err := k.kc.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		if errors.IsNotFound(err) || (p != nil && p.ObjectMeta.UID != pod.ObjectMeta.UID) {
 			klog.Infof("Deleted pod %q", pod.Name)
 			return true, nil
