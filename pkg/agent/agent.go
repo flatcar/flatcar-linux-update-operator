@@ -94,7 +94,7 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 
 	node, err := k8sutil.GetNodeRetry(k.nc, k.node)
 	if err != nil {
-		return err
+		return fmt.Errorf("getting node %q: %w", k.node, err)
 	}
 
 	// Only make a node schedulable if a reboot was in progress. This prevents a node from being made schedulable
@@ -115,7 +115,7 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 	klog.Infof("Setting annotations %#v", anno)
 
 	if err := k8sutil.SetNodeAnnotationsLabels(k.nc, k.node, anno, labels); err != nil {
-		return err
+		return fmt.Errorf("setting node %q labels and annotations: %w", k.node, err)
 	}
 
 	// Since we set 'reboot-needed=false', 'ok-to-reboot' should clear.
@@ -129,7 +129,7 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 		klog.Info("Marking node as schedulable")
 
 		if err := k8sutil.Unschedulable(k.nc, k.node, false); err != nil {
-			return err
+			return fmt.Errorf("marking node %q as unschedulable: %w", k.node, err)
 		}
 
 		anno = map[string]string{
@@ -139,7 +139,7 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 		klog.Infof("Setting annotations %#v", anno)
 
 		if err := k8sutil.SetNodeAnnotations(k.nc, k.node, anno); err != nil {
-			return err
+			return fmt.Errorf("setting node %q annotations: %w", k.node, err)
 		}
 	} else if madeUnschedulableAnnotationExists { // Annotation exists so node was marked unschedulable by external source.
 		klog.Info("Skipping marking node as schedulable -- node was marked unschedulable by an external source")
@@ -165,7 +165,7 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 
 	node, err = k8sutil.GetNodeRetry(k.nc, k.node)
 	if err != nil {
-		return err
+		return fmt.Errorf("getting node %q: %w", k.node, err)
 	}
 
 	alreadyUnschedulable := node.Spec.Unschedulable
@@ -182,7 +182,7 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 	klog.Infof("Setting annotations %#v", anno)
 
 	if err := k8sutil.SetNodeAnnotations(k.nc, k.node, anno); err != nil {
-		return err
+		return fmt.Errorf("setting node %q annotations: %w", k.node, err)
 	}
 
 	// Drain self equates to:
@@ -196,7 +196,7 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 		klog.Info("Marking node as unschedulable")
 
 		if err := k8sutil.Unschedulable(k.nc, k.node, true); err != nil {
-			return err
+			return fmt.Errorf("marking node %q as unschedulable: %w", k.node, err)
 		}
 	} else {
 		klog.Info("Node already marked as unschedulable")
@@ -300,7 +300,7 @@ func (k *Klocksmith) setInfoLabels() error {
 	}
 
 	if err := k8sutil.SetNodeLabels(k.nc, k.node, labels); err != nil {
-		return err
+		return fmt.Errorf("setting node %q labels: %w", k.node, err)
 	}
 
 	return nil

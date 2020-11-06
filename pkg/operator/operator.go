@@ -241,7 +241,7 @@ func (k *Kontroller) withLeaderElection() error {
 	// more likely to have a value.
 	id, err := os.Hostname()
 	if err != nil {
-		return err
+		return fmt.Errorf("getting hostname: %w", err)
 	}
 
 	resLock := &resourcelock.ConfigMapLock{

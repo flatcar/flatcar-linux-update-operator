@@ -102,7 +102,7 @@ func (o *optValue) Set(s string) error {
 	o.value = v
 	o.present = true
 
-	return err
+	return err //nolint:wrapcheck
 }
 
 func (o *optValue) String() string {

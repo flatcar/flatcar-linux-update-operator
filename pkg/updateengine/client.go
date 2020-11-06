@@ -42,7 +42,7 @@ func New() (*Client, error) {
 
 	c.conn, err = dbus.SystemBusPrivate()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("opening private connection to system bus: %w", err)
 	}
 
 	methods := []dbus.Auth{dbus.AuthExternal(strconv.Itoa(os.Getuid()))}
@@ -51,14 +51,14 @@ func New() (*Client, error) {
 	if err != nil {
 		c.conn.Close()
 
-		return nil, err
+		return nil, fmt.Errorf("authenticating to system bus: %w", err)
 	}
 
 	err = c.conn.Hello()
 	if err != nil {
 		c.conn.Close()
 
-		return nil, err
+		return nil, fmt.Errorf("sending hello to system bus: %w", err)
 	}
 
 	c.object = c.conn.Object("com.coreos.update1", dbus.ObjectPath(dbusPath))

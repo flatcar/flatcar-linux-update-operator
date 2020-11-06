@@ -21,7 +21,7 @@ func GetPodsForDeletion(kc kubernetes.Interface, node string) (pods []corev1.Pod
 		FieldSelector: fields.SelectorFromSet(fields.Set{"spec.nodeName": node}).String(),
 	})
 	if err != nil {
-		return pods, err
+		return nil, fmt.Errorf("listing pods on node %q: %w", node, err)
 	}
 
 	// Delete pods, even if they are lone pods without a controller. As an

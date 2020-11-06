@@ -71,7 +71,7 @@ func UpdateNodeRetry(nc v1core.NodeInterface, node string, f func(*v1api.Node)) 
 
 		_, err := nc.Update(context.TODO(), n, v1meta.UpdateOptions{})
 
-		return err
+		return err //nolint:wrapcheck
 	})
 	if err != nil {
 		// May be conflict if max retries were hit.
@@ -182,7 +182,7 @@ func getUpdateMap() (map[string]string, error) {
 	// This file should always be present on CoreOS.
 	uconf, err := os.Open(updateConfPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("opening file %q: %w", updateConfPath, err)
 	}
 
 	b, err := ioutil.ReadAll(uconf)
@@ -190,7 +190,7 @@ func getUpdateMap() (map[string]string, error) {
 	uconf.Close()
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("reading file %q: %w", updateConfPath, err)
 	}
 
 	splitNewlineEnv(infomap, string(b))
@@ -218,7 +218,7 @@ func getReleaseMap() (map[string]string, error) {
 	// This file should always be present on CoreOS.
 	osrelease, err := os.Open(osReleasePath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("opening file %q: %w", osReleasePath, err)
 	}
 
 	defer osrelease.Close()
@@ -228,7 +228,7 @@ func getReleaseMap() (map[string]string, error) {
 	osrelease.Close()
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("reading file %q: %w", osReleasePath, err)
 	}
 
 	splitNewlineEnv(infomap, string(b))

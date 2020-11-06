@@ -84,14 +84,13 @@ func (k *Kontroller) runDaemonsetUpdate(agentImageRepo string) error {
 		LabelSelector: labels.SelectorFromSet(labels.Set(managedByOperatorLabels)).String(),
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("listing DaemonSets: %w", err)
 	}
 
 	if len(agentDaemonsets.Items) == 0 {
 		// No daemonset, create it.
-		runErr := k.createAgentDamonset(agentImageRepo)
-		if runErr != nil {
-			return runErr
+		if err := k.createAgentDamonset(agentImageRepo); err != nil {
+			return fmt.Errorf("creating agent DaemonSet: %w", err)
 		}
 		// runAgent succeeded, all should be well and converging now
 		return nil
@@ -137,14 +136,14 @@ func (k *Kontroller) runDaemonsetUpdate(agentImageRepo string) error {
 		if err != nil {
 			klog.Errorf("could not delete old daemonset %+v: %v", agentDS, err)
 
-			return err
+			return fmt.Errorf("deleting old DaemonSet: %w", err)
 		}
 
 		err = k.createAgentDamonset(agentImageRepo)
 		if err != nil {
 			klog.Errorf("could not create new daemonset: %v", err)
 
-			return err
+			return fmt.Errorf("creating agent DaemonSet: %w", err)
 		}
 	}
 
@@ -156,7 +155,7 @@ func (k *Kontroller) createAgentDamonset(agentImageRepo string) error {
 
 	_, err := dsc.Create(context.TODO(), agentDaemonsetSpec(agentImageRepo), metav1.CreateOptions{})
 
-	return err
+	return err //nolint:wrapcheck
 }
 
 //nolint:funlen
