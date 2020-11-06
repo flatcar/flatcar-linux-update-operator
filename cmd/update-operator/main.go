@@ -22,7 +22,7 @@ var (
 	rebootWindowStart       = flag.String("reboot-window-start", "", "Day of week ('Sun', 'Mon', ...; optional) and time of day at which the reboot window starts. E.g. 'Mon 14:00', '11:00'")
 	rebootWindowLength      = flag.String("reboot-window-length", "", "Length of the reboot window. E.g. '1h30m'")
 	printVersion            = flag.Bool("version", false, "Print version and exit")
-	// deprecated
+	// Deprecated flags.
 	analyticsEnabled optValue
 	manageAgent      = flag.Bool("manage-agent", false, "Manage the associated update-agent")
 	agentImageRepo   = flag.String("agent-image-repo", "quay.io/kinvolk/flatcar-linux-update-operator", "The image to use for the managed agent, without version tag")
@@ -45,7 +45,7 @@ func main() {
 		klog.Warning("Use of -analytics is deprecated and will be removed. Google Analytics will not be enabled.")
 	}
 
-	// respect KUBECONFIG without the prefix as well
+	// Respect KUBECONFIG without the prefix as well.
 	if *kubeconfig == "" {
 		*kubeconfig = os.Getenv("KUBECONFIG")
 	}
@@ -59,13 +59,13 @@ func main() {
 		klog.Warning("Use of -manage-agent=true is deprecated and will be removed in the future")
 	}
 
-	// create Kubernetes client (clientset)
+	// Create Kubernetes client (clientset).
 	client, err := k8sutil.GetClient(*kubeconfig)
 	if err != nil {
 		klog.Fatalf("Failed to create Kubernetes client: %v", err)
 	}
 
-	// update-operator
+	// Construct update-operator.
 	o, err := operator.New(operator.Config{
 		Client:                  client,
 		AutoLabelContainerLinux: *autoLabelContainerLinux,
@@ -82,7 +82,7 @@ func main() {
 
 	klog.Infof("%s running", os.Args[0])
 
-	// Run operator until the stop channel is closed
+	// Run operator until the stop channel is closed.
 	stop := make(chan struct{})
 	defer close(stop)
 

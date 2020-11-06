@@ -25,12 +25,12 @@ var (
 		"app":        agentDefaultAppName,
 	}
 
-	// Labels nodes where update-agent should be scheduled
+	// Labels nodes where update-agent should be scheduled.
 	enableUpdateAgentLabel = map[string]string{
 		constants.LabelUpdateAgentEnabled: constants.True,
 	}
 
-	// Label Requirement matching nodes which lack the update agent label
+	// Label Requirement matching nodes which lack the update agent label.
 	updateAgentLabelMissing = k8sutil.NewRequirementOrDie(
 		constants.LabelUpdateAgentEnabled,
 		selection.DoesNotExist,
@@ -56,9 +56,9 @@ func (k *Kontroller) legacyLabeler() {
 		return
 	}
 
-	// match nodes that don't have an update-agent label
+	// Match nodes that don't have an update-agent label.
 	nodesMissingLabel := k8sutil.FilterNodesByRequirement(nodelist.Items, updateAgentLabelMissing)
-	// match nodes that identify as Flatcar Container Linux
+	// Match nodes that identify as Flatcar Container Linux.
 	nodesToLabel := k8sutil.FilterContainerLinuxNodes(nodesMissingLabel)
 
 	klog.V(6).Infof("Found Flatcar Container Linux nodes to label: %+v", nodelist.Items)
@@ -72,7 +72,7 @@ func (k *Kontroller) legacyLabeler() {
 	}
 }
 
-// updateAgent updates the agent on nodes if necessary.
+// runDaemonsetUpdate updates the agent on nodes if necessary.
 //
 // NOTE: the version for the agent is assumed to match the versioning scheme
 // for the operator, thus our version is used to figure out the appropriate
@@ -88,7 +88,7 @@ func (k *Kontroller) runDaemonsetUpdate(agentImageRepo string) error {
 	}
 
 	if len(agentDaemonsets.Items) == 0 {
-		// No daemonset, create it
+		// No daemonset, create it.
 		runErr := k.createAgentDamonset(agentImageRepo)
 		if runErr != nil {
 			return runErr
@@ -123,7 +123,8 @@ func (k *Kontroller) runDaemonsetUpdate(agentImageRepo string) error {
 	}
 
 	if dsSemver.LT(version.Semver) {
-		// daemonset is too old, update it
+		// Daemonset is too old, update it.
+		//
 		// TODO: perform a proper rolling update rather than delete-then-recreate
 		// Right now, daemonset rolling updates aren't upstream and are thus fairly
 		// painful to do correctly. In addition, doing it correctly doesn't add too
@@ -131,7 +132,7 @@ func (k *Kontroller) runDaemonsetUpdate(agentImageRepo string) error {
 		falseVal := false
 
 		err := k.kc.AppsV1().DaemonSets(k.namespace).Delete(context.TODO(), agentDS.Name, metav1.DeleteOptions{
-			OrphanDependents: &falseVal, // Cascading delete
+			OrphanDependents: &falseVal, // Cascading delete.
 		})
 		if err != nil {
 			klog.Errorf("could not delete old daemonset %+v: %v", agentDS, err)
@@ -189,7 +190,7 @@ func agentDaemonsetSpec(repo string) *appsv1.DaemonSet {
 					},
 				},
 				Spec: corev1.PodSpec{
-					// Update the master nodes too
+					// Update the master nodes too.
 					Tolerations: []corev1.Toleration{
 						{
 							Key:      "node-role.kubernetes.io/master",

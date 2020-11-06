@@ -37,7 +37,7 @@ func NodeAnnotationCondition(selector fields.Selector) watchtools.ConditionFunc 
 	}
 }
 
-// GetNodeRetry gets a node object, retrying up to DefaultBackoff number of times if it fails
+// GetNodeRetry gets a node object, retrying up to DefaultBackoff number of times if it fails.
 func GetNodeRetry(nc v1core.NodeInterface, node string) (*v1api.Node, error) {
 	var apiNode *v1api.Node
 
@@ -74,7 +74,7 @@ func UpdateNodeRetry(nc v1core.NodeInterface, node string, f func(*v1api.Node)) 
 		return err
 	})
 	if err != nil {
-		// may be conflict if max retries were hit
+		// May be conflict if max retries were hit.
 		return fmt.Errorf("unable to update node %q: %w", node, err)
 	}
 
@@ -102,7 +102,7 @@ func SetNodeAnnotations(nc v1core.NodeInterface, node string, m map[string]strin
 }
 
 // SetNodeAnnotationsLabels sets all keys in a and l to their values in
-// node's annotations and labels, respectively
+// node's annotations and labels, respectively.
 func SetNodeAnnotationsLabels(nc v1core.NodeInterface, node string, a, l map[string]string) error {
 	return UpdateNodeRetry(nc, node, func(n *v1api.Node) {
 		for k, v := range a {
@@ -115,7 +115,7 @@ func SetNodeAnnotationsLabels(nc v1core.NodeInterface, node string, a, l map[str
 	})
 }
 
-// DeleteNodeLabels deletes all keys in ks
+// DeleteNodeLabels deletes all keys in ks.
 func DeleteNodeLabels(nc v1core.NodeInterface, node string, ks []string) error {
 	return UpdateNodeRetry(nc, node, func(n *v1api.Node) {
 		for _, k := range ks {
@@ -124,7 +124,7 @@ func DeleteNodeLabels(nc v1core.NodeInterface, node string, ks []string) error {
 	})
 }
 
-// DeleteNodeAnnotations deletes all annotations with keys in ks
+// DeleteNodeAnnotations deletes all annotations with keys in ks.
 func DeleteNodeAnnotations(nc v1core.NodeInterface, node string, ks []string) error {
 	return UpdateNodeRetry(nc, node, func(n *v1api.Node) {
 		for _, k := range ks {
@@ -153,13 +153,13 @@ func Unschedulable(nc v1core.NodeInterface, node string, sched bool) error {
 	return nil
 }
 
-// splits newline-delimited KEY=VAL pairs and update map
+// splitNewlineEnv splits newline-delimited KEY=VAL pairs and update map.
 func splitNewlineEnv(m map[string]string, envs string) {
 	sc := bufio.NewScanner(strings.NewReader(envs))
 	for sc.Scan() {
 		spl := strings.SplitN(sc.Text(), "=", 2)
 
-		// just skip empty lines or lines without a value
+		// Just skip empty lines or lines without a value.
 		if len(spl) == 1 {
 			continue
 		}
@@ -179,7 +179,7 @@ type VersionInfo struct {
 func getUpdateMap() (map[string]string, error) {
 	infomap := map[string]string{}
 
-	// this file should always be present on CoreOS
+	// This file should always be present on CoreOS.
 	uconf, err := os.Open(updateConfPath)
 	if err != nil {
 		return nil, err
@@ -195,7 +195,7 @@ func getUpdateMap() (map[string]string, error) {
 
 	splitNewlineEnv(infomap, string(b))
 
-	// if present and readable, this file has overrides
+	// If present and readable, this file has overrides.
 	econf, err := os.Open(updateConfOverridePath)
 	if err != nil {
 		klog.Infof("Skipping missing update.conf: %w", err)
@@ -215,7 +215,7 @@ func getUpdateMap() (map[string]string, error) {
 func getReleaseMap() (map[string]string, error) {
 	infomap := map[string]string{}
 
-	// this file should always be present on CoreOS
+	// This file should always be present on CoreOS.
 	osrelease, err := os.Open(osReleasePath)
 	if err != nil {
 		return nil, err
