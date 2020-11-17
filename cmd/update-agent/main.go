@@ -23,7 +23,11 @@ var (
 
 func main() {
 	klog.InitFlags(nil)
-	flag.Set("logtostderr", "true")
+
+	if err := flag.Set("logtostderr", "true"); err != nil {
+		klog.Fatalf("Failed to set %q flag value: %v", "logtostderr", err)
+	}
+
 	flag.Parse()
 
 	if err := flagutil.SetFlagsFromEnv(flag.CommandLine, "UPDATE_AGENT"); err != nil {

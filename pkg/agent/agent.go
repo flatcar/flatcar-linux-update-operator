@@ -277,7 +277,7 @@ func (k *Klocksmith) updateStatusCallback(s updateengine.Status) {
 		labels[constants.LabelRebootNeeded] = constants.True
 	}
 
-	wait.PollUntil(defaultPollInterval, func() (bool, error) {
+	err := wait.PollUntil(defaultPollInterval, func() (bool, error) {
 		if err := k8sutil.SetNodeAnnotationsLabels(k.nc, k.node, anno, labels); err != nil {
 			klog.Errorf("Failed to set annotation %q: %v", constants.AnnotationStatus, err)
 
@@ -286,6 +286,9 @@ func (k *Klocksmith) updateStatusCallback(s updateengine.Status) {
 
 		return true, nil
 	}, wait.NeverStop)
+	if err != nil {
+		klog.Errorf("Failed updating node annotations and labels: %v", err)
+	}
 }
 
 // setInfoLabels labels our node with helpful info about Flatcar Container Linux.
