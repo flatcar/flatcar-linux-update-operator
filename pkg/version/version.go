@@ -21,6 +21,7 @@ var (
 // Semver is a variable, which holds parsed Version.
 var Semver semver.Version
 
+//nolint:gochecknoinits
 func init() {
 	v, err := semver.Parse(Version)
 	if err != nil {
