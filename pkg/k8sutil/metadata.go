@@ -52,8 +52,11 @@ func GetNodeRetry(nc v1core.NodeInterface, node string) (*v1api.Node, error) {
 
 		return nil
 	})
+	if err != nil {
+		return nil, fmt.Errorf("getting node: %w", err)
+	}
 
-	return apiNode, err
+	return apiNode, nil
 }
 
 // UpdateNodeRetry calls f to update a node object in Kubernetes.
