@@ -169,7 +169,7 @@ func splitNewlineEnv(m map[string]string, envs string) {
 	}
 }
 
-// VersionInfo contains CoreOS version and update information.
+// VersionInfo contains Flatcar version and update information.
 type VersionInfo struct {
 	Name    string
 	ID      string
@@ -180,7 +180,7 @@ type VersionInfo struct {
 func getUpdateMap() (map[string]string, error) {
 	infomap := map[string]string{}
 
-	// This file should always be present on CoreOS.
+	// This file should always be present on Flatcar.
 	uconf, err := os.Open(updateConfPath)
 	if err != nil {
 		return nil, fmt.Errorf("opening file %q: %w", updateConfPath, err)
@@ -216,7 +216,7 @@ func getUpdateMap() (map[string]string, error) {
 func getReleaseMap() (map[string]string, error) {
 	infomap := map[string]string{}
 
-	// This file should always be present on CoreOS.
+	// This file should always be present on Flatcar.
 	osrelease, err := os.Open(osReleasePath)
 	if err != nil {
 		return nil, fmt.Errorf("opening file %q: %w", osReleasePath, err)
@@ -237,7 +237,7 @@ func getReleaseMap() (map[string]string, error) {
 	return infomap, nil
 }
 
-// GetVersionInfo returns VersionInfo from the current CoreOS system.
+// GetVersionInfo returns VersionInfo from the current Flatcar system.
 //
 // Should probably live in a different package.
 func GetVersionInfo() (*VersionInfo, error) {
