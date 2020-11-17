@@ -18,7 +18,9 @@ import (
 func atomicCounterIncrement(n *corev1.Node) {
 	counterAnno := "counter"
 	s := n.Annotations[counterAnno]
+
 	var i int
+
 	if s == "" {
 		i = 0
 	} else {
@@ -28,6 +30,7 @@ func atomicCounterIncrement(n *corev1.Node) {
 			panic(err)
 		}
 	}
+
 	n.Annotations[counterAnno] = strconv.Itoa(i + 1)
 }
 
@@ -62,10 +65,10 @@ func TestUpdateNodeRetryHandlesConflict(t *testing.T) {
 	)
 
 	err := UpdateNodeRetry(mockNi, "mock_node", atomicCounterIncrement)
-
 	if err != nil {
 		t.Errorf("unexpected error: expected increment to succeed")
 	}
+
 	if mockNode.Annotations["counter"] != "22" {
 		t.Errorf("expected the counter to hit 22; was %v", mockNode.Annotations["counter"])
 	}

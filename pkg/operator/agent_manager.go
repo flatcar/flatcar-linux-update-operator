@@ -25,12 +25,12 @@ var (
 		"app":        agentDefaultAppName,
 	}
 
-	// Labels nodes where update-agent should be scheduled
+	// Labels nodes where update-agent should be scheduled.
 	enableUpdateAgentLabel = map[string]string{
 		constants.LabelUpdateAgentEnabled: constants.True,
 	}
 
-	// Label Requirement matching nodes which lack the update agent label
+	// Label Requirement matching nodes which lack the update agent label.
 	updateAgentLabelMissing = k8sutil.NewRequirementOrDie(
 		constants.LabelUpdateAgentEnabled,
 		selection.DoesNotExist,
@@ -52,25 +52,27 @@ func (k *Kontroller) legacyLabeler() {
 	nodelist, err := k.nc.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		klog.Infof("Failed listing nodes %v", err)
+
 		return
 	}
 
-	// match nodes that don't have an update-agent label
+	// Match nodes that don't have an update-agent label.
 	nodesMissingLabel := k8sutil.FilterNodesByRequirement(nodelist.Items, updateAgentLabelMissing)
-	// match nodes that identify as Flatcar Container Linux
+	// Match nodes that identify as Flatcar Container Linux.
 	nodesToLabel := k8sutil.FilterContainerLinuxNodes(nodesMissingLabel)
 
 	klog.V(6).Infof("Found Flatcar Container Linux nodes to label: %+v", nodelist.Items)
 
 	for _, node := range nodesToLabel {
 		klog.Infof("Setting label 'agent=true' on %q", node.Name)
+
 		if err := k8sutil.SetNodeLabels(k.nc, node.Name, enableUpdateAgentLabel); err != nil {
 			klog.Errorf("Failed setting label 'agent=true' on %q", node.Name)
 		}
 	}
 }
 
-// updateAgent updates the agent on nodes if necessary.
+// runDaemonsetUpdate updates the agent on nodes if necessary.
 //
 // NOTE: the version for the agent is assumed to match the versioning scheme
 // for the operator, thus our version is used to figure out the appropriate
@@ -82,14 +84,13 @@ func (k *Kontroller) runDaemonsetUpdate(agentImageRepo string) error {
 		LabelSelector: labels.SelectorFromSet(labels.Set(managedByOperatorLabels)).String(),
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("listing DaemonSets: %w", err)
 	}
 
 	if len(agentDaemonsets.Items) == 0 {
-		// No daemonset, create it
-		runErr := k.createAgentDamonset(agentImageRepo)
-		if runErr != nil {
-			return runErr
+		// No daemonset, create it.
+		if err := k.createAgentDamonset(agentImageRepo); err != nil {
+			return fmt.Errorf("creating agent DaemonSet: %w", err)
 		}
 		// runAgent succeeded, all should be well and converging now
 		return nil
@@ -99,42 +100,50 @@ func (k *Kontroller) runDaemonsetUpdate(agentImageRepo string) error {
 	// patch it each time rather than creating new ones.
 	if len(agentDaemonsets.Items) > 1 {
 		klog.Errorf("only expected one daemonset managed by operator; found %+v", agentDaemonsets.Items)
+
 		return fmt.Errorf("only expected one daemonset managed by operator; found %v", len(agentDaemonsets.Items))
 	}
 
 	agentDS := agentDaemonsets.Items[0]
 
 	var dsSemver semver.Version
+
 	if dsVersion, ok := agentDS.Annotations[constants.AgentVersion]; ok {
 		ver, err := semver.Parse(dsVersion)
 		if err != nil {
 			return fmt.Errorf("agent daemonset had version annotation, but it was not valid semver: %v[%v] = %v", agentDS.Name, constants.AgentVersion, dsVersion)
 		}
+
 		dsSemver = ver
 	} else {
 		klog.Errorf("managed daemonset did not have a version annotation: %+v", agentDS)
+
 		return fmt.Errorf("managed daemonset did not have a version annotation")
 	}
 
 	if dsSemver.LT(version.Semver) {
-		// daemonset is too old, update it
+		// Daemonset is too old, update it.
+		//
 		// TODO: perform a proper rolling update rather than delete-then-recreate
 		// Right now, daemonset rolling updates aren't upstream and are thus fairly
 		// painful to do correctly. In addition, doing it correctly doesn't add too
 		// much value unless we have corresponding detection/rollback logic.
 		falseVal := false
+
 		err := k.kc.AppsV1().DaemonSets(k.namespace).Delete(context.TODO(), agentDS.Name, metav1.DeleteOptions{
-			OrphanDependents: &falseVal, // Cascading delete
+			OrphanDependents: &falseVal, // Cascading delete.
 		})
 		if err != nil {
 			klog.Errorf("could not delete old daemonset %+v: %v", agentDS, err)
-			return err
+
+			return fmt.Errorf("deleting old DaemonSet: %w", err)
 		}
 
 		err = k.createAgentDamonset(agentImageRepo)
 		if err != nil {
 			klog.Errorf("could not create new daemonset: %v", err)
-			return err
+
+			return fmt.Errorf("creating agent DaemonSet: %w", err)
 		}
 	}
 
@@ -146,7 +155,7 @@ func (k *Kontroller) createAgentDamonset(agentImageRepo string) error {
 
 	_, err := dsc.Create(context.TODO(), agentDaemonsetSpec(agentImageRepo), metav1.CreateOptions{})
 
-	return err
+	return err //nolint:wrapcheck
 }
 
 //nolint:funlen
@@ -158,6 +167,7 @@ func agentDaemonsetSpec(repo string) *appsv1.DaemonSet {
 	for k, v := range managedByOperatorLabels {
 		versionedSelector[k] = v
 	}
+
 	versionedSelector[constants.AgentVersion] = version.Version
 
 	return &appsv1.DaemonSet{
@@ -179,7 +189,7 @@ func agentDaemonsetSpec(repo string) *appsv1.DaemonSet {
 					},
 				},
 				Spec: corev1.PodSpec{
-					// Update the master nodes too
+					// Update the master nodes too.
 					Tolerations: []corev1.Toleration{
 						{
 							Key:      "node-role.kubernetes.io/master",

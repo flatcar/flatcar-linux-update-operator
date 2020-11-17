@@ -44,7 +44,7 @@ var DefaultBackoff = wait.Backoff{
 	Jitter:   0.1,
 }
 
-// RetryConflict executes the provided function repeatedly, retrying if the server returns a conflicting
+// RetryOnConflict executes the provided function repeatedly, retrying if the server returns a conflicting
 // write. Callers should preserve previous executions if they wish to retry changes. It performs an
 // exponential backoff.
 //
@@ -62,27 +62,33 @@ var DefaultBackoff = wait.Backoff{
 // TODO: Make Backoff an interface?
 func RetryOnConflict(backoff wait.Backoff, fn func() error) error {
 	var lastConflictErr error
+
 	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
 		err := fn()
+
 		switch {
 		case err == nil:
 			return true, nil
 		case errors.IsConflict(err):
 			lastConflictErr = err
+
 			return false, nil
 		default:
 			return false, err
 		}
 	})
+
 	if err == wait.ErrWaitTimeout {
 		err = lastConflictErr
 	}
+
 	return err
 }
 
-// RetryOnError retries a function repeatedly with the specified backoff until it succeeds or times out
+// RetryOnError retries a function repeatedly with the specified backoff until it succeeds or times out.
 func RetryOnError(backoff wait.Backoff, fn func() error) error {
 	var lastErr error
+
 	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
 		lastErr := fn()
 
@@ -92,5 +98,6 @@ func RetryOnError(backoff wait.Backoff, fn func() error) error {
 	if err == wait.ErrWaitTimeout {
 		err = lastErr
 	}
+
 	return err
 }

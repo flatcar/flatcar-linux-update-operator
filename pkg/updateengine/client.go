@@ -23,11 +23,10 @@ import (
 )
 
 const (
-	dbusPath            = "/com/coreos/update1"
-	dbusInterface       = "com.coreos.update1.Manager"
-	dbusMember          = "StatusUpdate"
-	dbusMemberInterface = dbusInterface + "." + dbusMember
-	signalBuffer        = 32 // TODO(bp): What is a reasonable value here?
+	dbusPath      = "/com/coreos/update1"
+	dbusInterface = "com.coreos.update1.Manager"
+	dbusMember    = "StatusUpdate"
+	signalBuffer  = 32 // TODO(bp): What is a reasonable value here?
 )
 
 type Client struct {
@@ -38,29 +37,33 @@ type Client struct {
 
 func New() (*Client, error) {
 	c := new(Client)
+
 	var err error
 
 	c.conn, err = dbus.SystemBusPrivate()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("opening private connection to system bus: %w", err)
 	}
 
 	methods := []dbus.Auth{dbus.AuthExternal(strconv.Itoa(os.Getuid()))}
+
 	err = c.conn.Auth(methods)
 	if err != nil {
 		c.conn.Close()
-		return nil, err
+
+		return nil, fmt.Errorf("authenticating to system bus: %w", err)
 	}
 
 	err = c.conn.Hello()
 	if err != nil {
 		c.conn.Close()
-		return nil, err
+
+		return nil, fmt.Errorf("sending hello to system bus: %w", err)
 	}
 
 	c.object = c.conn.Object("com.coreos.update1", dbus.ObjectPath(dbusPath))
 
-	// Setup the filter for the StatusUpdate signals
+	// Setup the filter for the StatusUpdate signals.
 	match := fmt.Sprintf("type='signal',interface='%s',member='%s'", dbusInterface, dbusMember)
 
 	call := c.conn.BusObject().Call("org.freedesktop.DBus.AddMatch", 0, match)
@@ -78,6 +81,7 @@ func (c *Client) Close() error {
 	if c.conn != nil {
 		return c.conn.Close()
 	}
+
 	return nil
 }
 
@@ -86,9 +90,9 @@ func (c *Client) Close() error {
 // get the initial status and send it on the rcvr channel before receiving
 // starts.
 func (c *Client) ReceiveStatuses(rcvr chan Status, stop <-chan struct{}) {
-	// if there is an error getting the current status, ignore it and just
+	// If there is an error getting the current status, ignore it and just
 	// move onto the main loop.
-	st, _ := c.GetStatus()
+	st, _ := c.getStatus()
 	rcvr <- st
 
 	for {
@@ -115,18 +119,12 @@ func (c *Client) RebootNeededSignal(rcvr chan Status, stop <-chan struct{}) {
 	}
 }
 
-// GetStatus gets the current status from update_engine
-func (c *Client) GetStatus() (Status, error) {
+// getStatus gets the current status from update_engine.
+func (c *Client) getStatus() (Status, error) {
 	call := c.object.Call(dbusInterface+".GetStatus", 0)
 	if call.Err != nil {
 		return Status{}, call.Err
 	}
-	return NewStatus(call.Body), nil
-}
 
-// AttemptUpdate will trigger an update if available. This is an asynchronous
-// call - it returns immediately.
-func (c *Client) AttemptUpdate() error {
-	call := c.object.Call(dbusInterface+".AttemptUpdate", 0)
-	return call.Err
+	return NewStatus(call.Body), nil
 }

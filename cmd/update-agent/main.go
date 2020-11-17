@@ -38,6 +38,7 @@ func main() {
 	}
 
 	rt := time.Duration(*reapTimeout) * time.Second
+
 	a, err := agent.New(*node, rt)
 	if err != nil {
 		klog.Fatalf("Failed to initialize %s: %v", os.Args[0], err)

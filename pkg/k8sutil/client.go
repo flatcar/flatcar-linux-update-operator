@@ -13,8 +13,9 @@ import (
 func GetClient(path string) (*kubernetes.Clientset, error) {
 	conf, err := getClientConfig(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get Kubernetes client config: %v", err)
+		return nil, fmt.Errorf("failed to get Kubernetes client config: %w", err)
 	}
+
 	return kubernetes.NewForConfig(conf)
 }
 

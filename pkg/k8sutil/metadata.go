@@ -27,9 +27,9 @@ const (
 // node being watched has an annotation of key equal to value.
 func NodeAnnotationCondition(selector fields.Selector) watchtools.ConditionFunc {
 	return func(event watch.Event) (bool, error) {
-		switch event.Type {
-		case watch.Modified:
+		if event.Type == watch.Modified {
 			node := event.Object.(*v1api.Node)
+
 			return selector.Matches(fields.Set(node.Annotations)), nil
 		}
 
@@ -37,16 +37,18 @@ func NodeAnnotationCondition(selector fields.Selector) watchtools.ConditionFunc 
 	}
 }
 
-// GetNodeRetry gets a node object, retrying up to DefaultBackoff number of times if it fails
+// GetNodeRetry gets a node object, retrying up to DefaultBackoff number of times if it fails.
 func GetNodeRetry(nc v1core.NodeInterface, node string) (*v1api.Node, error) {
 	var apiNode *v1api.Node
+
 	err := RetryOnError(DefaultBackoff, func() error {
 		n, getErr := nc.Get(context.TODO(), node, v1meta.GetOptions{})
 		if getErr != nil {
-			return fmt.Errorf("failed to get node %q: %v", node, getErr)
+			return fmt.Errorf("failed to get node %q: %w", node, getErr)
 		}
 
 		apiNode = n
+
 		return nil
 	})
 
@@ -62,17 +64,18 @@ func UpdateNodeRetry(nc v1core.NodeInterface, node string, f func(*v1api.Node)) 
 	err := RetryOnConflict(DefaultBackoff, func() error {
 		n, getErr := nc.Get(context.TODO(), node, v1meta.GetOptions{})
 		if getErr != nil {
-			return fmt.Errorf("failed to get node %q: %v", node, getErr)
+			return fmt.Errorf("failed to get node %q: %w", node, getErr)
 		}
 
 		f(n)
 
 		_, err := nc.Update(context.TODO(), n, v1meta.UpdateOptions{})
-		return err
+
+		return err //nolint:wrapcheck
 	})
 	if err != nil {
-		// may be conflict if max retries were hit
-		return fmt.Errorf("unable to update node %q: %v", node, err)
+		// May be conflict if max retries were hit.
+		return fmt.Errorf("unable to update node %q: %w", node, err)
 	}
 
 	return nil
@@ -99,7 +102,7 @@ func SetNodeAnnotations(nc v1core.NodeInterface, node string, m map[string]strin
 }
 
 // SetNodeAnnotationsLabels sets all keys in a and l to their values in
-// node's annotations and labels, respectively
+// node's annotations and labels, respectively.
 func SetNodeAnnotationsLabels(nc v1core.NodeInterface, node string, a, l map[string]string) error {
 	return UpdateNodeRetry(nc, node, func(n *v1api.Node) {
 		for k, v := range a {
@@ -112,7 +115,7 @@ func SetNodeAnnotationsLabels(nc v1core.NodeInterface, node string, a, l map[str
 	})
 }
 
-// DeleteNodeLabels deletes all keys in ks
+// DeleteNodeLabels deletes all keys in ks.
 func DeleteNodeLabels(nc v1core.NodeInterface, node string, ks []string) error {
 	return UpdateNodeRetry(nc, node, func(n *v1api.Node) {
 		for _, k := range ks {
@@ -121,7 +124,7 @@ func DeleteNodeLabels(nc v1core.NodeInterface, node string, ks []string) error {
 	})
 }
 
-// DeleteNodeAnnotations deletes all annotations with keys in ks
+// DeleteNodeAnnotations deletes all annotations with keys in ks.
 func DeleteNodeAnnotations(nc v1core.NodeInterface, node string, ks []string) error {
 	return UpdateNodeRetry(nc, node, func(n *v1api.Node) {
 		for _, k := range ks {
@@ -134,28 +137,29 @@ func DeleteNodeAnnotations(nc v1core.NodeInterface, node string, ks []string) er
 func Unschedulable(nc v1core.NodeInterface, node string, sched bool) error {
 	n, err := nc.Get(context.TODO(), node, v1meta.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to get node %q: %v", node, err)
+		return fmt.Errorf("failed to get node %q: %w", node, err)
 	}
 
 	n.Spec.Unschedulable = sched
 
 	if err := RetryOnConflict(DefaultBackoff, func() (err error) {
 		n, err = nc.Update(context.TODO(), n, v1meta.UpdateOptions{})
+
 		return
 	}); err != nil {
-		return fmt.Errorf("unable to set 'Unschedulable' property of node %q to %t: %v", node, sched, err)
+		return fmt.Errorf("unable to set 'Unschedulable' property of node %q to %t: %w", node, sched, err)
 	}
 
 	return nil
 }
 
-// splits newline-delimited KEY=VAL pairs and update map
+// splitNewlineEnv splits newline-delimited KEY=VAL pairs and update map.
 func splitNewlineEnv(m map[string]string, envs string) {
 	sc := bufio.NewScanner(strings.NewReader(envs))
 	for sc.Scan() {
 		spl := strings.SplitN(sc.Text(), "=", 2)
 
-		// just skip empty lines or lines without a value
+		// Just skip empty lines or lines without a value.
 		if len(spl) == 1 {
 			continue
 		}
@@ -175,28 +179,32 @@ type VersionInfo struct {
 func getUpdateMap() (map[string]string, error) {
 	infomap := map[string]string{}
 
-	// this file should always be present on CoreOS
+	// This file should always be present on CoreOS.
 	uconf, err := os.Open(updateConfPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("opening file %q: %w", updateConfPath, err)
 	}
 
 	b, err := ioutil.ReadAll(uconf)
+
 	uconf.Close()
+
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("reading file %q: %w", updateConfPath, err)
 	}
 
 	splitNewlineEnv(infomap, string(b))
 
-	// if present and readable, this file has overrides
+	// If present and readable, this file has overrides.
 	econf, err := os.Open(updateConfOverridePath)
 	if err != nil {
-		klog.Infof("Skipping missing update.conf: %v", err)
+		klog.Infof("Skipping missing update.conf: %w", err)
 	}
 
 	b, err = ioutil.ReadAll(econf)
+
 	econf.Close()
+
 	if err == nil {
 		splitNewlineEnv(infomap, string(b))
 	}
@@ -207,17 +215,20 @@ func getUpdateMap() (map[string]string, error) {
 func getReleaseMap() (map[string]string, error) {
 	infomap := map[string]string{}
 
-	// this file should always be present on CoreOS
+	// This file should always be present on CoreOS.
 	osrelease, err := os.Open(osReleasePath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("opening file %q: %w", osReleasePath, err)
 	}
 
 	defer osrelease.Close()
+
 	b, err := ioutil.ReadAll(osrelease)
+
 	osrelease.Close()
+
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("reading file %q: %w", osReleasePath, err)
 	}
 
 	splitNewlineEnv(infomap, string(b))
@@ -231,12 +242,12 @@ func getReleaseMap() (map[string]string, error) {
 func GetVersionInfo() (*VersionInfo, error) {
 	updateconf, err := getUpdateMap()
 	if err != nil {
-		return nil, fmt.Errorf("unable to get update configuration: %v", err)
+		return nil, fmt.Errorf("unable to get update configuration: %w", err)
 	}
 
 	osrelease, err := getReleaseMap()
 	if err != nil {
-		return nil, fmt.Errorf("unable to get os release info: %v", err)
+		return nil, fmt.Errorf("unable to get os release info: %w", err)
 	}
 
 	vi := &VersionInfo{

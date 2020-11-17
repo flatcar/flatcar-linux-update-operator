@@ -1,4 +1,4 @@
-package drain
+package k8sutil
 
 import (
 	"context"
@@ -21,14 +21,13 @@ func GetPodsForDeletion(kc kubernetes.Interface, node string) (pods []corev1.Pod
 		FieldSelector: fields.SelectorFromSet(fields.Set{"spec.nodeName": node}).String(),
 	})
 	if err != nil {
-		return pods, err
+		return nil, fmt.Errorf("listing pods on node %q: %w", node, err)
 	}
 
 	// Delete pods, even if they are lone pods without a controller. As an
 	// exception, skip mirror pods and daemonset pods with an existing
 	// daemonset (since the daemonset owner would recreate them anyway).
 	for _, pod := range podList.Items {
-
 		// skip mirror pods
 		if _, ok := pod.Annotations[corev1.MirrorPodAnnotationKey]; ok {
 			continue
@@ -50,16 +49,20 @@ func getOwnerDaemonset(kc kubernetes.Interface, pod corev1.Pod) (interface{}, er
 	if len(pod.OwnerReferences) == 0 {
 		return nil, fmt.Errorf("pod %q has no owner objects", pod.Name)
 	}
+
 	for _, ownerRef := range pod.OwnerReferences {
+		ownerRef := ownerRef
+
 		// skip pod if it is owned by an existing daemonset
 		if ownerRef.Kind == "DaemonSet" {
-			ds, err := getDaemonsetController(kc, pod.Namespace, &ownerRef)
+			ds, err := getDaemonsetController(kc, pod.Namespace, ownerRef)
 			if err == nil {
 				// daemonset owner exists
 				return ds, nil
 			}
+
 			if !errors.IsNotFound(err) {
-				return nil, fmt.Errorf("failed to get controller of pod %q: %v", pod.Name, err)
+				return nil, fmt.Errorf("failed to get controller of pod %q: %w", pod.Name, err)
 			}
 		}
 	}
@@ -70,10 +73,10 @@ func getOwnerDaemonset(kc kubernetes.Interface, pod corev1.Pod) (interface{}, er
 // Stripped down version of https://github.com/kubernetes/kubernetes/blob/1bc56825a2dff06f29663a024ee339c25e6e6280/pkg/kubectl/cmd/drain.go#L272
 //
 //nolint:lll
-func getDaemonsetController(kc kubernetes.Interface, namespace string, controllerRef *metav1.OwnerReference) (interface{}, error) {
-	switch controllerRef.Kind {
-	case "DaemonSet":
+func getDaemonsetController(kc kubernetes.Interface, namespace string, controllerRef metav1.OwnerReference) (interface{}, error) {
+	if controllerRef.Kind == "DaemonSet" {
 		return kc.AppsV1().DaemonSets(namespace).Get(context.TODO(), controllerRef.Name, metav1.GetOptions{})
 	}
-	return nil, fmt.Errorf("Unknown controller kind %q", controllerRef.Kind)
+
+	return nil, fmt.Errorf("unknown controller kind %q", controllerRef.Kind)
 }
