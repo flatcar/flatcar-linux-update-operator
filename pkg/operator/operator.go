@@ -87,6 +87,7 @@ var (
 	notAfterRebootReq  = k8sutil.NewRequirementOrDie(constants.LabelAfterReboot, selection.NotIn, []string{constants.True})
 )
 
+// Kontroller implement operator part of FLUO.
 type Kontroller struct {
 	kc kubernetes.Interface
 	nc corev1client.NodeInterface
