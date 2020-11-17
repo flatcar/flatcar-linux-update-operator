@@ -49,14 +49,16 @@ func New() (*Client, error) {
 
 	err = c.conn.Auth(methods)
 	if err != nil {
-		c.conn.Close()
+		// Best effort closing the connection.
+		_ = c.conn.Close()
 
 		return nil, fmt.Errorf("authenticating to system bus: %w", err)
 	}
 
 	err = c.conn.Hello()
 	if err != nil {
-		c.conn.Close()
+		// Best effort closing the connection.
+		_ = c.conn.Close()
 
 		return nil, fmt.Errorf("sending hello to system bus: %w", err)
 	}

@@ -111,7 +111,8 @@ func (k *Kontroller) runDaemonsetUpdate(agentImageRepo string) error {
 	if dsVersion, ok := agentDS.Annotations[constants.AgentVersion]; ok {
 		ver, err := semver.Parse(dsVersion)
 		if err != nil {
-			return fmt.Errorf("agent daemonset had version annotation, but it was not valid semver: %v[%v] = %v", agentDS.Name, constants.AgentVersion, dsVersion)
+			return fmt.Errorf("agent daemonset had version annotation, but it was not valid semver: %v[%v] = %v",
+				agentDS.Name, constants.AgentVersion, dsVersion)
 		}
 
 		dsSemver = ver

@@ -99,6 +99,8 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 
 	// Only make a node schedulable if a reboot was in progress. This prevents a node from being made schedulable
 	// if it was made unschedulable by something other than the agent.
+	//
+	//nolint:lll
 	madeUnschedulableAnnotation, madeUnschedulableAnnotationExists := node.Annotations[constants.AnnotationAgentMadeUnschedulable]
 	makeSchedulable := madeUnschedulableAnnotation == constants.True
 
@@ -329,7 +331,10 @@ func (k *Klocksmith) waitForOkToReboot() error {
 		return fmt.Errorf("failed to get self node (%q): %w", k.node, err)
 	}
 
-	if n.Annotations[constants.AnnotationOkToReboot] == constants.True && n.Annotations[constants.AnnotationRebootNeeded] == constants.True {
+	okToReboot := n.Annotations[constants.AnnotationOkToReboot] == constants.True
+	rebootNeeded := n.Annotations[constants.AnnotationRebootNeeded] == constants.True
+
+	if okToReboot && rebootNeeded {
 		return nil
 	}
 

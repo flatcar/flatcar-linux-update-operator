@@ -81,6 +81,8 @@ var (
 	afterRebootReq = k8sutil.NewRequirementOrDie(constants.LabelAfterReboot, selection.In, []string{constants.True})
 
 	// notBeforeRebootReq and notAfterRebootReq are the inverse of the above checks.
+	//
+	//nolint:lll
 	notBeforeRebootReq = k8sutil.NewRequirementOrDie(constants.LabelBeforeReboot, selection.NotIn, []string{constants.True})
 	notAfterRebootReq  = k8sutil.NewRequirementOrDie(constants.LabelAfterReboot, selection.NotIn, []string{constants.True})
 )
@@ -167,7 +169,8 @@ func New(config Config) (*Kontroller, error) {
 
 	namespace := os.Getenv("POD_NAMESPACE")
 	if namespace == "" {
-		return nil, fmt.Errorf("unable to determine operator namespace: please ensure POD_NAMESPACE environment variable is set")
+		return nil, fmt.Errorf("unable to determine operator namespace: please ensure POD_NAMESPACE " +
+			"environment variable is set")
 	}
 
 	var rebootWindow *timeutil.Periodic
