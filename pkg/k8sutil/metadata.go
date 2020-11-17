@@ -188,19 +188,16 @@ func getUpdateMap() (map[string]string, error) {
 
 	splitNewlineEnv(infomap, string(b))
 
-	// If present and readable, this file has overrides.
-	econf, err := os.Open(updateConfOverridePath)
+	updateConfOverride, err := ioutil.ReadFile(updateConfOverridePath)
 	if err != nil {
+		if !os.IsNotExist(err) {
+			return nil, fmt.Errorf("reading file %q: %w", updateConfOverridePath, err)
+		}
+
 		klog.Infof("Skipping missing update.conf: %w", err)
 	}
 
-	b, err = ioutil.ReadAll(econf)
-
-	econf.Close()
-
-	if err == nil {
-		splitNewlineEnv(infomap, string(b))
-	}
+	splitNewlineEnv(infomap, string(updateConfOverride))
 
 	return infomap, nil
 }
