@@ -27,6 +27,7 @@ import (
 	"github.com/kinvolk/flatcar-linux-update-operator/pkg/updateengine"
 )
 
+// Klocksmith implements agent part of FLUO.
 type Klocksmith struct {
 	node        string
 	kc          kubernetes.Interface
@@ -43,6 +44,7 @@ var shouldRebootSelector = fields.Set(map[string]string{
 	constants.AnnotationRebootNeeded: constants.True,
 }).AsSelector()
 
+// New returns initialized Klocksmith.
 func New(node string, reapTimeout time.Duration) (*Klocksmith, error) {
 	// Set up kubernetes in-cluster client.
 	kc, err := k8sutil.GetClient("")
