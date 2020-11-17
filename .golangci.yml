@@ -1,3 +1,6 @@
+output:
+  sort-results: true
+
 run:
   modules-download-mode: vendor
   timeout: 5m
