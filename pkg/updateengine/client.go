@@ -29,12 +29,18 @@ const (
 	signalBuffer  = 32 // TODO(bp): What is a reasonable value here?
 )
 
+// Client allows reading update-engine status using D-Bus.
+//
+// New instance should be initialized using New() function.
+//
+// When finished using this object, Close() should be called to close D-Bus connection.
 type Client struct {
 	conn   *dbus.Conn
 	object dbus.BusObject
 	ch     chan *dbus.Signal
 }
 
+// New creates new instance of Client and initializes it.
 func New() (*Client, error) {
 	c := new(Client)
 
@@ -79,6 +85,7 @@ func New() (*Client, error) {
 	return c, nil
 }
 
+// Close closes internal D-Bus connection.
 func (c *Client) Close() error {
 	if c.conn != nil {
 		return c.conn.Close()
