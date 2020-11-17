@@ -107,20 +107,6 @@ func (c *Client) ReceiveStatuses(rcvr chan Status, stop <-chan struct{}) {
 	}
 }
 
-func (c *Client) RebootNeededSignal(rcvr chan Status, stop <-chan struct{}) {
-	for {
-		select {
-		case <-stop:
-			return
-		case signal := <-c.ch:
-			s := NewStatus(signal.Body)
-			if s.CurrentOperation == UpdateStatusUpdatedNeedReboot {
-				rcvr <- s
-			}
-		}
-	}
-}
-
 // getStatus gets the current status from update_engine.
 func (c *Client) getStatus() (Status, error) {
 	call := c.object.Call(dbusInterface+".GetStatus", 0)
