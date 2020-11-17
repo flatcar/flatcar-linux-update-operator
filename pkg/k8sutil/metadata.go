@@ -181,15 +181,7 @@ func getUpdateMap() (map[string]string, error) {
 	infomap := map[string]string{}
 
 	// This file should always be present on Flatcar.
-	uconf, err := os.Open(updateConfPath)
-	if err != nil {
-		return nil, fmt.Errorf("opening file %q: %w", updateConfPath, err)
-	}
-
-	b, err := ioutil.ReadAll(uconf)
-
-	uconf.Close()
-
+	b, err := ioutil.ReadFile(updateConfPath)
 	if err != nil {
 		return nil, fmt.Errorf("reading file %q: %w", updateConfPath, err)
 	}
@@ -217,17 +209,7 @@ func getReleaseMap() (map[string]string, error) {
 	infomap := map[string]string{}
 
 	// This file should always be present on Flatcar.
-	osrelease, err := os.Open(osReleasePath)
-	if err != nil {
-		return nil, fmt.Errorf("opening file %q: %w", osReleasePath, err)
-	}
-
-	defer osrelease.Close()
-
-	b, err := ioutil.ReadAll(osrelease)
-
-	osrelease.Close()
-
+	b, err := ioutil.ReadFile(osReleasePath)
 	if err != nil {
 		return nil, fmt.Errorf("reading file %q: %w", osReleasePath, err)
 	}
