@@ -536,13 +536,9 @@ func (k *Kontroller) markBeforeReboot() error {
 	klog.Infof("Found %d nodes that need a reboot", len(chosenNodes))
 
 	for _, n := range chosenNodes {
-		err = k.mark(n.Name, constants.LabelBeforeReboot, k.beforeRebootAnnotations)
+		err = k.mark(n.Name, constants.LabelBeforeReboot, "before-reboot", k.beforeRebootAnnotations)
 		if err != nil {
 			return fmt.Errorf("labeling node for before reboot checks: %w", err)
-		}
-
-		if len(k.beforeRebootAnnotations) > 0 {
-			klog.Infof("Waiting for before-reboot annotations on node %q: %v", n.Name, k.beforeRebootAnnotations)
 		}
 	}
 
@@ -572,20 +568,16 @@ func (k *Kontroller) markAfterReboot() error {
 
 	// For all the nodes which just rebooted, remove any old annotations and add the after-reboot=true label.
 	for _, n := range justRebootedNodes {
-		err = k.mark(n.Name, constants.LabelAfterReboot, k.afterRebootAnnotations)
+		err = k.mark(n.Name, constants.LabelAfterReboot, "after-reboot", k.afterRebootAnnotations)
 		if err != nil {
 			return fmt.Errorf("labeling node for after reboot checks: %w", err)
-		}
-
-		if len(k.afterRebootAnnotations) > 0 {
-			klog.Infof("Waiting for after-reboot annotations on node %q: %v", n.Name, k.afterRebootAnnotations)
 		}
 	}
 
 	return nil
 }
 
-func (k *Kontroller) mark(nodeName string, label string, annotations []string) error {
+func (k *Kontroller) mark(nodeName, label, annotationsType string, annotations []string) error {
 	klog.V(4).Infof("Deleting annotations %v for %q", annotations, nodeName)
 	klog.V(4).Infof("Setting label %q to %q for node %q", label, constants.True, nodeName)
 
@@ -597,6 +589,10 @@ func (k *Kontroller) mark(nodeName string, label string, annotations []string) e
 	})
 	if err != nil {
 		return fmt.Errorf("setting label %q to %q on node %q: %w", label, constants.True, nodeName, err)
+	}
+
+	if len(annotations) > 0 {
+		klog.Infof("Waiting for %s annotations on node %q: %v", annotationsType, nodeName, annotations)
 	}
 
 	return nil
