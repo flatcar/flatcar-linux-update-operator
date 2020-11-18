@@ -467,6 +467,70 @@ func (k *Kontroller) checkAfterReboot() error {
 	return nil
 }
 
+// insideRebootWindow checks if process is inside reboot window at the time
+// of calling this function.
+//
+// If reboot window is not configured, true is always returned.
+func (k *Kontroller) insideRebootWindow() bool {
+	if k.rebootWindow == nil {
+		return true
+	}
+
+	// Get previous occurrence relative to now.
+	period := k.rebootWindow.Previous(time.Now())
+
+	return !(period.End.After(time.Now()))
+}
+
+// remainingRebootingCapacity calculates how many more nodes can be rebooted at a time based
+// on a given list of nodes.
+//
+// If maximum capacity is reached, it is logged and list of rebooting nodes is logged as well.
+func (k *Kontroller) remainingRebootingCapacity(nodelist *corev1.NodeList) int {
+	rebootingNodes := k8sutil.FilterNodesByAnnotation(nodelist.Items, stillRebootingSelector)
+
+	// Nodes running before and after reboot checks are still considered to be "rebooting" to us.
+	beforeRebootNodes := k8sutil.FilterNodesByRequirement(nodelist.Items, beforeRebootReq)
+	afterRebootNodes := k8sutil.FilterNodesByRequirement(nodelist.Items, afterRebootReq)
+
+	rebootingNodes = append(append(rebootingNodes, beforeRebootNodes...), afterRebootNodes...)
+
+	remainingCapacity := maxRebootingNodes - len(rebootingNodes)
+
+	if remainingCapacity == 0 {
+		for _, n := range rebootingNodes {
+			klog.Infof("Found node %q still rebooting, waiting", n.Name)
+		}
+
+		klog.Infof("Found %d (of max %d) rebooting nodes; waiting for completion", len(rebootingNodes), maxRebootingNodes)
+	}
+
+	return remainingCapacity
+}
+
+// nodesRequiringReboot filters given list of nodes and returns ones which requires a reboot.
+func (k *Kontroller) nodesRequiringReboot(nodelist *corev1.NodeList) []corev1.Node {
+	rebootableNodes := k8sutil.FilterNodesByAnnotation(nodelist.Items, wantsRebootSelector)
+
+	return k8sutil.FilterNodesByRequirement(rebootableNodes, notBeforeRebootReq)
+}
+
+// rebootableNodes returns list of nodes which can be marked for rebooting based on remaining capacity.
+func (k *Kontroller) rebootableNodes(nodelist *corev1.NodeList) []*corev1.Node {
+	remainingCapacity := k.remainingRebootingCapacity(nodelist)
+
+	nodesRequiringReboot := k.nodesRequiringReboot(nodelist)
+
+	chosenNodes := make([]*corev1.Node, 0, remainingCapacity)
+	for i := 0; i < remainingCapacity && i < len(nodesRequiringReboot); i++ {
+		chosenNodes = append(chosenNodes, &nodesRequiringReboot[i])
+	}
+
+	klog.Infof("Found %d nodes that need a reboot", len(chosenNodes))
+
+	return chosenNodes
+}
+
 // markBeforeReboot gets nodes which want to reboot and marks them with the
 // before-reboot=true label. This is considered the beginning of the reboot
 // process from the perspective of the update-operator. It will only mark
@@ -483,59 +547,14 @@ func (k *Kontroller) markBeforeReboot() error {
 		return fmt.Errorf("listing nodes: %w", err)
 	}
 
-	// Check if a reboot window is configured.
-	if k.rebootWindow != nil {
-		// Get previous occurrence relative to now.
-		period := k.rebootWindow.Previous(time.Now())
-		// Check if we are inside the reboot window.
-		if !(period.End.After(time.Now())) {
-			klog.V(4).Info("We are outside the reboot window; not labeling rebootable nodes for now")
-
-			return nil
-		}
-	}
-
-	// Find nodes which are still rebooting.
-	rebootingNodes := k8sutil.FilterNodesByAnnotation(nodelist.Items, stillRebootingSelector)
-	// Nodes running before and after reboot checks are still considered to be "rebooting" to us.
-	beforeRebootNodes := k8sutil.FilterNodesByRequirement(nodelist.Items, beforeRebootReq)
-	rebootingNodes = append(rebootingNodes, beforeRebootNodes...)
-	afterRebootNodes := k8sutil.FilterNodesByRequirement(nodelist.Items, afterRebootReq)
-	rebootingNodes = append(rebootingNodes, afterRebootNodes...)
-
-	// Verify the number of currently rebooting nodes is less than the the maximum number.
-	if len(rebootingNodes) >= maxRebootingNodes {
-		for _, n := range rebootingNodes {
-			klog.Infof("Found node %q still rebooting, waiting", n.Name)
-		}
-
-		klog.Infof("Found %d (of max %d) rebooting nodes; waiting for completion", len(rebootingNodes), maxRebootingNodes)
+	if !k.insideRebootWindow() {
+		klog.V(4).Info("We are outside the reboot window; not labeling rebootable nodes for now")
 
 		return nil
-	}
-
-	// Find nodes which want to reboot.
-	rebootableNodes := k8sutil.FilterNodesByAnnotation(nodelist.Items, wantsRebootSelector)
-	rebootableNodes = k8sutil.FilterNodesByRequirement(rebootableNodes, notBeforeRebootReq)
-
-	// Don't even bother if rebootableNodes is empty. We wouldn't do anything anyway.
-	if len(rebootableNodes) == 0 {
-		return nil
-	}
-
-	// Find the number of nodes we can tell to reboot.
-	remainingRebootableCount := maxRebootingNodes - len(rebootingNodes)
-
-	// Choose some number of nodes.
-	chosenNodes := make([]*corev1.Node, 0, remainingRebootableCount)
-	for i := 0; i < remainingRebootableCount && i < len(rebootableNodes); i++ {
-		chosenNodes = append(chosenNodes, &rebootableNodes[i])
 	}
 
 	// Set before-reboot=true for the chosen nodes.
-	klog.Infof("Found %d nodes that need a reboot", len(chosenNodes))
-
-	for _, n := range chosenNodes {
+	for _, n := range k.rebootableNodes(nodelist) {
 		err = k.mark(n.Name, constants.LabelBeforeReboot, "before-reboot", k.beforeRebootAnnotations)
 		if err != nil {
 			return fmt.Errorf("labeling node for before reboot checks: %w", err)
