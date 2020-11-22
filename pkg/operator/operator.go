@@ -130,10 +130,24 @@ func New(config Config) (*Kontroller, error) {
 		return nil, fmt.Errorf("kubernetes client must not be nil")
 	}
 
-	kc := config.Client
+	namespace := os.Getenv("POD_NAMESPACE")
+	if namespace == "" {
+		return nil, fmt.Errorf("unable to determine operator namespace: please ensure POD_NAMESPACE " +
+			"environment variable is set")
+	}
 
-	// Node interface.
-	nc := kc.CoreV1().Nodes()
+	var rebootWindow *timeutil.Periodic
+
+	if config.RebootWindowStart != "" && config.RebootWindowLength != "" {
+		rw, err := timeutil.ParsePeriodic(config.RebootWindowStart, config.RebootWindowLength)
+		if err != nil {
+			return nil, fmt.Errorf("parsing reboot window: %w", err)
+		}
+
+		rebootWindow = rw
+	}
+
+	kc := config.Client
 
 	// Create event emitter.
 	broadcaster := record.NewBroadcaster()
@@ -159,26 +173,9 @@ func New(config Config) (*Kontroller, error) {
 		Component: leaderElectionEventSourceComponent,
 	})
 
-	namespace := os.Getenv("POD_NAMESPACE")
-	if namespace == "" {
-		return nil, fmt.Errorf("unable to determine operator namespace: please ensure POD_NAMESPACE " +
-			"environment variable is set")
-	}
-
-	var rebootWindow *timeutil.Periodic
-
-	if config.RebootWindowStart != "" && config.RebootWindowLength != "" {
-		rw, err := timeutil.ParsePeriodic(config.RebootWindowStart, config.RebootWindowLength)
-		if err != nil {
-			return nil, fmt.Errorf("parsing reboot window: %w", err)
-		}
-
-		rebootWindow = rw
-	}
-
 	return &Kontroller{
 		kc:                          kc,
-		nc:                          nc,
+		nc:                          kc.CoreV1().Nodes(),
 		er:                          er,
 		beforeRebootAnnotations:     config.BeforeRebootAnnotations,
 		afterRebootAnnotations:      config.AfterRebootAnnotations,
