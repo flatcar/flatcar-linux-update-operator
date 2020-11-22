@@ -17,26 +17,28 @@ import (
 	"github.com/kinvolk/flatcar-linux-update-operator/pkg/version"
 )
 
-var (
+const (
 	daemonsetName = "flatcar-linux-update-agent-ds"
+)
 
-	managedByOperatorLabels = map[string]string{
+func managedByOperatorLabels() map[string]string {
+	return map[string]string{
 		"managed-by": "flatcar-linux-update-operator",
 		"app":        agentDefaultAppName,
 	}
+}
 
-	// Labels nodes where update-agent should be scheduled.
-	enableUpdateAgentLabel = map[string]string{
+// Labels nodes where update-agent should be scheduled.
+func enableUpdateAgentLabel() map[string]string {
+	return map[string]string{
 		constants.LabelUpdateAgentEnabled: constants.True,
 	}
+}
 
-	// Label Requirement matching nodes which lack the update agent label.
-	updateAgentLabelMissing = k8sutil.NewRequirementOrDie(
-		constants.LabelUpdateAgentEnabled,
-		selection.DoesNotExist,
-		[]string{},
-	)
-)
+// Label Requirement matching nodes which lack the update agent label.
+func updateAgentLabelMissing() (*labels.Requirement, error) {
+	return labels.NewRequirement(constants.LabelUpdateAgentEnabled, selection.DoesNotExist, []string{})
+}
 
 // legacyLabeler finds Flatcar Container Linux nodes lacking the update-agent enabled
 // label and adds the label set "true" so nodes opt-in to running update-agent.
@@ -56,8 +58,10 @@ func (k *Kontroller) legacyLabeler() {
 		return
 	}
 
+	req, _ := updateAgentLabelMissing()
+
 	// Match nodes that don't have an update-agent label.
-	nodesMissingLabel := k8sutil.FilterNodesByRequirement(nodelist.Items, updateAgentLabelMissing)
+	nodesMissingLabel := k8sutil.FilterNodesByRequirement(nodelist.Items, req)
 	// Match nodes that identify as Flatcar Container Linux.
 	nodesToLabel := k8sutil.FilterContainerLinuxNodes(nodesMissingLabel)
 
@@ -66,7 +70,7 @@ func (k *Kontroller) legacyLabeler() {
 	for _, node := range nodesToLabel {
 		klog.Infof("Setting label 'agent=true' on %q", node.Name)
 
-		if err := k8sutil.SetNodeLabels(k.nc, node.Name, enableUpdateAgentLabel); err != nil {
+		if err := k8sutil.SetNodeLabels(k.nc, node.Name, enableUpdateAgentLabel()); err != nil {
 			klog.Errorf("Failed setting label 'agent=true' on %q", node.Name)
 		}
 	}
@@ -81,7 +85,7 @@ func (k *Kontroller) legacyLabeler() {
 // compatible, so if the agent's version is greater than ours, it's okay.
 func (k *Kontroller) runDaemonsetUpdate(agentImageRepo string) error {
 	agentDaemonsets, err := k.kc.AppsV1().DaemonSets(k.namespace).List(context.TODO(), metav1.ListOptions{
-		LabelSelector: labels.SelectorFromSet(labels.Set(managedByOperatorLabels)).String(),
+		LabelSelector: labels.SelectorFromSet(labels.Set(managedByOperatorLabels())).String(),
 	})
 	if err != nil {
 		return fmt.Errorf("listing DaemonSets: %w", err)
@@ -165,7 +169,7 @@ func agentDaemonsetSpec(repo string) *appsv1.DaemonSet {
 	// This ensures that the 'orphan adoption' logic doesn't kick in for these
 	// daemonsets.
 	versionedSelector := make(map[string]string)
-	for k, v := range managedByOperatorLabels {
+	for k, v := range managedByOperatorLabels() {
 		versionedSelector[k] = v
 	}
 
@@ -174,7 +178,7 @@ func agentDaemonsetSpec(repo string) *appsv1.DaemonSet {
 	return &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   daemonsetName,
-			Labels: managedByOperatorLabels,
+			Labels: managedByOperatorLabels(),
 			Annotations: map[string]string{
 				constants.AgentVersion: version.Version,
 			},

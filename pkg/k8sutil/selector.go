@@ -6,19 +6,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/selection"
 )
-
-// NewRequirementOrDie wraps a call to NewRequirement and panics if the Requirement
-// cannot be created. It is intended for use in variable initializations only.
-func NewRequirementOrDie(key string, op selection.Operator, vals []string) *labels.Requirement {
-	req, err := labels.NewRequirement(key, op, vals)
-	if err != nil {
-		panic(err)
-	}
-
-	return req
-}
 
 // FilterNodesByAnnotation takes a node list and a field selector, and returns
 // a node list that matches the field selector.

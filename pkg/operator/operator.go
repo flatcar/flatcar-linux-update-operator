@@ -5,11 +5,13 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
@@ -42,50 +44,72 @@ const (
 	reconciliationPeriod = 30 * time.Second
 )
 
-var (
-	// justRebootedSelector is a selector for combination of annotations
-	// expected to be on a node after it has completed a reboot.
-	//
-	// The update-operator sets constants.AnnotationOkToReboot to true to
-	// trigger a reboot, and the update-agent sets
-	// constants.AnnotationRebootNeeded and
-	// constants.AnnotationRebootInProgress to false when it has finished.
-	justRebootedSelector = fields.Set(map[string]string{
+// justRebootedSelector is a selector for combination of annotations
+// expected to be on a node after it has completed a reboot.
+//
+// The update-operator sets constants.AnnotationOkToReboot to true to
+// trigger a reboot, and the update-agent sets
+// constants.AnnotationRebootNeeded and
+// constants.AnnotationRebootInProgress to false when it has finished.
+func justRebootedSelector() fields.Selector {
+	return fields.Set(map[string]string{
 		constants.AnnotationOkToReboot:       constants.True,
 		constants.AnnotationRebootNeeded:     constants.False,
 		constants.AnnotationRebootInProgress: constants.False,
 	}).AsSelector()
+}
 
-	// wantsRebootSelector is a selector for the annotation expected to be on a node when it wants to be rebooted.
-	//
-	// The update-agent sets constants.AnnotationRebootNeeded to true when
-	// it would like to reboot, and false when it starts up.
-	//
-	// If constants.AnnotationRebootPaused is set to "true", the update-agent will not consider it for rebooting.
-	wantsRebootSelector = fields.ParseSelectorOrDie(constants.AnnotationRebootNeeded + "==" + constants.True +
-		"," + constants.AnnotationRebootPaused + "!=" + constants.True +
-		"," + constants.AnnotationOkToReboot + "!=" + constants.True +
-		"," + constants.AnnotationRebootInProgress + "!=" + constants.True)
+// wantsRebootSelector is a selector for the annotation expected to be on a node when it wants to be rebooted.
+//
+// The update-agent sets constants.AnnotationRebootNeeded to true when
+// it would like to reboot, and false when it starts up.
+//
+// If constants.AnnotationRebootPaused is set to "true", the update-agent will not consider it for rebooting.
+func wantsRebootSelector() (fields.Selector, error) {
+	return fields.ParseSelector(strings.Join([]string{
+		constants.AnnotationRebootNeeded + "==" + constants.True,
+		constants.AnnotationRebootPaused + "!=" + constants.True,
+		constants.AnnotationOkToReboot + "!=" + constants.True,
+		constants.AnnotationRebootInProgress + "!=" + constants.True,
+	}, ","))
+}
 
-	// stillRebootingSelector is a selector for the annotation set expected to be
-	// on a node when it's in the process of rebooting.
-	stillRebootingSelector = fields.Set(map[string]string{
+// stillRebootingSelector is a selector for the annotation set expected to be
+// on a node when it's in the process of rebooting.
+func stillRebootingSelector() fields.Selector {
+	return fields.Set(map[string]string{
 		constants.AnnotationOkToReboot:   constants.True,
 		constants.AnnotationRebootNeeded: constants.True,
 	}).AsSelector()
+}
 
-	// beforeRebootReq requires a node to be waiting for before reboot checks to complete.
-	beforeRebootReq = k8sutil.NewRequirementOrDie(constants.LabelBeforeReboot, selection.In, []string{constants.True})
+// beforeRebootReq requires a node to be waiting for before reboot checks to complete.
+func beforeRebootReq() *labels.Requirement {
+	req, _ := labels.NewRequirement(constants.LabelBeforeReboot, selection.In, []string{constants.True})
 
-	// afterRebootReq requires a node to be waiting for after reboot checks to complete.
-	afterRebootReq = k8sutil.NewRequirementOrDie(constants.LabelAfterReboot, selection.In, []string{constants.True})
+	return req
+}
 
-	// notBeforeRebootReq and notAfterRebootReq are the inverse of the above checks.
-	//
-	//nolint:lll
-	notBeforeRebootReq = k8sutil.NewRequirementOrDie(constants.LabelBeforeReboot, selection.NotIn, []string{constants.True})
-	notAfterRebootReq  = k8sutil.NewRequirementOrDie(constants.LabelAfterReboot, selection.NotIn, []string{constants.True})
-)
+// afterRebootReq requires a node to be waiting for after reboot checks to complete.
+func afterRebootReq() *labels.Requirement {
+	req, _ := labels.NewRequirement(constants.LabelAfterReboot, selection.In, []string{constants.True})
+
+	return req
+}
+
+// notBeforeRebootReq is the inverse of the beforeRebootReq.
+func notBeforeRebootReq() *labels.Requirement {
+	req, _ := labels.NewRequirement(constants.LabelBeforeReboot, selection.NotIn, []string{constants.True})
+
+	return req
+}
+
+// notAfterRebootReq is the inverse of afterRebootReq.
+func notAfterRebootReq() *labels.Requirement {
+	req, _ := labels.NewRequirement(constants.LabelAfterReboot, selection.NotIn, []string{constants.True})
+
+	return req
+}
 
 // Kontroller implement operator part of FLUO.
 type Kontroller struct {
@@ -368,12 +392,14 @@ func (k *Kontroller) cleanupState() error {
 		return fmt.Errorf("listing nodes: %w", err)
 	}
 
+	selector, _ := wantsRebootSelector()
+
 	for _, n := range nodelist.Items {
 		err = k8sutil.UpdateNodeRetry(k.nc, n.Name, func(node *corev1.Node) {
 			// Make sure that nodes with the before-reboot label actually
 			// still wants to reboot.
 			if _, exists := node.Labels[constants.LabelBeforeReboot]; exists {
-				if !wantsRebootSelector.Matches(fields.Set(node.Annotations)) {
+				if !selector.Matches(fields.Set(node.Annotations)) {
 					klog.Warningf("Node %v no longer wanted to reboot while we were trying to label it so: %v",
 						node.Name, node.Annotations)
 					delete(node.Labels, constants.LabelBeforeReboot)
@@ -405,7 +431,7 @@ func (k *Kontroller) checkBeforeReboot() error {
 		return fmt.Errorf("listing nodes: %w", err)
 	}
 
-	preRebootNodes := k8sutil.FilterNodesByRequirement(nodelist.Items, beforeRebootReq)
+	preRebootNodes := k8sutil.FilterNodesByRequirement(nodelist.Items, beforeRebootReq())
 
 	for _, n := range preRebootNodes {
 		if hasAllAnnotations(n, k.beforeRebootAnnotations) {
@@ -442,7 +468,7 @@ func (k *Kontroller) checkAfterReboot() error {
 		return fmt.Errorf("listing nodes: %w", err)
 	}
 
-	postRebootNodes := k8sutil.FilterNodesByRequirement(nodelist.Items, afterRebootReq)
+	postRebootNodes := k8sutil.FilterNodesByRequirement(nodelist.Items, afterRebootReq())
 
 	for _, n := range postRebootNodes {
 		if hasAllAnnotations(n, k.afterRebootAnnotations) {
@@ -487,11 +513,11 @@ func (k *Kontroller) insideRebootWindow() bool {
 //
 // If maximum capacity is reached, it is logged and list of rebooting nodes is logged as well.
 func (k *Kontroller) remainingRebootingCapacity(nodelist *corev1.NodeList) int {
-	rebootingNodes := k8sutil.FilterNodesByAnnotation(nodelist.Items, stillRebootingSelector)
+	rebootingNodes := k8sutil.FilterNodesByAnnotation(nodelist.Items, stillRebootingSelector())
 
 	// Nodes running before and after reboot checks are still considered to be "rebooting" to us.
-	beforeRebootNodes := k8sutil.FilterNodesByRequirement(nodelist.Items, beforeRebootReq)
-	afterRebootNodes := k8sutil.FilterNodesByRequirement(nodelist.Items, afterRebootReq)
+	beforeRebootNodes := k8sutil.FilterNodesByRequirement(nodelist.Items, beforeRebootReq())
+	afterRebootNodes := k8sutil.FilterNodesByRequirement(nodelist.Items, afterRebootReq())
 
 	rebootingNodes = append(append(rebootingNodes, beforeRebootNodes...), afterRebootNodes...)
 
@@ -510,9 +536,11 @@ func (k *Kontroller) remainingRebootingCapacity(nodelist *corev1.NodeList) int {
 
 // nodesRequiringReboot filters given list of nodes and returns ones which requires a reboot.
 func (k *Kontroller) nodesRequiringReboot(nodelist *corev1.NodeList) []corev1.Node {
-	rebootableNodes := k8sutil.FilterNodesByAnnotation(nodelist.Items, wantsRebootSelector)
+	selector, _ := wantsRebootSelector()
 
-	return k8sutil.FilterNodesByRequirement(rebootableNodes, notBeforeRebootReq)
+	rebootableNodes := k8sutil.FilterNodesByAnnotation(nodelist.Items, selector)
+
+	return k8sutil.FilterNodesByRequirement(rebootableNodes, notBeforeRebootReq())
 }
 
 // rebootableNodes returns list of nodes which can be marked for rebooting based on remaining capacity.
@@ -579,9 +607,9 @@ func (k *Kontroller) markAfterReboot() error {
 	}
 
 	// Find nodes which just rebooted.
-	justRebootedNodes := k8sutil.FilterNodesByAnnotation(nodelist.Items, justRebootedSelector)
+	justRebootedNodes := k8sutil.FilterNodesByAnnotation(nodelist.Items, justRebootedSelector())
 	// Also filter out any nodes that are already labeled with after-reboot=true.
-	justRebootedNodes = k8sutil.FilterNodesByRequirement(justRebootedNodes, notAfterRebootReq)
+	justRebootedNodes = k8sutil.FilterNodesByRequirement(justRebootedNodes, notAfterRebootReq())
 
 	klog.Infof("Found %d rebooted nodes", len(justRebootedNodes))
 
