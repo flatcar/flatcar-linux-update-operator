@@ -17,24 +17,42 @@ import (
 var (
 	beforeRebootAnnotations flagutil.StringSliceFlag
 	afterRebootAnnotations  flagutil.StringSliceFlag
-	kubeconfig              = flag.String("kubeconfig", "", "Path to a kubeconfig file. Default to the in-cluster config if not provided.")
-	autoLabelContainerLinux = flag.Bool("auto-label-flatcar-linux", false, "Auto-label Flatcar Container Linux nodes with agent=true (convenience)")
-	rebootWindowStart       = flag.String("reboot-window-start", "", "Day of week ('Sun', 'Mon', ...; optional) and time of day at which the reboot window starts. E.g. 'Mon 14:00', '11:00'")
-	rebootWindowLength      = flag.String("reboot-window-length", "", "Length of the reboot window. E.g. '1h30m'")
-	printVersion            = flag.Bool("version", false, "Print version and exit")
+
+	kubeconfig = flag.String("kubeconfig", "",
+		"Path to a kubeconfig file. Default to the in-cluster config if not provided.")
+
+	autoLabelContainerLinux = flag.Bool("auto-label-flatcar-linux", false,
+		"Auto-label Flatcar Container Linux nodes with agent=true (convenience)")
+
+	rebootWindowStart = flag.String("reboot-window-start", "",
+		"Day of week ('Sun', 'Mon', ...; optional) and time of day at which the reboot window starts. "+
+			"E.g. 'Mon 14:00', '11:00'")
+
+	rebootWindowLength = flag.String("reboot-window-length", "", "Length of the reboot window. E.g. '1h30m'")
+	printVersion       = flag.Bool("version", false, "Print version and exit")
 	// Deprecated flags.
 	analyticsEnabled optValue
 	manageAgent      = flag.Bool("manage-agent", false, "Manage the associated update-agent")
-	agentImageRepo   = flag.String("agent-image-repo", "quay.io/kinvolk/flatcar-linux-update-operator", "The image to use for the managed agent, without version tag")
+	agentImageRepo   = flag.String("agent-image-repo", "quay.io/kinvolk/flatcar-linux-update-operator",
+		"The image to use for the managed agent, without version tag")
 )
 
 func main() {
-	flag.Var(&beforeRebootAnnotations, "before-reboot-annotations", "List of comma-separated Kubernetes node annotations that must be set to 'true' before a reboot is allowed")
-	flag.Var(&afterRebootAnnotations, "after-reboot-annotations", "List of comma-separated Kubernetes node annotations that must be set to 'true' before a node is marked schedulable and the operator lock is released")
+	flag.Var(&beforeRebootAnnotations, "before-reboot-annotations",
+		"List of comma-separated Kubernetes node annotations that must be set to 'true' before a reboot is allowed")
+
+	flag.Var(&afterRebootAnnotations, "after-reboot-annotations",
+		"List of comma-separated Kubernetes node annotations that must be set to 'true' before a node is marked "+
+			"schedulable and the operator lock is released")
+
 	flag.Var(&analyticsEnabled, "analytics", "Send analytics to Google Analytics")
 
 	klog.InitFlags(nil)
-	flag.Set("logtostderr", "true")
+
+	if err := flag.Set("logtostderr", "true"); err != nil {
+		klog.Fatalf("Failed setting %q flag: %v", "logtostderr", err)
+	}
+
 	flag.Parse()
 
 	if err := flagutil.SetFlagsFromEnv(flag.CommandLine, "UPDATE_OPERATOR"); err != nil {

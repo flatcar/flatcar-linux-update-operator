@@ -29,12 +29,18 @@ const (
 	signalBuffer  = 32 // TODO(bp): What is a reasonable value here?
 )
 
+// Client allows reading update-engine status using D-Bus.
+//
+// New instance should be initialized using New() function.
+//
+// When finished using this object, Close() should be called to close D-Bus connection.
 type Client struct {
 	conn   *dbus.Conn
 	object dbus.BusObject
 	ch     chan *dbus.Signal
 }
 
+// New creates new instance of Client and initializes it.
 func New() (*Client, error) {
 	c := new(Client)
 
@@ -49,14 +55,16 @@ func New() (*Client, error) {
 
 	err = c.conn.Auth(methods)
 	if err != nil {
-		c.conn.Close()
+		// Best effort closing the connection.
+		_ = c.conn.Close()
 
 		return nil, fmt.Errorf("authenticating to system bus: %w", err)
 	}
 
 	err = c.conn.Hello()
 	if err != nil {
-		c.conn.Close()
+		// Best effort closing the connection.
+		_ = c.conn.Close()
 
 		return nil, fmt.Errorf("sending hello to system bus: %w", err)
 	}
@@ -77,6 +85,7 @@ func New() (*Client, error) {
 	return c, nil
 }
 
+// Close closes internal D-Bus connection.
 func (c *Client) Close() error {
 	if c.conn != nil {
 		return c.conn.Close()
@@ -101,20 +110,6 @@ func (c *Client) ReceiveStatuses(rcvr chan Status, stop <-chan struct{}) {
 			return
 		case signal := <-c.ch:
 			rcvr <- NewStatus(signal.Body)
-		}
-	}
-}
-
-func (c *Client) RebootNeededSignal(rcvr chan Status, stop <-chan struct{}) {
-	for {
-		select {
-		case <-stop:
-			return
-		case signal := <-c.ch:
-			s := NewStatus(signal.Body)
-			if s.CurrentOperation == UpdateStatusUpdatedNeedReboot {
-				rcvr <- s
-			}
 		}
 	}
 }

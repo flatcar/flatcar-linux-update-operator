@@ -16,12 +16,18 @@ import (
 var (
 	node         = flag.String("node", "", "Kubernetes node name")
 	printVersion = flag.Bool("version", false, "Print version and exit")
-	reapTimeout  = flag.Int("grace-period", 600, "Period of time in seconds given to a pod to terminate when rebooting for an update")
+
+	reapTimeout = flag.Int("grace-period", 600,
+		"Period of time in seconds given to a pod to terminate when rebooting for an update")
 )
 
 func main() {
 	klog.InitFlags(nil)
-	flag.Set("logtostderr", "true")
+
+	if err := flag.Set("logtostderr", "true"); err != nil {
+		klog.Fatalf("Failed to set %q flag value: %v", "logtostderr", err)
+	}
+
 	flag.Parse()
 
 	if err := flagutil.SetFlagsFromEnv(flag.CommandLine, "UPDATE_AGENT"); err != nil {

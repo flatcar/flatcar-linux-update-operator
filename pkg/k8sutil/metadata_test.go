@@ -1,4 +1,4 @@
-package k8sutil
+package k8sutil_test
 
 import (
 	"context"
@@ -7,12 +7,13 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
-
-	mock_v1 "github.com/kinvolk/flatcar-linux-update-operator/pkg/k8sutil/mocks"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+
+	"github.com/kinvolk/flatcar-linux-update-operator/pkg/k8sutil"
+	mock_v1 "github.com/kinvolk/flatcar-linux-update-operator/pkg/k8sutil/mocks"
 )
 
 func atomicCounterIncrement(n *corev1.Node) {
@@ -35,9 +36,6 @@ func atomicCounterIncrement(n *corev1.Node) {
 }
 
 func TestUpdateNodeRetryHandlesConflict(t *testing.T) {
-	DefaultBackoff.Duration = 0
-	DefaultRetry.Duration = 0
-
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	mockNi := mock_v1.NewMockNodeInterface(ctrl)
@@ -64,7 +62,7 @@ func TestUpdateNodeRetryHandlesConflict(t *testing.T) {
 		mockNi.EXPECT().Update(context.TODO(), mockNode, metav1.UpdateOptions{}).Return(mockNode, nil),
 	)
 
-	err := UpdateNodeRetry(mockNi, "mock_node", atomicCounterIncrement)
+	err := k8sutil.UpdateNodeRetry(mockNi, "mock_node", atomicCounterIncrement)
 	if err != nil {
 		t.Errorf("unexpected error: expected increment to succeed")
 	}

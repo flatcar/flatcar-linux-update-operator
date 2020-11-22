@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	watchtools "k8s.io/client-go/tools/watch"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 )
 
@@ -41,7 +42,7 @@ func NodeAnnotationCondition(selector fields.Selector) watchtools.ConditionFunc 
 func GetNodeRetry(nc v1core.NodeInterface, node string) (*v1api.Node, error) {
 	var apiNode *v1api.Node
 
-	err := RetryOnError(DefaultBackoff, func() error {
+	err := retry.OnError(retry.DefaultBackoff, func(error) bool { return true }, func() error {
 		n, getErr := nc.Get(context.TODO(), node, v1meta.GetOptions{})
 		if getErr != nil {
 			return fmt.Errorf("failed to get node %q: %w", node, getErr)
@@ -51,8 +52,11 @@ func GetNodeRetry(nc v1core.NodeInterface, node string) (*v1api.Node, error) {
 
 		return nil
 	})
+	if err != nil {
+		return nil, fmt.Errorf("getting node: %w", err)
+	}
 
-	return apiNode, err
+	return apiNode, nil
 }
 
 // UpdateNodeRetry calls f to update a node object in Kubernetes.
@@ -61,7 +65,7 @@ func GetNodeRetry(nc v1core.NodeInterface, node string) (*v1api.Node, error) {
 // f will be called each time since the node object will likely have changed if
 // a retry is necessary.
 func UpdateNodeRetry(nc v1core.NodeInterface, node string, f func(*v1api.Node)) error {
-	err := RetryOnConflict(DefaultBackoff, func() error {
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		n, getErr := nc.Get(context.TODO(), node, v1meta.GetOptions{})
 		if getErr != nil {
 			return fmt.Errorf("failed to get node %q: %w", node, getErr)
@@ -142,7 +146,7 @@ func Unschedulable(nc v1core.NodeInterface, node string, sched bool) error {
 
 	n.Spec.Unschedulable = sched
 
-	if err := RetryOnConflict(DefaultBackoff, func() (err error) {
+	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		n, err = nc.Update(context.TODO(), n, v1meta.UpdateOptions{})
 
 		return
@@ -168,7 +172,7 @@ func splitNewlineEnv(m map[string]string, envs string) {
 	}
 }
 
-// VersionInfo contains CoreOS version and update information.
+// VersionInfo contains Flatcar version and update information.
 type VersionInfo struct {
 	Name    string
 	ID      string
@@ -179,35 +183,24 @@ type VersionInfo struct {
 func getUpdateMap() (map[string]string, error) {
 	infomap := map[string]string{}
 
-	// This file should always be present on CoreOS.
-	uconf, err := os.Open(updateConfPath)
-	if err != nil {
-		return nil, fmt.Errorf("opening file %q: %w", updateConfPath, err)
-	}
-
-	b, err := ioutil.ReadAll(uconf)
-
-	uconf.Close()
-
+	// This file should always be present on Flatcar.
+	b, err := ioutil.ReadFile(updateConfPath)
 	if err != nil {
 		return nil, fmt.Errorf("reading file %q: %w", updateConfPath, err)
 	}
 
 	splitNewlineEnv(infomap, string(b))
 
-	// If present and readable, this file has overrides.
-	econf, err := os.Open(updateConfOverridePath)
+	updateConfOverride, err := ioutil.ReadFile(updateConfOverridePath)
 	if err != nil {
+		if !os.IsNotExist(err) {
+			return nil, fmt.Errorf("reading file %q: %w", updateConfOverridePath, err)
+		}
+
 		klog.Infof("Skipping missing update.conf: %w", err)
 	}
 
-	b, err = ioutil.ReadAll(econf)
-
-	econf.Close()
-
-	if err == nil {
-		splitNewlineEnv(infomap, string(b))
-	}
+	splitNewlineEnv(infomap, string(updateConfOverride))
 
 	return infomap, nil
 }
@@ -215,18 +208,8 @@ func getUpdateMap() (map[string]string, error) {
 func getReleaseMap() (map[string]string, error) {
 	infomap := map[string]string{}
 
-	// This file should always be present on CoreOS.
-	osrelease, err := os.Open(osReleasePath)
-	if err != nil {
-		return nil, fmt.Errorf("opening file %q: %w", osReleasePath, err)
-	}
-
-	defer osrelease.Close()
-
-	b, err := ioutil.ReadAll(osrelease)
-
-	osrelease.Close()
-
+	// This file should always be present on Flatcar.
+	b, err := ioutil.ReadFile(osReleasePath)
 	if err != nil {
 		return nil, fmt.Errorf("reading file %q: %w", osReleasePath, err)
 	}
@@ -236,7 +219,7 @@ func getReleaseMap() (map[string]string, error) {
 	return infomap, nil
 }
 
-// GetVersionInfo returns VersionInfo from the current CoreOS system.
+// GetVersionInfo returns VersionInfo from the current Flatcar system.
 //
 // Should probably live in a different package.
 func GetVersionInfo() (*VersionInfo, error) {

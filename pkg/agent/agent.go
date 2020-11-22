@@ -27,6 +27,7 @@ import (
 	"github.com/kinvolk/flatcar-linux-update-operator/pkg/updateengine"
 )
 
+// Klocksmith implements agent part of FLUO.
 type Klocksmith struct {
 	node        string
 	kc          kubernetes.Interface
@@ -43,6 +44,7 @@ var shouldRebootSelector = fields.Set(map[string]string{
 	constants.AnnotationRebootNeeded: constants.True,
 }).AsSelector()
 
+// New returns initialized Klocksmith.
 func New(node string, reapTimeout time.Duration) (*Klocksmith, error) {
 	// Set up kubernetes in-cluster client.
 	kc, err := k8sutil.GetClient("")
@@ -99,6 +101,8 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 
 	// Only make a node schedulable if a reboot was in progress. This prevents a node from being made schedulable
 	// if it was made unschedulable by something other than the agent.
+	//
+	//nolint:lll
 	madeUnschedulableAnnotation, madeUnschedulableAnnotationExists := node.Annotations[constants.AnnotationAgentMadeUnschedulable]
 	makeSchedulable := madeUnschedulableAnnotation == constants.True
 
@@ -275,7 +279,7 @@ func (k *Klocksmith) updateStatusCallback(s updateengine.Status) {
 		labels[constants.LabelRebootNeeded] = constants.True
 	}
 
-	wait.PollUntil(defaultPollInterval, func() (bool, error) {
+	err := wait.PollUntil(defaultPollInterval, func() (bool, error) {
 		if err := k8sutil.SetNodeAnnotationsLabels(k.nc, k.node, anno, labels); err != nil {
 			klog.Errorf("Failed to set annotation %q: %v", constants.AnnotationStatus, err)
 
@@ -284,6 +288,9 @@ func (k *Klocksmith) updateStatusCallback(s updateengine.Status) {
 
 		return true, nil
 	}, wait.NeverStop)
+	if err != nil {
+		klog.Errorf("Failed updating node annotations and labels: %v", err)
+	}
 }
 
 // setInfoLabels labels our node with helpful info about Flatcar Container Linux.
@@ -329,7 +336,10 @@ func (k *Klocksmith) waitForOkToReboot() error {
 		return fmt.Errorf("failed to get self node (%q): %w", k.node, err)
 	}
 
-	if n.Annotations[constants.AnnotationOkToReboot] == constants.True && n.Annotations[constants.AnnotationRebootNeeded] == constants.True {
+	okToReboot := n.Annotations[constants.AnnotationOkToReboot] == constants.True
+	rebootNeeded := n.Annotations[constants.AnnotationRebootNeeded] == constants.True
+
+	if okToReboot && rebootNeeded {
 		return nil
 	}
 

@@ -18,8 +18,10 @@ var (
 	Commit = "UNKNOWN"
 )
 
+// Semver is a variable, which holds parsed Version.
 var Semver semver.Version
 
+//nolint:gochecknoinits
 func init() {
 	v, err := semver.Parse(Version)
 	if err != nil {
@@ -30,6 +32,7 @@ func init() {
 	Semver = v
 }
 
+// Format formats Version and Commit variables into single string.
 func Format() string {
 	return fmt.Sprintf("Version: %s\nCommit: %s", Version, Commit)
 }

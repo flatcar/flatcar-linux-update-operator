@@ -1,3 +1,6 @@
+output:
+  sort-results: true
+
 run:
   modules-download-mode: vendor
   timeout: 5m
@@ -15,6 +18,10 @@ issues:
     - linters:
         - lll
       source: "^\\/\\/go:generate"
+    # Ignore URLs in comments.
+    - linters:
+        - lll
+      source: "http(s)://"
 
 # List for enabled linters can be generated for updates using the following command.
 # golangci-lint linters | grep -E '^\S+:' | cut -d: -f1 | sort | sed 's/^/    - /g' | grep -v -E "($(grep '^  disable:' -A 100 .golangci.yml  | grep -E '    - \S+$' | awk '{print $2}' | tr \\n '|' | sed 's/|$//g'))"

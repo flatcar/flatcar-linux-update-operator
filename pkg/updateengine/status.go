@@ -33,6 +33,7 @@ const (
 	UpdateStatusReportingErrorEvent = "UPDATE_STATUS_REPORTING_ERROR_EVENT"
 )
 
+// Status represents status received from update-engine.
 type Status struct {
 	LastCheckedTime  int64
 	Progress         float64
@@ -41,6 +42,7 @@ type Status struct {
 	NewSize          int64
 }
 
+// NewStatus constructs status from received D-Bus signal body.
 func NewStatus(body []interface{}) (s Status) {
 	s.LastCheckedTime = body[0].(int64)
 	s.Progress = body[1].(float64)
@@ -51,6 +53,7 @@ func NewStatus(body []interface{}) (s Status) {
 	return
 }
 
+// String implements Stringer interface for Status.
 func (s *Status) String() string {
 	return fmt.Sprintf("LastCheckedTime=%v Progress=%v CurrentOperation=%q NewVersion=%v NewSize=%v",
 		s.LastCheckedTime,
