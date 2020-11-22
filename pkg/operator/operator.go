@@ -30,10 +30,7 @@ import (
 const (
 	eventSourceComponent               = "update-operator"
 	leaderElectionEventSourceComponent = "update-operator-leader-election"
-	// agentDefaultAppName is the label value for the 'app' key that agents are
-	// expected to be labeled with.
-	agentDefaultAppName = "flatcar-linux-update-agent"
-	maxRebootingNodes   = 1
+	maxRebootingNodes                  = 1
 
 	leaderElectionResourceName = "flatcar-linux-update-operator-lock"
 
@@ -110,10 +107,6 @@ type Kontroller struct {
 
 	// Reboot window.
 	rebootWindow *timeutil.Periodic
-
-	// Deprecated.
-	manageAgent    bool
-	agentImageRepo string
 }
 
 // Config configures a Kontroller.
@@ -128,9 +121,6 @@ type Config struct {
 	// Reboot window.
 	RebootWindowStart  string
 	RebootWindowLength string
-	// Deprecated.
-	ManageAgent    bool
-	AgentImageRepo string
 }
 
 // New initializes a new Kontroller.
@@ -196,8 +186,6 @@ func New(config Config) (*Kontroller, error) {
 		leaderElectionEventRecorder: leaderElectionEventRecorder,
 		namespace:                   namespace,
 		autoLabelContainerLinux:     config.AutoLabelContainerLinux,
-		manageAgent:                 config.ManageAgent,
-		agentImageRepo:              config.AgentImageRepo,
 		rebootWindow:                rebootWindow,
 	}, nil
 }
@@ -213,18 +201,6 @@ func (k *Kontroller) Run(stop <-chan struct{}) error {
 	// Start Flatcar Container Linux node auto-labeler.
 	if k.autoLabelContainerLinux {
 		go wait.Until(k.legacyLabeler, reconciliationPeriod, stop)
-	}
-
-	// Before doing anything else, make sure the associated agent daemonset is
-	// ready if it's our responsibility.
-	if k.manageAgent && k.agentImageRepo != "" {
-		// Create or update the update-agent daemonset.
-		err := k.runDaemonsetUpdate(k.agentImageRepo)
-		if err != nil {
-			klog.Errorf("unable to ensure managed agents are ready: %v", err)
-
-			return err
-		}
 	}
 
 	klog.V(5).Info("starting controller")
