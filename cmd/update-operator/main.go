@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strconv"
 
 	"github.com/coreos/pkg/flagutil"
 	"k8s.io/klog/v2"
@@ -30,11 +29,6 @@ var (
 
 	rebootWindowLength = flag.String("reboot-window-length", "", "Length of the reboot window. E.g. '1h30m'")
 	printVersion       = flag.Bool("version", false, "Print version and exit")
-	// Deprecated flags.
-	analyticsEnabled optValue
-	manageAgent      = flag.Bool("manage-agent", false, "Manage the associated update-agent")
-	agentImageRepo   = flag.String("agent-image-repo", "quay.io/kinvolk/flatcar-linux-update-operator",
-		"The image to use for the managed agent, without version tag")
 )
 
 func main() {
@@ -44,8 +38,6 @@ func main() {
 	flag.Var(&afterRebootAnnotations, "after-reboot-annotations",
 		"List of comma-separated Kubernetes node annotations that must be set to 'true' before a node is marked "+
 			"schedulable and the operator lock is released")
-
-	flag.Var(&analyticsEnabled, "analytics", "Send analytics to Google Analytics")
 
 	klog.InitFlags(nil)
 
@@ -59,10 +51,6 @@ func main() {
 		klog.Fatalf("Failed to parse environment variables: %v", err)
 	}
 
-	if analyticsEnabled.present {
-		klog.Warning("Use of -analytics is deprecated and will be removed. Google Analytics will not be enabled.")
-	}
-
 	// Respect KUBECONFIG without the prefix as well.
 	if *kubeconfig == "" {
 		*kubeconfig = os.Getenv("KUBECONFIG")
@@ -71,10 +59,6 @@ func main() {
 	if *printVersion {
 		fmt.Println(version.Format())
 		os.Exit(0)
-	}
-
-	if *manageAgent {
-		klog.Warning("Use of -manage-agent=true is deprecated and will be removed in the future")
 	}
 
 	// Create Kubernetes client (clientset).
@@ -87,8 +71,6 @@ func main() {
 	o, err := operator.New(operator.Config{
 		Client:                  client,
 		AutoLabelContainerLinux: *autoLabelContainerLinux,
-		ManageAgent:             *manageAgent,
-		AgentImageRepo:          *agentImageRepo,
 		BeforeRebootAnnotations: beforeRebootAnnotations,
 		AfterRebootAnnotations:  afterRebootAnnotations,
 		RebootWindowStart:       *rebootWindowStart,
@@ -107,22 +89,4 @@ func main() {
 	if err := o.Run(stop); err != nil {
 		klog.Fatalf("Error while running %s: %v", os.Args[0], err)
 	}
-}
-
-// optValue is a flag.Value that detects whether a user passed a flag directly.
-type optValue struct {
-	value   bool
-	present bool
-}
-
-func (o *optValue) Set(s string) error {
-	v, err := strconv.ParseBool(s)
-	o.value = v
-	o.present = true
-
-	return err //nolint:wrapcheck
-}
-
-func (o *optValue) String() string {
-	return strconv.FormatBool(o.value)
 }
