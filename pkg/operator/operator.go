@@ -408,22 +408,24 @@ func (k *Kontroller) checkBeforeReboot() error {
 	preRebootNodes := k8sutil.FilterNodesByRequirement(nodelist.Items, beforeRebootReq)
 
 	for _, n := range preRebootNodes {
-		if hasAllAnnotations(n, k.beforeRebootAnnotations) {
-			klog.V(4).Infof("Deleting label %q for %q", constants.LabelBeforeReboot, n.Name)
-			klog.V(4).Infof("Setting annotation %q to true for %q", constants.AnnotationOkToReboot, n.Name)
+		if !hasAllAnnotations(n, k.beforeRebootAnnotations) {
+			continue
+		}
 
-			err = k8sutil.UpdateNodeRetry(k.nc, n.Name, func(node *corev1.Node) {
-				delete(node.Labels, constants.LabelBeforeReboot)
-				// Cleanup the before-reboot annotations.
-				for _, annotation := range k.beforeRebootAnnotations {
-					klog.V(4).Infof("Deleting annotation %q from node %q", annotation, node.Name)
-					delete(node.Annotations, annotation)
-				}
-				node.Annotations[constants.AnnotationOkToReboot] = constants.True
-			})
-			if err != nil {
-				return fmt.Errorf("updating node %q: %w", n.Name, err)
+		klog.V(4).Infof("Deleting label %q for %q", constants.LabelBeforeReboot, n.Name)
+		klog.V(4).Infof("Setting annotation %q to true for %q", constants.AnnotationOkToReboot, n.Name)
+
+		err = k8sutil.UpdateNodeRetry(k.nc, n.Name, func(node *corev1.Node) {
+			delete(node.Labels, constants.LabelBeforeReboot)
+			// Cleanup the before-reboot annotations.
+			for _, annotation := range k.beforeRebootAnnotations {
+				klog.V(4).Infof("Deleting annotation %q from node %q", annotation, node.Name)
+				delete(node.Annotations, annotation)
 			}
+			node.Annotations[constants.AnnotationOkToReboot] = constants.True
+		})
+		if err != nil {
+			return fmt.Errorf("updating node %q: %w", n.Name, err)
 		}
 	}
 
@@ -445,22 +447,24 @@ func (k *Kontroller) checkAfterReboot() error {
 	postRebootNodes := k8sutil.FilterNodesByRequirement(nodelist.Items, afterRebootReq)
 
 	for _, n := range postRebootNodes {
-		if hasAllAnnotations(n, k.afterRebootAnnotations) {
-			klog.V(4).Infof("Deleting label %q for %q", constants.LabelAfterReboot, n.Name)
-			klog.V(4).Infof("Setting annotation %q to false for %q", constants.AnnotationOkToReboot, n.Name)
+		if !hasAllAnnotations(n, k.afterRebootAnnotations) {
+			continue
+		}
 
-			err = k8sutil.UpdateNodeRetry(k.nc, n.Name, func(node *corev1.Node) {
-				delete(node.Labels, constants.LabelAfterReboot)
-				// Cleanup the after-reboot annotations.
-				for _, annotation := range k.afterRebootAnnotations {
-					klog.V(4).Infof("Deleting annotation %q from node %q", annotation, node.Name)
-					delete(node.Annotations, annotation)
-				}
-				node.Annotations[constants.AnnotationOkToReboot] = constants.False
-			})
-			if err != nil {
-				return fmt.Errorf("updating node %q: %w", n.Name, err)
+		klog.V(4).Infof("Deleting label %q for %q", constants.LabelAfterReboot, n.Name)
+		klog.V(4).Infof("Setting annotation %q to false for %q", constants.AnnotationOkToReboot, n.Name)
+
+		err = k8sutil.UpdateNodeRetry(k.nc, n.Name, func(node *corev1.Node) {
+			delete(node.Labels, constants.LabelAfterReboot)
+			// Cleanup the after-reboot annotations.
+			for _, annotation := range k.afterRebootAnnotations {
+				klog.V(4).Infof("Deleting annotation %q from node %q", annotation, node.Name)
+				delete(node.Annotations, annotation)
 			}
+			node.Annotations[constants.AnnotationOkToReboot] = constants.False
+		})
+		if err != nil {
+			return fmt.Errorf("updating node %q: %w", n.Name, err)
 		}
 	}
 
