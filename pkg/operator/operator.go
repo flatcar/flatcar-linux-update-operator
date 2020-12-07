@@ -417,11 +417,13 @@ func (k *Kontroller) checkBeforeReboot() error {
 
 		err = k8sutil.UpdateNodeRetry(k.nc, n.Name, func(node *corev1.Node) {
 			delete(node.Labels, constants.LabelBeforeReboot)
+
 			// Cleanup the before-reboot annotations.
 			for _, annotation := range k.beforeRebootAnnotations {
 				klog.V(4).Infof("Deleting annotation %q from node %q", annotation, node.Name)
 				delete(node.Annotations, annotation)
 			}
+
 			node.Annotations[constants.AnnotationOkToReboot] = constants.True
 		})
 		if err != nil {
@@ -456,11 +458,13 @@ func (k *Kontroller) checkAfterReboot() error {
 
 		err = k8sutil.UpdateNodeRetry(k.nc, n.Name, func(node *corev1.Node) {
 			delete(node.Labels, constants.LabelAfterReboot)
+
 			// Cleanup the after-reboot annotations.
 			for _, annotation := range k.afterRebootAnnotations {
 				klog.V(4).Infof("Deleting annotation %q from node %q", annotation, node.Name)
 				delete(node.Annotations, annotation)
 			}
+
 			node.Annotations[constants.AnnotationOkToReboot] = constants.False
 		})
 		if err != nil {
