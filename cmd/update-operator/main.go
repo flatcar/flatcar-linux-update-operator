@@ -31,7 +31,7 @@ var (
 	printVersion       = flag.Bool("version", false, "Print version and exit")
 )
 
-func main() {
+func handleFlags() {
 	flag.Var(&beforeRebootAnnotations, "before-reboot-annotations",
 		"List of comma-separated Kubernetes node annotations that must be set to 'true' before a reboot is allowed")
 
@@ -55,6 +55,10 @@ func main() {
 	if *kubeconfig == "" {
 		*kubeconfig = os.Getenv("KUBECONFIG")
 	}
+}
+
+func main() {
+	handleFlags()
 
 	if *printVersion {
 		fmt.Println(version.Format())
