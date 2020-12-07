@@ -13,29 +13,36 @@ import (
 	"github.com/kinvolk/flatcar-linux-update-operator/pkg/version"
 )
 
-var (
+type flags struct {
 	beforeRebootAnnotations flagutil.StringSliceFlag
 	afterRebootAnnotations  flagutil.StringSliceFlag
+	kubeconfig              *string
+	autoLabelContainerLinux *bool
+	rebootWindowStart       *string
+	rebootWindowLength      *string
+	printVersion            *bool
+}
 
-	kubeconfig = flag.String("kubeconfig", "",
-		"Path to a kubeconfig file. Default to the in-cluster config if not provided.")
+func handleFlags() *flags {
+	f := &flags{
+		kubeconfig: flag.String("kubeconfig", "",
+			"Path to a kubeconfig file. Default to the in-cluster config if not provided."),
 
-	autoLabelContainerLinux = flag.Bool("auto-label-flatcar-linux", false,
-		"Auto-label Flatcar Container Linux nodes with agent=true (convenience)")
+		autoLabelContainerLinux: flag.Bool("auto-label-flatcar-linux", false,
+			"Auto-label Flatcar Container Linux nodes with agent=true (convenience)"),
 
-	rebootWindowStart = flag.String("reboot-window-start", "",
-		"Day of week ('Sun', 'Mon', ...; optional) and time of day at which the reboot window starts. "+
-			"E.g. 'Mon 14:00', '11:00'")
+		rebootWindowStart: flag.String("reboot-window-start", "",
+			"Day of week ('Sun', 'Mon', ...; optional) and time of day at which the reboot window starts. "+
+				"E.g. 'Mon 14:00', '11:00'"),
 
-	rebootWindowLength = flag.String("reboot-window-length", "", "Length of the reboot window. E.g. '1h30m'")
-	printVersion       = flag.Bool("version", false, "Print version and exit")
-)
+		rebootWindowLength: flag.String("reboot-window-length", "", "Length of the reboot window. E.g. '1h30m'"),
+		printVersion:       flag.Bool("version", false, "Print version and exit"),
+	}
 
-func handleFlags() {
-	flag.Var(&beforeRebootAnnotations, "before-reboot-annotations",
+	flag.Var(&f.beforeRebootAnnotations, "before-reboot-annotations",
 		"List of comma-separated Kubernetes node annotations that must be set to 'true' before a reboot is allowed")
 
-	flag.Var(&afterRebootAnnotations, "after-reboot-annotations",
+	flag.Var(&f.afterRebootAnnotations, "after-reboot-annotations",
 		"List of comma-separated Kubernetes node annotations that must be set to 'true' before a node is marked "+
 			"schedulable and the operator lock is released")
 
@@ -52,21 +59,23 @@ func handleFlags() {
 	}
 
 	// Respect KUBECONFIG without the prefix as well.
-	if *kubeconfig == "" {
-		*kubeconfig = os.Getenv("KUBECONFIG")
+	if *f.kubeconfig == "" {
+		*f.kubeconfig = os.Getenv("KUBECONFIG")
 	}
+
+	return f
 }
 
 func main() {
-	handleFlags()
+	f := handleFlags()
 
-	if *printVersion {
+	if *f.printVersion {
 		fmt.Println(version.Format())
 		os.Exit(0)
 	}
 
 	// Create Kubernetes client (clientset).
-	client, err := k8sutil.GetClient(*kubeconfig)
+	client, err := k8sutil.GetClient(*f.kubeconfig)
 	if err != nil {
 		klog.Fatalf("Failed to create Kubernetes client: %v", err)
 	}
@@ -74,11 +83,11 @@ func main() {
 	// Construct update-operator.
 	o, err := operator.New(operator.Config{
 		Client:                  client,
-		AutoLabelContainerLinux: *autoLabelContainerLinux,
-		BeforeRebootAnnotations: beforeRebootAnnotations,
-		AfterRebootAnnotations:  afterRebootAnnotations,
-		RebootWindowStart:       *rebootWindowStart,
-		RebootWindowLength:      *rebootWindowLength,
+		AutoLabelContainerLinux: *f.autoLabelContainerLinux,
+		BeforeRebootAnnotations: f.beforeRebootAnnotations,
+		AfterRebootAnnotations:  f.afterRebootAnnotations,
+		RebootWindowStart:       *f.rebootWindowStart,
+		RebootWindowLength:      *f.rebootWindowLength,
 	})
 	if err != nil {
 		klog.Fatalf("Failed to initialize %s: %v", os.Args[0], err)
