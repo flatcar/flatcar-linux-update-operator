@@ -410,12 +410,7 @@ func (k *Klocksmith) waitForNotOkToReboot() error {
 			return false, fmt.Errorf("our node was deleted while we were waiting for ready")
 		}
 
-		no := event.Object.(*corev1.Node)
-		if no.Annotations[constants.AnnotationOkToReboot] != constants.True {
-			return true, nil
-		}
-
-		return false, nil
+		return event.Object.(*corev1.Node).Annotations[constants.AnnotationOkToReboot] != constants.True, nil
 	}))
 	if err != nil {
 		return fmt.Errorf("waiting for annotation %q failed: %w", constants.AnnotationOkToReboot, err)
