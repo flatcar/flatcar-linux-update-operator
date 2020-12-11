@@ -37,7 +37,10 @@ type Klocksmith struct {
 	reapTimeout time.Duration
 }
 
-const defaultPollInterval = 10 * time.Second
+const (
+	defaultPollInterval     = 10 * time.Second
+	maxOperatorResponseTime = 24 * time.Hour
+)
 
 var shouldRebootSelector = fields.Set(map[string]string{
 	constants.AnnotationOkToReboot:   constants.True,
@@ -354,7 +357,7 @@ func (k *Klocksmith) waitForOkToReboot() error {
 
 	// Hopefully 24 hours is enough time between indicating we need a
 	// reboot and the controller telling us to do it.
-	ctx, _ := watchtools.ContextWithOptionalTimeout(context.Background(), time.Hour*24)
+	ctx, _ := watchtools.ContextWithOptionalTimeout(context.Background(), maxOperatorResponseTime)
 
 	ev, err := watchtools.UntilWithoutRetry(ctx, watcher, k8sutil.NodeAnnotationCondition(shouldRebootSelector))
 	if err != nil {
@@ -400,7 +403,7 @@ func (k *Klocksmith) waitForNotOkToReboot() error {
 	// true' vs '== False'; due to the operator matching on '== True', and not
 	// going out of its way to convert '' => 'False', checking the exact inverse
 	// of what the operator checks is the correct thing to do.
-	ctx, _ := watchtools.ContextWithOptionalTimeout(context.Background(), time.Hour*24)
+	ctx, _ := watchtools.ContextWithOptionalTimeout(context.Background(), maxOperatorResponseTime)
 
 	ev, err := watchtools.UntilWithoutRetry(ctx, watcher, watchtools.ConditionFunc(func(event watch.Event) (bool, error) {
 		switch event.Type {
