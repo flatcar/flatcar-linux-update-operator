@@ -276,8 +276,7 @@ func (k *Kontroller) process() {
 	// fix them.
 	klog.V(4).Info("Cleaning up node state")
 
-	err := k.cleanupState()
-	if err != nil {
+	if err := k.cleanupState(); err != nil {
 		klog.Errorf("Failed to cleanup node state: %v", err)
 
 		return
@@ -289,8 +288,7 @@ func (k *Kontroller) process() {
 	// the reboot has completed.
 	klog.V(4).Info("Checking if configured after-reboot annotations are set to true")
 
-	err = k.checkAfterReboot()
-	if err != nil {
+	if err := k.checkAfterReboot(); err != nil {
 		klog.Errorf("Failed to check after reboot: %v", err)
 
 		return
@@ -300,8 +298,7 @@ func (k *Kontroller) process() {
 	// remove after-reboot annotations and add the after-reboot=true label.
 	klog.V(4).Info("Labeling rebooted nodes with after-reboot label")
 
-	err = k.markAfterReboot()
-	if err != nil {
+	if err := k.markAfterReboot(); err != nil {
 		klog.Errorf("Failed to update recently rebooted nodes: %v", err)
 
 		return
@@ -313,8 +310,7 @@ func (k *Kontroller) process() {
 	// time to reboot.
 	klog.V(4).Info("Checking if configured before-reboot annotations are set to true")
 
-	err = k.checkBeforeReboot()
-	if err != nil {
+	if err := k.checkBeforeReboot(); err != nil {
 		klog.Errorf("Failed to check before reboot: %v", err)
 
 		return
@@ -324,8 +320,7 @@ func (k *Kontroller) process() {
 	// annotations and add the before-reboot=true label.
 	klog.V(4).Info("Labeling rebootable nodes with before-reboot label")
 
-	err = k.markBeforeReboot()
-	if err != nil {
+	if err := k.markBeforeReboot(); err != nil {
 		klog.Errorf("Failed to update rebootable nodes: %v", err)
 
 		return
