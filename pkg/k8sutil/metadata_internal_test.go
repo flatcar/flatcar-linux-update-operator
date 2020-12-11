@@ -6,6 +6,8 @@ import (
 )
 
 func Test_slitNewlineEnv_retain_map_values_when_given_empty_input(t *testing.T) {
+	t.Parallel()
+
 	expected := map[string]string{"foo": "bar"}
 
 	input := map[string]string{}

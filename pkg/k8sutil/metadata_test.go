@@ -36,6 +36,8 @@ func atomicCounterIncrement(n *corev1.Node) {
 }
 
 func TestUpdateNodeRetryHandlesConflict(t *testing.T) {
+	t.Parallel()
+
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	mockNi := mock_v1.NewMockNodeInterface(ctrl)
