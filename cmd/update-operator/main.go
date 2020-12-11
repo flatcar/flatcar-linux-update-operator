@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strconv"
 
 	"github.com/coreos/pkg/flagutil"
 	"k8s.io/klog/v2"
@@ -14,38 +13,38 @@ import (
 	"github.com/kinvolk/flatcar-linux-update-operator/pkg/version"
 )
 
-var (
+type flags struct {
 	beforeRebootAnnotations flagutil.StringSliceFlag
 	afterRebootAnnotations  flagutil.StringSliceFlag
+	kubeconfig              *string
+	autoLabelContainerLinux *bool
+	rebootWindowStart       *string
+	rebootWindowLength      *string
+	printVersion            *bool
+}
 
-	kubeconfig = flag.String("kubeconfig", "",
-		"Path to a kubeconfig file. Default to the in-cluster config if not provided.")
+func handleFlags() *flags {
+	f := &flags{
+		kubeconfig: flag.String("kubeconfig", "",
+			"Path to a kubeconfig file. Default to the in-cluster config if not provided."),
 
-	autoLabelContainerLinux = flag.Bool("auto-label-flatcar-linux", false,
-		"Auto-label Flatcar Container Linux nodes with agent=true (convenience)")
+		autoLabelContainerLinux: flag.Bool("auto-label-flatcar-linux", false,
+			"Auto-label Flatcar Container Linux nodes with agent=true (convenience)"),
 
-	rebootWindowStart = flag.String("reboot-window-start", "",
-		"Day of week ('Sun', 'Mon', ...; optional) and time of day at which the reboot window starts. "+
-			"E.g. 'Mon 14:00', '11:00'")
+		rebootWindowStart: flag.String("reboot-window-start", "",
+			"Day of week ('Sun', 'Mon', ...; optional) and time of day at which the reboot window starts. "+
+				"E.g. 'Mon 14:00', '11:00'"),
 
-	rebootWindowLength = flag.String("reboot-window-length", "", "Length of the reboot window. E.g. '1h30m'")
-	printVersion       = flag.Bool("version", false, "Print version and exit")
-	// Deprecated flags.
-	analyticsEnabled optValue
-	manageAgent      = flag.Bool("manage-agent", false, "Manage the associated update-agent")
-	agentImageRepo   = flag.String("agent-image-repo", "quay.io/kinvolk/flatcar-linux-update-operator",
-		"The image to use for the managed agent, without version tag")
-)
+		rebootWindowLength: flag.String("reboot-window-length", "", "Length of the reboot window. E.g. '1h30m'"),
+		printVersion:       flag.Bool("version", false, "Print version and exit"),
+	}
 
-func main() {
-	flag.Var(&beforeRebootAnnotations, "before-reboot-annotations",
+	flag.Var(&f.beforeRebootAnnotations, "before-reboot-annotations",
 		"List of comma-separated Kubernetes node annotations that must be set to 'true' before a reboot is allowed")
 
-	flag.Var(&afterRebootAnnotations, "after-reboot-annotations",
+	flag.Var(&f.afterRebootAnnotations, "after-reboot-annotations",
 		"List of comma-separated Kubernetes node annotations that must be set to 'true' before a node is marked "+
 			"schedulable and the operator lock is released")
-
-	flag.Var(&analyticsEnabled, "analytics", "Send analytics to Google Analytics")
 
 	klog.InitFlags(nil)
 
@@ -59,26 +58,24 @@ func main() {
 		klog.Fatalf("Failed to parse environment variables: %v", err)
 	}
 
-	if analyticsEnabled.present {
-		klog.Warning("Use of -analytics is deprecated and will be removed. Google Analytics will not be enabled.")
-	}
-
 	// Respect KUBECONFIG without the prefix as well.
-	if *kubeconfig == "" {
-		*kubeconfig = os.Getenv("KUBECONFIG")
+	if *f.kubeconfig == "" {
+		*f.kubeconfig = os.Getenv("KUBECONFIG")
 	}
 
-	if *printVersion {
+	return f
+}
+
+func main() {
+	f := handleFlags()
+
+	if *f.printVersion {
 		fmt.Println(version.Format())
 		os.Exit(0)
 	}
 
-	if *manageAgent {
-		klog.Warning("Use of -manage-agent=true is deprecated and will be removed in the future")
-	}
-
 	// Create Kubernetes client (clientset).
-	client, err := k8sutil.GetClient(*kubeconfig)
+	client, err := k8sutil.GetClient(*f.kubeconfig)
 	if err != nil {
 		klog.Fatalf("Failed to create Kubernetes client: %v", err)
 	}
@@ -86,13 +83,11 @@ func main() {
 	// Construct update-operator.
 	o, err := operator.New(operator.Config{
 		Client:                  client,
-		AutoLabelContainerLinux: *autoLabelContainerLinux,
-		ManageAgent:             *manageAgent,
-		AgentImageRepo:          *agentImageRepo,
-		BeforeRebootAnnotations: beforeRebootAnnotations,
-		AfterRebootAnnotations:  afterRebootAnnotations,
-		RebootWindowStart:       *rebootWindowStart,
-		RebootWindowLength:      *rebootWindowLength,
+		AutoLabelContainerLinux: *f.autoLabelContainerLinux,
+		BeforeRebootAnnotations: f.beforeRebootAnnotations,
+		AfterRebootAnnotations:  f.afterRebootAnnotations,
+		RebootWindowStart:       *f.rebootWindowStart,
+		RebootWindowLength:      *f.rebootWindowLength,
 	})
 	if err != nil {
 		klog.Fatalf("Failed to initialize %s: %v", os.Args[0], err)
@@ -107,22 +102,4 @@ func main() {
 	if err := o.Run(stop); err != nil {
 		klog.Fatalf("Error while running %s: %v", os.Args[0], err)
 	}
-}
-
-// optValue is a flag.Value that detects whether a user passed a flag directly.
-type optValue struct {
-	value   bool
-	present bool
-}
-
-func (o *optValue) Set(s string) error {
-	v, err := strconv.ParseBool(s)
-	o.value = v
-	o.present = true
-
-	return err //nolint:wrapcheck
-}
-
-func (o *optValue) String() string {
-	return strconv.FormatBool(o.value)
 }

@@ -10,6 +10,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
@@ -29,10 +30,7 @@ import (
 const (
 	eventSourceComponent               = "update-operator"
 	leaderElectionEventSourceComponent = "update-operator-leader-election"
-	// agentDefaultAppName is the label value for the 'app' key that agents are
-	// expected to be labeled with.
-	agentDefaultAppName = "flatcar-linux-update-agent"
-	maxRebootingNodes   = 1
+	maxRebootingNodes                  = 1
 
 	leaderElectionResourceName = "flatcar-linux-update-operator-lock"
 
@@ -109,10 +107,6 @@ type Kontroller struct {
 
 	// Reboot window.
 	rebootWindow *timeutil.Periodic
-
-	// Deprecated.
-	manageAgent    bool
-	agentImageRepo string
 }
 
 // Config configures a Kontroller.
@@ -127,9 +121,6 @@ type Config struct {
 	// Reboot window.
 	RebootWindowStart  string
 	RebootWindowLength string
-	// Deprecated.
-	ManageAgent    bool
-	AgentImageRepo string
 }
 
 // New initializes a new Kontroller.
@@ -139,10 +130,24 @@ func New(config Config) (*Kontroller, error) {
 		return nil, fmt.Errorf("kubernetes client must not be nil")
 	}
 
-	kc := config.Client
+	namespace := os.Getenv("POD_NAMESPACE")
+	if namespace == "" {
+		return nil, fmt.Errorf("unable to determine operator namespace: please ensure POD_NAMESPACE " +
+			"environment variable is set")
+	}
 
-	// Node interface.
-	nc := kc.CoreV1().Nodes()
+	var rebootWindow *timeutil.Periodic
+
+	if config.RebootWindowStart != "" && config.RebootWindowLength != "" {
+		rw, err := timeutil.ParsePeriodic(config.RebootWindowStart, config.RebootWindowLength)
+		if err != nil {
+			return nil, fmt.Errorf("parsing reboot window: %w", err)
+		}
+
+		rebootWindow = rw
+	}
+
+	kc := config.Client
 
 	// Create event emitter.
 	broadcaster := record.NewBroadcaster()
@@ -168,26 +173,9 @@ func New(config Config) (*Kontroller, error) {
 		Component: leaderElectionEventSourceComponent,
 	})
 
-	namespace := os.Getenv("POD_NAMESPACE")
-	if namespace == "" {
-		return nil, fmt.Errorf("unable to determine operator namespace: please ensure POD_NAMESPACE " +
-			"environment variable is set")
-	}
-
-	var rebootWindow *timeutil.Periodic
-
-	if config.RebootWindowStart != "" && config.RebootWindowLength != "" {
-		rw, err := timeutil.ParsePeriodic(config.RebootWindowStart, config.RebootWindowLength)
-		if err != nil {
-			return nil, fmt.Errorf("parsing reboot window: %w", err)
-		}
-
-		rebootWindow = rw
-	}
-
 	return &Kontroller{
 		kc:                          kc,
-		nc:                          nc,
+		nc:                          kc.CoreV1().Nodes(),
 		er:                          er,
 		beforeRebootAnnotations:     config.BeforeRebootAnnotations,
 		afterRebootAnnotations:      config.AfterRebootAnnotations,
@@ -195,8 +183,6 @@ func New(config Config) (*Kontroller, error) {
 		leaderElectionEventRecorder: leaderElectionEventRecorder,
 		namespace:                   namespace,
 		autoLabelContainerLinux:     config.AutoLabelContainerLinux,
-		manageAgent:                 config.ManageAgent,
-		agentImageRepo:              config.AgentImageRepo,
 		rebootWindow:                rebootWindow,
 	}, nil
 }
@@ -212,18 +198,6 @@ func (k *Kontroller) Run(stop <-chan struct{}) error {
 	// Start Flatcar Container Linux node auto-labeler.
 	if k.autoLabelContainerLinux {
 		go wait.Until(k.legacyLabeler, reconciliationPeriod, stop)
-	}
-
-	// Before doing anything else, make sure the associated agent daemonset is
-	// ready if it's our responsibility.
-	if k.manageAgent && k.agentImageRepo != "" {
-		// Create or update the update-agent daemonset.
-		err := k.runDaemonsetUpdate(k.agentImageRepo)
-		if err != nil {
-			klog.Errorf("unable to ensure managed agents are ready: %v", err)
-
-			return err
-		}
 	}
 
 	klog.V(5).Info("starting controller")
@@ -391,6 +365,51 @@ func (k *Kontroller) cleanupState() error {
 	return nil
 }
 
+// checkReboot gets all nodes with a given requirement and checks if all of the given annotations are set to true.
+//
+// If they are, it deletes given annotations and label, then sets ok-to-reboot annotation to either true or false,
+// depending on the given parameter.
+//
+// If ok-to-reboot is set to true, it gives node agent a signal that it is OK to proceed with rebooting.
+//
+// If ok-to-reboot is set to false, it means node has finished rebooting successfully.
+//
+// If there is an error getting the list of nodes or updating any of them, an
+// error is immediately returned.
+func (k *Kontroller) checkReboot(req *labels.Requirement, annotations []string, label, okToReboot string) error {
+	nodelist, err := k.nc.List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("listing nodes: %w", err)
+	}
+
+	nodes := k8sutil.FilterNodesByRequirement(nodelist.Items, req)
+
+	for _, n := range nodes {
+		if !hasAllAnnotations(n, annotations) {
+			continue
+		}
+
+		klog.V(4).Infof("Deleting label %q for %q", label, n.Name)
+		klog.V(4).Infof("Setting annotation %q to %q for %q", constants.AnnotationOkToReboot, okToReboot, n.Name)
+
+		if err := k8sutil.UpdateNodeRetry(k.nc, n.Name, func(node *corev1.Node) {
+			delete(node.Labels, label)
+
+			// Cleanup the annotations.
+			for _, annotation := range annotations {
+				klog.V(4).Infof("Deleting annotation %q from node %q", annotation, node.Name)
+				delete(node.Annotations, annotation)
+			}
+
+			node.Annotations[constants.AnnotationOkToReboot] = okToReboot
+		}); err != nil {
+			return fmt.Errorf("updating node %q: %w", n.Name, err)
+		}
+	}
+
+	return nil
+}
+
 // checkBeforeReboot gets all nodes with the before-reboot=true label and checks
 // if all of the configured before-reboot annotations are set to true. If they
 // are, it deletes the before-reboot=true label and sets reboot-ok=true to tell
@@ -400,34 +419,7 @@ func (k *Kontroller) cleanupState() error {
 // If there is an error getting the list of nodes or updating any of them, an
 // error is immediately returned.
 func (k *Kontroller) checkBeforeReboot() error {
-	nodelist, err := k.nc.List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		return fmt.Errorf("listing nodes: %w", err)
-	}
-
-	preRebootNodes := k8sutil.FilterNodesByRequirement(nodelist.Items, beforeRebootReq)
-
-	for _, n := range preRebootNodes {
-		if hasAllAnnotations(n, k.beforeRebootAnnotations) {
-			klog.V(4).Infof("Deleting label %q for %q", constants.LabelBeforeReboot, n.Name)
-			klog.V(4).Infof("Setting annotation %q to true for %q", constants.AnnotationOkToReboot, n.Name)
-
-			err = k8sutil.UpdateNodeRetry(k.nc, n.Name, func(node *corev1.Node) {
-				delete(node.Labels, constants.LabelBeforeReboot)
-				// Cleanup the before-reboot annotations.
-				for _, annotation := range k.beforeRebootAnnotations {
-					klog.V(4).Infof("Deleting annotation %q from node %q", annotation, node.Name)
-					delete(node.Annotations, annotation)
-				}
-				node.Annotations[constants.AnnotationOkToReboot] = constants.True
-			})
-			if err != nil {
-				return fmt.Errorf("updating node %q: %w", n.Name, err)
-			}
-		}
-	}
-
-	return nil
+	return k.checkReboot(beforeRebootReq, k.beforeRebootAnnotations, constants.LabelBeforeReboot, constants.True)
 }
 
 // checkAfterReboot gets all nodes with the after-reboot=true label and checks
@@ -437,34 +429,7 @@ func (k *Kontroller) checkBeforeReboot() error {
 // If there is an error getting the list of nodes or updating any of them, an
 // error is immediately returned.
 func (k *Kontroller) checkAfterReboot() error {
-	nodelist, err := k.nc.List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		return fmt.Errorf("listing nodes: %w", err)
-	}
-
-	postRebootNodes := k8sutil.FilterNodesByRequirement(nodelist.Items, afterRebootReq)
-
-	for _, n := range postRebootNodes {
-		if hasAllAnnotations(n, k.afterRebootAnnotations) {
-			klog.V(4).Infof("Deleting label %q for %q", constants.LabelAfterReboot, n.Name)
-			klog.V(4).Infof("Setting annotation %q to false for %q", constants.AnnotationOkToReboot, n.Name)
-
-			err = k8sutil.UpdateNodeRetry(k.nc, n.Name, func(node *corev1.Node) {
-				delete(node.Labels, constants.LabelAfterReboot)
-				// Cleanup the after-reboot annotations.
-				for _, annotation := range k.afterRebootAnnotations {
-					klog.V(4).Infof("Deleting annotation %q from node %q", annotation, node.Name)
-					delete(node.Annotations, annotation)
-				}
-				node.Annotations[constants.AnnotationOkToReboot] = constants.False
-			})
-			if err != nil {
-				return fmt.Errorf("updating node %q: %w", n.Name, err)
-			}
-		}
-	}
-
-	return nil
+	return k.checkReboot(afterRebootReq, k.beforeRebootAnnotations, constants.LabelAfterReboot, constants.False)
 }
 
 // markBeforeReboot gets nodes which want to reboot and marks them with the

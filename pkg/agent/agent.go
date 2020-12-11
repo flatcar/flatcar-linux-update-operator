@@ -408,14 +408,11 @@ func (k *Klocksmith) waitForNotOkToReboot() error {
 			return false, fmt.Errorf("error watching node: %v", event.Object)
 		case watch.Deleted:
 			return false, fmt.Errorf("our node was deleted while we were waiting for ready")
+		case watch.Added, watch.Modified:
+			return event.Object.(*corev1.Node).Annotations[constants.AnnotationOkToReboot] != constants.True, nil
+		default:
+			return false, fmt.Errorf("unknown event type: %v", event.Type)
 		}
-
-		no := event.Object.(*corev1.Node)
-		if no.Annotations[constants.AnnotationOkToReboot] != constants.True {
-			return true, nil
-		}
-
-		return false, nil
 	}))
 	if err != nil {
 		return fmt.Errorf("waiting for annotation %q failed: %w", constants.AnnotationOkToReboot, err)
