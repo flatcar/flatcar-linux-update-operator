@@ -458,6 +458,21 @@ func (k *Kontroller) checkAfterReboot(ctx context.Context) error {
 	return k.checkReboot(ctx, opt)
 }
 
+// insideRebootWindow checks if process is inside reboot window at the time
+// of calling this function.
+//
+// If reboot window is not configured, true is always returned.
+func (k *Kontroller) insideRebootWindow() bool {
+	if k.rebootWindow == nil {
+		return true
+	}
+
+	// Most recent reboot window might still be open.
+	mostRecentRebootWindow := k.rebootWindow.Previous(time.Now())
+
+	return time.Now().Before(mostRecentRebootWindow.End)
+}
+
 // markBeforeReboot gets nodes which want to reboot and marks them with the
 // before-reboot=true label. This is considered the beginning of the reboot
 // process from the perspective of the update-operator. It will only mark
@@ -474,16 +489,10 @@ func (k *Kontroller) markBeforeReboot(ctx context.Context) error {
 		return fmt.Errorf("listing nodes: %w", err)
 	}
 
-	// Check if a reboot window is configured.
-	if k.rebootWindow != nil {
-		// Get previous occurrence relative to now.
-		period := k.rebootWindow.Previous(time.Now())
-		// Check if we are inside the reboot window.
-		if !(period.End.After(time.Now())) {
-			klog.V(4).Info("We are outside the reboot window; not labeling rebootable nodes for now")
+	if !k.insideRebootWindow() {
+		klog.V(4).Info("We are outside the reboot window; not labeling rebootable nodes for now")
 
-			return nil
-		}
+		return nil
 	}
 
 	// Find nodes which are still rebooting.
