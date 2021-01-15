@@ -94,9 +94,15 @@ linters:
     - wrapcheck
     - wsl
   disable:
+    # We use different import grouping style than gci forces.
     - gci
+    # We still have many globals to get rid of.
     - gochecknoglobals
+    # TODOs in the code are OK.
     - godox
+    # We do not have clearly defined error types yet.
     - goerr113
+    # We do not require all used structs to have all fields initialized.
     - exhaustivestruct
+    # We do not care about the memory efficiency really.
     - maligned
