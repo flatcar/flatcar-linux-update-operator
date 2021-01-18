@@ -22,6 +22,13 @@ issues:
     - linters:
         - lll
       source: "http(s)://"
+    # Allow use of fmt.Print* functions.
+    - linters:
+      - forbidigo
+      text: "use of `fmt.Printf` forbidden by pattern"
+    - linters:
+      - forbidigo
+      text: "use of `fmt.Println` forbidden by pattern"
 
 linters-settings:
   exhaustive:
@@ -42,6 +49,7 @@ linters:
     - errorlint
     - exhaustive
     - exportloopref
+    - forbidigo
     - funlen
     - gochecknoinits
     - gocognit
@@ -60,19 +68,23 @@ linters:
     - ineffassign
     - interfacer
     - lll
+    - makezero
     - misspell
     - nakedret
     - nestif
     - nlreturn
     - noctx
     - nolintlint
+    - paralleltest
     - prealloc
+    - predeclared
     - rowserrcheck
     - scopelint
     - sqlclosecheck
     - structcheck
     - stylecheck
     - testpackage
+    - thelper
     - tparallel
     - typecheck
     - unconvert
@@ -82,9 +94,15 @@ linters:
     - wrapcheck
     - wsl
   disable:
+    # We use different import grouping style than gci forces.
     - gci
+    # We still have many globals to get rid of.
     - gochecknoglobals
+    # TODOs in the code are OK.
     - godox
+    # We do not have clearly defined error types yet.
     - goerr113
+    # We do not require all used structs to have all fields initialized.
     - exhaustivestruct
+    # We do not care about the memory efficiency really.
     - maligned
