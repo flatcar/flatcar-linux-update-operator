@@ -37,7 +37,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Run lint
-        run: make lint
+        run: make lint check-update-linters
 
   codespell:
     name: Codespell
