@@ -29,7 +29,10 @@ const (
 func NodeAnnotationCondition(selector fields.Selector) watchtools.ConditionFunc {
 	return func(event watch.Event) (bool, error) {
 		if event.Type == watch.Modified {
-			node := event.Object.(*v1api.Node)
+			node, ok := event.Object.(*v1api.Node)
+			if !ok {
+				return false, fmt.Errorf("received event object is not Node, got: %#v", event.Object)
+			}
 
 			return selector.Matches(fields.Set(node.Annotations)), nil
 		}

@@ -422,7 +422,10 @@ func (k *Klocksmith) waitForNotOkToReboot() error {
 	}
 
 	// Sanity check.
-	no := ev.Object.(*corev1.Node)
+	no, ok := ev.Object.(*corev1.Node)
+	if !ok {
+		return fmt.Errorf("object received in event is not Node, got: %#v", ev.Object)
+	}
 
 	if no.Annotations[constants.AnnotationOkToReboot] == constants.True {
 		panic("event did not contain annotation expected")

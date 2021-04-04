@@ -32,7 +32,7 @@ test:
 
 .PHONY: generate
 generate:
-	go generate -mod=vendor -v -x ./...
+	go generate -mod=vendor -tags generate -v -x ./...
 
 .PHONY: image
 image:
