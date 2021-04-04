@@ -1,4 +1,4 @@
-FROM golang:1.15-alpine3.12 as builder
+FROM golang:1.16-alpine3.13 as builder
 
 MAINTAINER Kinvolk
 
@@ -10,7 +10,7 @@ COPY . .
 
 RUN make bin/update-agent bin/update-operator
 
-FROM alpine:3.12
+FROM alpine:3.13
 
 MAINTAINER Kinvolk
 
