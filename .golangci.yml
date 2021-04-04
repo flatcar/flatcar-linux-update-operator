@@ -52,18 +52,25 @@ linters:
     - exhaustivestruct
     # We do not care about the memory efficiency really.
     - maligned
+    # This linter has been deprecated.
+    - interfacer
+    # This linter has been deprecated.
+    - scopelint
   enable:
     - asciicheck
     - bodyclose
+    - cyclop
     - deadcode
     - depguard
     - dogsled
     - dupl
+    - durationcheck
     - errcheck
     - errorlint
     - exhaustive
     - exportloopref
     - forbidigo
+    - forcetypeassert
     - funlen
     - gochecknoinits
     - gocognit
@@ -77,23 +84,26 @@ linters:
     - goimports
     - golint
     - gomnd
+    - gomoddirectives
     - gomodguard
     - goprintffuncname
+    - ifshort
+    - importas
     - ineffassign
-    - interfacer
     - lll
     - makezero
     - misspell
     - nakedret
     - nestif
+    - nilerr
     - nlreturn
     - noctx
     - nolintlint
     - paralleltest
     - prealloc
     - predeclared
+    - revive
     - rowserrcheck
-    - scopelint
     - sqlclosecheck
     - structcheck
     - stylecheck
@@ -104,6 +114,7 @@ linters:
     - unconvert
     - unparam
     - varcheck
+    - wastedassign
     - whitespace
     - wrapcheck
     - wsl
