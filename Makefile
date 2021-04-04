@@ -10,6 +10,8 @@ LD_FLAGS="-w -X $(REPO)/pkg/version.Version=$(RELEASE_VERSION) -X $(REPO)/pkg/ve
 DOCKER_CMD ?= docker
 IMAGE_REPO?=quay.io/kinvolk/flatcar-linux-update-operator
 
+GOLANGCI_LINT_CONFIG_FILE ?= .golangci.yml
+
 .PHONY: all
 all: build test lint
 
@@ -67,6 +69,17 @@ check-vendor: check-working-tree-clean vendor
 check-tidy: check-working-tree-clean
 	go mod tidy
 	@test -z "$$(git status --porcelain)" || (echo "Please run 'go mod tidy' and commit generated changes."; git status; exit 1)
+
+.PHONY: check-update-linters
+check-update-linters: check-working-tree-clean update-linters
+	@test -z "$$(git status --porcelain)" || (echo "Linter configuration outdated. Run 'make update-linters' and commit generated changes to fix."; exit 1)
+
+.PHONY: update-linters
+update-linters:
+	# Remove all enabled linters.
+	sed -i '/^  enable:/q0' $(GOLANGCI_LINT_CONFIG_FILE)
+	# Then add all possible linters to config.
+	golangci-lint linters | grep -E '^\S+:' | cut -d: -f1 | sort | sed 's/^/    - /g' | grep -v -E "($$(sed -e '1,/^  disable:$$/d' .golangci.yml  | grep -E '    - \S+$$' | awk '{print $$2}' | tr \\n '|' | sed 's/|$$//g'))" >> $(GOLANGCI_LINT_CONFIG_FILE)
 
 .PHONY: lint
 lint: build build-test

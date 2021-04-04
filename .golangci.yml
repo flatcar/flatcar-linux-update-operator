@@ -36,10 +36,22 @@ linters-settings:
   exhaustive:
     default-signifies-exhaustive: true
 
-# List for enabled linters can be generated for updates using the following command.
-# golangci-lint linters | grep -E '^\S+:' | cut -d: -f1 | sort | sed 's/^/    - /g' | grep -v -E "($(grep '^  disable:' -A 100 .golangci.yml  | grep -E '    - \S+$' | awk '{print $2}' | tr \\n '|' | sed 's/|$//g'))"
+# Update list of enabled linters using 'make update-linters'.
 linters:
   disable-all: false
+  disable:
+    # We use different import grouping style than gci forces.
+    - gci
+    # We still have many globals to get rid of.
+    - gochecknoglobals
+    # TODOs in the code are OK.
+    - godox
+    # We do not have clearly defined error types yet.
+    - goerr113
+    # We do not require all used structs to have all fields initialized.
+    - exhaustivestruct
+    # We do not care about the memory efficiency really.
+    - maligned
   enable:
     - asciicheck
     - bodyclose
@@ -95,16 +107,3 @@ linters:
     - whitespace
     - wrapcheck
     - wsl
-  disable:
-    # We use different import grouping style than gci forces.
-    - gci
-    # We still have many globals to get rid of.
-    - gochecknoglobals
-    # TODOs in the code are OK.
-    - godox
-    # We do not have clearly defined error types yet.
-    - goerr113
-    # We do not require all used structs to have all fields initialized.
-    - exhaustivestruct
-    # We do not care about the memory efficiency really.
-    - maligned
