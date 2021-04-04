@@ -31,6 +31,13 @@ issues:
       - forbidigo
       text: "use of `fmt.Println` forbidden by pattern"
       path: cmd/
+    # Allow to return unwrapped errors from external packages, as we do not use typed errors yet.
+    - linters:
+      - wrapcheck
+      text: "error returned from external package is unwrapped"
+    - linters:
+      - wrapcheck
+      text: "error returned from interface method should be wrapped"
 
 linters-settings:
   exhaustive:
