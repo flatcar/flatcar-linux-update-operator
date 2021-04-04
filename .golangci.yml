@@ -26,9 +26,11 @@ issues:
     - linters:
       - forbidigo
       text: "use of `fmt.Printf` forbidden by pattern"
+      path: cmd/
     - linters:
       - forbidigo
       text: "use of `fmt.Println` forbidden by pattern"
+      path: cmd/
 
 linters-settings:
   exhaustive:
