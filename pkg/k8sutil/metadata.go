@@ -75,7 +75,7 @@ func UpdateNodeRetry(nc v1core.NodeInterface, node string, f func(*v1api.Node)) 
 
 		_, err := nc.Update(context.TODO(), n, v1meta.UpdateOptions{})
 
-		return err //nolint:wrapcheck
+		return err
 	})
 	if err != nil {
 		// May be conflict if max retries were hit.
