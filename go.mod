@@ -3,7 +3,7 @@ module github.com/kinvolk/flatcar-linux-update-operator
 go 1.16
 
 require (
-	github.com/blang/semver v3.5.1+incompatible
+	github.com/blang/semver/v4 v4.0.0
 	github.com/coreos/go-systemd v0.0.0-20191104093116-d3cd4ed1dbcf
 	github.com/coreos/locksmith v0.6.2
 	github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f
