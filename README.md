@@ -53,3 +53,11 @@ kubectl apply -f examples/deploy -R
 ## Test
 
 To test that it is working, you can SSH to a node and trigger an update check by running `update_engine_client -check_for_update` or simulate a reboot is needed by running `locksmithctl send-need-reboot`.
+
+You can also annotate one of your nodes using the command below. Shortly after, you should see the Node being drained as a preparation for the reboot.
+
+```sh
+export NODE="<node name>"
+kubectl annotate node $NODE --overwrite \
+    flatcar-linux-update.v1.flatcar-linux.net/reboot-needed="true"
+```
