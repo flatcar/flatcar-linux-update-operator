@@ -51,7 +51,7 @@ clean: ## Cleans build artifacts.
 	rm -rf bin
 
 .PHONY: ci
-ci: check-generate check-vendor check-tidy build test ## Runs checks performed by CI without external dependencies required (e.g. golangci-lint).
+ci: check-generate check-vendor check-tidy build test test-integration ## Runs checks performed by CI without external dependencies required (e.g. golangci-lint).
 
 .PHONY: check-working-tree-clean
 check-working-tree-clean: ## Checks if working directory is clean.
@@ -92,6 +92,20 @@ codespell: CODESPELL_BIN := codespell
 codespell: ## Runs spell checking.
 	which $(CODESPELL_BIN) >/dev/null 2>&1 || (echo "$(CODESPELL_BIN) binary not found, skipping spell checking"; exit 0)
 	$(CODESPELL_BIN) --skip $(CODESPELL_SKIP) --ignore-words .codespell.ignorewords --check-filenames --check-hidden
+
+.PHONY: test-up
+test-up: ## Starts testing D-Bus instance in Docker container using docker-compose.
+	env UID=$$(id -u) docker-compose -f test/docker-compose.yml up -d
+
+.PHONY: test-down
+test-down: ## Tears down testing D-Bus instance created by 'test-up'.
+	docker-compose -f test/docker-compose.yml down
+
+.PHONY: test-integration
+test-integration: test-up
+test-integration: ## Runs integration tests using D-Bus running in Docker container.
+	FLUO_TEST_DBUS_SOCKET=$$(realpath ./test/test_bus_socket) go test -mod=vendor -count 1 ./...
+	make test-down
 
 .PHONY: help
 help: ## Prints help message.

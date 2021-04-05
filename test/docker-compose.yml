@@ -1,0 +1,13 @@
+version: "3.8"
+services:
+  dbus:
+    build: .
+    command:
+      - dbus-daemon
+      - --nofork
+      - --config-file=/var/run/dbus/testing.conf
+      - --nosyslog
+    user: "${UID}"
+    volumes:
+      - ./:/var/run/dbus
+      - /etc/passwd:/etc/passwd
