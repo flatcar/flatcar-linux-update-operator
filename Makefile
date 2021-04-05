@@ -51,7 +51,7 @@ clean:
 	rm -rf bin
 
 .PHONY: ci
-ci: check-generate check-vendor build test
+ci: check-generate check-vendor check-tidy build test
 
 .PHONY: check-working-tree-clean
 check-working-tree-clean:
