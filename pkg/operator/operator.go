@@ -412,7 +412,7 @@ func (k *Kontroller) checkBeforeReboot() error {
 }
 
 // checkAfterReboot gets all nodes with the after-reboot=true label and checks
-// if  all of the configured after-reboot annotations are set to true. If they
+// if all of the configured after-reboot annotations are set to true. If they
 // are, it deletes the after-reboot=true label and sets reboot-ok=false to tell
 // the agent that it has completed it's reboot successfully.
 // If there is an error getting the list of nodes or updating any of them, an
