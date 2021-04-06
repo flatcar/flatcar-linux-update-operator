@@ -16,23 +16,27 @@ import (
 	mock_v1 "github.com/kinvolk/flatcar-linux-update-operator/pkg/k8sutil/mocks"
 )
 
-func atomicCounterIncrement(n *corev1.Node) {
-	counterAnno := "counter"
-	s := n.Annotations[counterAnno]
+func atomicCounterIncrement(t *testing.T) func(n *corev1.Node) {
+	t.Helper()
 
-	var i int
+	return func(n *corev1.Node) {
+		counterAnno := "counter"
+		s := n.Annotations[counterAnno]
 
-	if s == "" {
-		i = 0
-	} else {
-		var err error
-		i, err = strconv.Atoi(s)
-		if err != nil {
-			panic(err)
+		var i int
+
+		if s == "" {
+			i = 0
+		} else {
+			var err error
+			i, err = strconv.Atoi(s)
+			if err != nil {
+				t.Fatalf("parsing %q to integer: %v", s, err)
+			}
 		}
-	}
 
-	n.Annotations[counterAnno] = strconv.Itoa(i + 1)
+		n.Annotations[counterAnno] = strconv.Itoa(i + 1)
+	}
 }
 
 func TestUpdateNodeRetryHandlesConflict(t *testing.T) {
@@ -64,7 +68,7 @@ func TestUpdateNodeRetryHandlesConflict(t *testing.T) {
 		mockNi.EXPECT().Update(context.TODO(), mockNode, metav1.UpdateOptions{}).Return(mockNode, nil),
 	)
 
-	err := k8sutil.UpdateNodeRetry(mockNi, "mock_node", atomicCounterIncrement)
+	err := k8sutil.UpdateNodeRetry(mockNi, "mock_node", atomicCounterIncrement(t))
 	if err != nil {
 		t.Errorf("unexpected error: expected increment to succeed")
 	}

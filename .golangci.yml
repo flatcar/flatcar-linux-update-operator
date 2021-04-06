@@ -26,73 +26,26 @@ issues:
     - linters:
       - forbidigo
       text: "use of `fmt.Printf` forbidden by pattern"
+      path: cmd/
     - linters:
       - forbidigo
       text: "use of `fmt.Println` forbidden by pattern"
+      path: cmd/
+    # Allow to return unwrapped errors from external packages, as we do not use typed errors yet.
+    - linters:
+      - wrapcheck
+      text: "error returned from external package is unwrapped"
+    - linters:
+      - wrapcheck
+      text: "error returned from interface method should be wrapped"
 
 linters-settings:
   exhaustive:
     default-signifies-exhaustive: true
 
-# List for enabled linters can be generated for updates using the following command.
-# golangci-lint linters | grep -E '^\S+:' | cut -d: -f1 | sort | sed 's/^/    - /g' | grep -v -E "($(grep '^  disable:' -A 100 .golangci.yml  | grep -E '    - \S+$' | awk '{print $2}' | tr \\n '|' | sed 's/|$//g'))"
+# Update list of enabled linters using 'make update-linters'.
 linters:
   disable-all: false
-  enable:
-    - asciicheck
-    - bodyclose
-    - deadcode
-    - depguard
-    - dogsled
-    - dupl
-    - errcheck
-    - errorlint
-    - exhaustive
-    - exportloopref
-    - forbidigo
-    - funlen
-    - gochecknoinits
-    - gocognit
-    - goconst
-    - gocritic
-    - gocyclo
-    - godot
-    - gofmt
-    - gofumpt
-    - goheader
-    - goimports
-    - golint
-    - gomnd
-    - gomodguard
-    - goprintffuncname
-    - ineffassign
-    - interfacer
-    - lll
-    - makezero
-    - misspell
-    - nakedret
-    - nestif
-    - nlreturn
-    - noctx
-    - nolintlint
-    - paralleltest
-    - prealloc
-    - predeclared
-    - rowserrcheck
-    - scopelint
-    - sqlclosecheck
-    - structcheck
-    - stylecheck
-    - testpackage
-    - thelper
-    - tparallel
-    - typecheck
-    - unconvert
-    - unparam
-    - varcheck
-    - whitespace
-    - wrapcheck
-    - wsl
   disable:
     # We use different import grouping style than gci forces.
     - gci
@@ -106,3 +59,69 @@ linters:
     - exhaustivestruct
     # We do not care about the memory efficiency really.
     - maligned
+    # This linter has been deprecated.
+    - interfacer
+    # This linter has been deprecated.
+    - scopelint
+  enable:
+    - asciicheck
+    - bodyclose
+    - cyclop
+    - deadcode
+    - depguard
+    - dogsled
+    - dupl
+    - durationcheck
+    - errcheck
+    - errorlint
+    - exhaustive
+    - exportloopref
+    - forbidigo
+    - forcetypeassert
+    - funlen
+    - gochecknoinits
+    - gocognit
+    - goconst
+    - gocritic
+    - gocyclo
+    - godot
+    - gofmt
+    - gofumpt
+    - goheader
+    - goimports
+    - golint
+    - gomnd
+    - gomoddirectives
+    - gomodguard
+    - goprintffuncname
+    - ifshort
+    - importas
+    - ineffassign
+    - lll
+    - makezero
+    - misspell
+    - nakedret
+    - nestif
+    - nilerr
+    - nlreturn
+    - noctx
+    - nolintlint
+    - paralleltest
+    - prealloc
+    - predeclared
+    - revive
+    - rowserrcheck
+    - sqlclosecheck
+    - structcheck
+    - stylecheck
+    - testpackage
+    - thelper
+    - tparallel
+    - typecheck
+    - unconvert
+    - unparam
+    - varcheck
+    - wastedassign
+    - whitespace
+    - wrapcheck
+    - wsl

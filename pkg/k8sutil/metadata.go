@@ -29,7 +29,10 @@ const (
 func NodeAnnotationCondition(selector fields.Selector) watchtools.ConditionFunc {
 	return func(event watch.Event) (bool, error) {
 		if event.Type == watch.Modified {
-			node := event.Object.(*v1api.Node)
+			node, ok := event.Object.(*v1api.Node)
+			if !ok {
+				return false, fmt.Errorf("received event object is not Node, got: %#v", event.Object)
+			}
 
 			return selector.Matches(fields.Set(node.Annotations)), nil
 		}
@@ -75,7 +78,7 @@ func UpdateNodeRetry(nc v1core.NodeInterface, node string, f func(*v1api.Node)) 
 
 		_, err := nc.Update(context.TODO(), n, v1meta.UpdateOptions{})
 
-		return err //nolint:wrapcheck
+		return err
 	})
 	if err != nil {
 		// May be conflict if max retries were hit.

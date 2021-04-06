@@ -190,8 +190,7 @@ func New(config Config) (*Kontroller, error) {
 // Run starts the operator reconcilitation process and runs until the stop
 // channel is closed.
 func (k *Kontroller) Run(stop <-chan struct{}) error {
-	err := k.withLeaderElection()
-	if err != nil {
+	if err := k.withLeaderElection(); err != nil {
 		return err
 	}
 
