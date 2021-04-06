@@ -89,7 +89,6 @@ var (
 type Kontroller struct {
 	kc kubernetes.Interface
 	nc corev1client.NodeInterface
-	er record.EventRecorder
 
 	// Annotations to look for before and after reboots.
 	beforeRebootAnnotations []string
@@ -152,7 +151,6 @@ func New(config Config) (*Kontroller, error) {
 	// Create event emitter.
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(&corev1client.EventSinkImpl{Interface: kc.CoreV1().Events("")})
-	er := broadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: eventSourceComponent})
 
 	leaderElectionClientConfig, err := rest.InClusterConfig()
 	if err != nil {
@@ -176,7 +174,6 @@ func New(config Config) (*Kontroller, error) {
 	return &Kontroller{
 		kc:                          kc,
 		nc:                          kc.CoreV1().Nodes(),
-		er:                          er,
 		beforeRebootAnnotations:     config.BeforeRebootAnnotations,
 		afterRebootAnnotations:      config.AfterRebootAnnotations,
 		leaderElectionClient:        leaderElectionClient,
