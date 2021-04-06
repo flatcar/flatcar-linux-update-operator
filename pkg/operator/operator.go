@@ -54,13 +54,13 @@ var (
 		constants.AnnotationRebootInProgress: constants.False,
 	}).AsSelector()
 
-	// wantsRebootSelector is a selector for the annotation expected to be on a node when it wants to be rebooted.
+	// rebootableSelector is a selector for the annotation expected to be on a node when it can be rebooted.
 	//
 	// The update-agent sets constants.AnnotationRebootNeeded to true when
 	// it would like to reboot, and false when it starts up.
 	//
 	// If constants.AnnotationRebootPaused is set to "true", the update-agent will not consider it for rebooting.
-	wantsRebootSelector = fields.ParseSelectorOrDie(constants.AnnotationRebootNeeded + "==" + constants.True +
+	rebootableSelector = fields.ParseSelectorOrDie(constants.AnnotationRebootNeeded + "==" + constants.True +
 		"," + constants.AnnotationRebootPaused + "!=" + constants.True +
 		"," + constants.AnnotationOkToReboot + "!=" + constants.True +
 		"," + constants.AnnotationRebootInProgress + "!=" + constants.True)
@@ -338,7 +338,7 @@ func (k *Kontroller) cleanupState() error {
 			// Make sure that nodes with the before-reboot label actually
 			// still wants to reboot.
 			if _, exists := node.Labels[constants.LabelBeforeReboot]; exists {
-				if !wantsRebootSelector.Matches(fields.Set(node.Annotations)) {
+				if !rebootableSelector.Matches(fields.Set(node.Annotations)) {
 					klog.Warningf("Node %v no longer wanted to reboot while we were trying to label it so: %v",
 						node.Name, node.Annotations)
 					delete(node.Labels, constants.LabelBeforeReboot)
@@ -471,7 +471,7 @@ func (k *Kontroller) markBeforeReboot() error {
 	}
 
 	// Find nodes which want to reboot.
-	rebootableNodes := k8sutil.FilterNodesByAnnotation(nodelist.Items, wantsRebootSelector)
+	rebootableNodes := k8sutil.FilterNodesByAnnotation(nodelist.Items, rebootableSelector)
 	rebootableNodes = k8sutil.FilterNodesByRequirement(rebootableNodes, notBeforeRebootReq)
 
 	// Don't even bother if rebootableNodes is empty. We wouldn't do anything anyway.
