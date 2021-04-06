@@ -405,8 +405,6 @@ func (k *Kontroller) checkReboot(req *labels.Requirement, annotations []string, 
 // if all of the configured before-reboot annotations are set to true. If they
 // are, it deletes the before-reboot=true label and sets reboot-ok=true to tell
 // the agent that it is ready to start the actual reboot process.
-// If it goes to set reboot-ok=true and finds that the node no longer wants a
-// reboot, then it just deletes the before-reboot=true label.
 // If there is an error getting the list of nodes or updating any of them, an
 // error is immediately returned.
 func (k *Kontroller) checkBeforeReboot() error {
