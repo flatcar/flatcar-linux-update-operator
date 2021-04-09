@@ -417,7 +417,7 @@ func (k *Kontroller) checkBeforeReboot() error {
 // If there is an error getting the list of nodes or updating any of them, an
 // error is immediately returned.
 func (k *Kontroller) checkAfterReboot() error {
-	return k.checkReboot(afterRebootReq, k.beforeRebootAnnotations, constants.LabelAfterReboot, constants.False)
+	return k.checkReboot(afterRebootReq, k.afterRebootAnnotations, constants.LabelAfterReboot, constants.False)
 }
 
 // markBeforeReboot gets nodes which want to reboot and marks them with the
