@@ -1,6 +1,6 @@
-# github.com/blang/semver v3.5.1+incompatible
+# github.com/blang/semver/v4 v4.0.0
 ## explicit
-github.com/blang/semver
+github.com/blang/semver/v4
 # github.com/coreos/go-systemd v0.0.0-20191104093116-d3cd4ed1dbcf
 ## explicit
 github.com/coreos/go-systemd/login1
@@ -17,6 +17,9 @@ github.com/go-logr/logr
 # github.com/godbus/dbus v4.1.0+incompatible
 ## explicit
 github.com/godbus/dbus
+# github.com/godbus/dbus/v5 v5.0.4
+## explicit
+github.com/godbus/dbus/v5
 # github.com/gogo/protobuf v1.3.1
 github.com/gogo/protobuf/proto
 github.com/gogo/protobuf/sortkeys
