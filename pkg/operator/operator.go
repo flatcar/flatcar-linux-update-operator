@@ -28,7 +28,6 @@ import (
 )
 
 const (
-	eventSourceComponent               = "update-operator"
 	leaderElectionEventSourceComponent = "update-operator-leader-election"
 	maxRebootingNodes                  = 1
 
