@@ -77,11 +77,10 @@ var (
 	// afterRebootReq requires a node to be waiting for after reboot checks to complete.
 	afterRebootReq = k8sutil.NewRequirementOrDie(constants.LabelAfterReboot, selection.In, []string{constants.True})
 
-	// notBeforeRebootReq and notAfterRebootReq are the inverse of the above checks.
+	// notBeforeRebootReq is the inverse of the above checks.
 	//
 	//nolint:lll
 	notBeforeRebootReq = k8sutil.NewRequirementOrDie(constants.LabelBeforeReboot, selection.NotIn, []string{constants.True})
-	notAfterRebootReq  = k8sutil.NewRequirementOrDie(constants.LabelAfterReboot, selection.NotIn, []string{constants.True})
 )
 
 // Kontroller implement operator part of FLUO.
@@ -509,15 +508,16 @@ func (k *Kontroller) markBeforeReboot() error {
 // If there is an error getting the list of nodes or updating any of them, an
 // error is immediately returned.
 func (k *Kontroller) markAfterReboot() error {
-	nodelist, err := k.nc.List(context.TODO(), metav1.ListOptions{})
+	nodelist, err := k.nc.List(context.TODO(), metav1.ListOptions{
+		// Filter out any nodes that are already labeled with after-reboot=true.
+		LabelSelector: fmt.Sprintf("%s!=%s", constants.LabelAfterReboot, constants.True),
+	})
 	if err != nil {
 		return fmt.Errorf("listing nodes: %w", err)
 	}
 
 	// Find nodes which just rebooted.
 	justRebootedNodes := k8sutil.FilterNodesByAnnotation(nodelist.Items, justRebootedSelector)
-	// Also filter out any nodes that are already labeled with after-reboot=true.
-	justRebootedNodes = k8sutil.FilterNodesByRequirement(justRebootedNodes, notAfterRebootReq)
 
 	klog.Infof("Found %d rebooted nodes", len(justRebootedNodes))
 
