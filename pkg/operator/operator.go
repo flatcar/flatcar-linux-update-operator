@@ -478,11 +478,6 @@ func (k *Kontroller) markBeforeReboot() error {
 	rebootableNodes := k8sutil.FilterNodesByAnnotation(nodelist.Items, rebootableSelector)
 	rebootableNodes = k8sutil.FilterNodesByRequirement(rebootableNodes, notBeforeRebootReq)
 
-	// Don't even bother if rebootableNodes is empty. We wouldn't do anything anyway.
-	if len(rebootableNodes) == 0 {
-		return nil
-	}
-
 	// Find the number of nodes we can tell to reboot.
 	remainingRebootableCount := k.maxRebootingNodes - len(rebootingNodes)
 
