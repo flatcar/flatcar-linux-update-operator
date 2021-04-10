@@ -339,15 +339,19 @@ func (k *Kontroller) cleanupState() error {
 		err = k8sutil.UpdateNodeRetry(k.nc, n.Name, func(node *corev1.Node) {
 			// Make sure that nodes with the before-reboot label actually
 			// still wants to reboot.
-			if _, exists := node.Labels[constants.LabelBeforeReboot]; exists {
-				if !rebootableSelector.Matches(fields.Set(node.Annotations)) {
-					klog.Warningf("Node %q no longer wanted to reboot while we were trying to label it so: %v",
-						node.Name, node.Annotations)
-					delete(node.Labels, constants.LabelBeforeReboot)
-					for _, annotation := range k.beforeRebootAnnotations {
-						delete(node.Annotations, annotation)
-					}
-				}
+			if _, exists := node.Labels[constants.LabelBeforeReboot]; !exists {
+				return
+			}
+
+			if rebootableSelector.Matches(fields.Set(node.Annotations)) {
+				return
+			}
+
+			klog.Warningf("Node %q no longer wanted to reboot while we were trying to label it so: %v",
+				node.Name, node.Annotations)
+			delete(node.Labels, constants.LabelBeforeReboot)
+			for _, annotation := range k.beforeRebootAnnotations {
+				delete(node.Annotations, annotation)
 			}
 		})
 		if err != nil {
