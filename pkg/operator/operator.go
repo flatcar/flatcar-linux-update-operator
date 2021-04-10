@@ -105,6 +105,8 @@ type Kontroller struct {
 
 	// Reboot window.
 	rebootWindow *timeutil.Periodic
+
+	maxRebootingNodes int
 }
 
 // Config configures a Kontroller.
@@ -180,6 +182,7 @@ func New(config Config) (*Kontroller, error) {
 		namespace:                   namespace,
 		autoLabelContainerLinux:     config.AutoLabelContainerLinux,
 		rebootWindow:                rebootWindow,
+		maxRebootingNodes:           maxRebootingNodes,
 	}, nil
 }
 
@@ -457,12 +460,12 @@ func (k *Kontroller) markBeforeReboot() error {
 	rebootingNodes = append(rebootingNodes, afterRebootNodes...)
 
 	// Verify the number of currently rebooting nodes is less than the the maximum number.
-	if len(rebootingNodes) >= maxRebootingNodes {
+	if len(rebootingNodes) >= k.maxRebootingNodes {
 		for _, n := range rebootingNodes {
 			klog.Infof("Found node %q still rebooting, waiting", n.Name)
 		}
 
-		klog.Infof("Found %d (of max %d) rebooting nodes; waiting for completion", len(rebootingNodes), maxRebootingNodes)
+		klog.Infof("Found %d (of max %d) rebooting nodes; waiting for completion", len(rebootingNodes), k.maxRebootingNodes)
 
 		return nil
 	}
@@ -477,7 +480,7 @@ func (k *Kontroller) markBeforeReboot() error {
 	}
 
 	// Find the number of nodes we can tell to reboot.
-	remainingRebootableCount := maxRebootingNodes - len(rebootingNodes)
+	remainingRebootableCount := k.maxRebootingNodes - len(rebootingNodes)
 
 	// Choose some number of nodes.
 	chosenNodes := make([]*corev1.Node, 0, remainingRebootableCount)
