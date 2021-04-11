@@ -70,7 +70,14 @@ func New(node string, reapTimeout time.Duration) (*Klocksmith, error) {
 		return nil, fmt.Errorf("error establishing connection to logind dbus: %w", err)
 	}
 
-	return &Klocksmith{node, kc, nc, ue, lc, reapTimeout}, nil
+	return &Klocksmith{
+		node:        node,
+		kc:          kc,
+		nc:          nc,
+		ue:          ue,
+		lc:          lc,
+		reapTimeout: reapTimeout,
+	}, nil
 }
 
 // Run starts the agent to listen for an update_engine reboot signal and react
