@@ -5,8 +5,12 @@
 package agent
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -40,6 +44,10 @@ type Klocksmith struct {
 const (
 	defaultPollInterval     = 10 * time.Second
 	maxOperatorResponseTime = 24 * time.Hour
+
+	updateConfPath         = "/usr/share/flatcar/update.conf"
+	updateConfOverridePath = "/etc/flatcar/update.conf"
+	osReleasePath          = "/etc/os-release"
 )
 
 var shouldRebootSelector = fields.Set(map[string]string{
@@ -305,7 +313,7 @@ func (k *Klocksmith) updateStatusCallback(s updateengine.Status) {
 
 // setInfoLabels labels our node with helpful info about Flatcar Container Linux.
 func (k *Klocksmith) setInfoLabels() error {
-	vi, err := k8sutil.GetVersionInfo()
+	vi, err := GetVersionInfo()
 	if err != nil {
 		return fmt.Errorf("failed to get version info: %w", err)
 	}
@@ -490,4 +498,90 @@ func sleepOrDone(d time.Duration, done <-chan struct{}) {
 	case <-done:
 		return
 	}
+}
+
+// splitNewlineEnv splits newline-delimited KEY=VAL pairs and update map.
+func splitNewlineEnv(m map[string]string, envs string) {
+	sc := bufio.NewScanner(strings.NewReader(envs))
+	for sc.Scan() {
+		spl := strings.SplitN(sc.Text(), "=", 2)
+
+		// Just skip empty lines or lines without a value.
+		if len(spl) == 1 {
+			continue
+		}
+
+		m[spl[0]] = spl[1]
+	}
+}
+
+// VersionInfo contains Flatcar version and update information.
+type VersionInfo struct {
+	Name    string
+	ID      string
+	Group   string
+	Version string
+}
+
+func getUpdateMap() (map[string]string, error) {
+	infomap := map[string]string{}
+
+	// This file should always be present on Flatcar.
+	b, err := ioutil.ReadFile(updateConfPath)
+	if err != nil {
+		return nil, fmt.Errorf("reading file %q: %w", updateConfPath, err)
+	}
+
+	splitNewlineEnv(infomap, string(b))
+
+	updateConfOverride, err := ioutil.ReadFile(updateConfOverridePath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return nil, fmt.Errorf("reading file %q: %w", updateConfOverridePath, err)
+		}
+
+		klog.Infof("Skipping missing update.conf: %w", err)
+	}
+
+	splitNewlineEnv(infomap, string(updateConfOverride))
+
+	return infomap, nil
+}
+
+func getReleaseMap() (map[string]string, error) {
+	infomap := map[string]string{}
+
+	// This file should always be present on Flatcar.
+	b, err := ioutil.ReadFile(osReleasePath)
+	if err != nil {
+		return nil, fmt.Errorf("reading file %q: %w", osReleasePath, err)
+	}
+
+	splitNewlineEnv(infomap, string(b))
+
+	return infomap, nil
+}
+
+// GetVersionInfo returns VersionInfo from the current Flatcar system.
+//
+// Should probably live in a different package.
+func GetVersionInfo() (*VersionInfo, error) {
+	updateconf, err := getUpdateMap()
+	if err != nil {
+		return nil, fmt.Errorf("unable to get update configuration: %w", err)
+	}
+
+	osrelease, err := getReleaseMap()
+	if err != nil {
+		return nil, fmt.Errorf("unable to get os release info: %w", err)
+	}
+
+	vi := &VersionInfo{
+		Name:    osrelease["NAME"],
+		ID:      osrelease["ID"],
+		Group:   updateconf["GROUP"],
+		Version: osrelease["VERSION"],
+	}
+
+	return vi, nil
 }
