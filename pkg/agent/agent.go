@@ -517,7 +517,6 @@ func splitNewlineEnv(m map[string]string, envs string) {
 
 // versionInfo contains Flatcar version and update information.
 type versionInfo struct {
-	name    string
 	id      string
 	group   string
 	version string
@@ -577,7 +576,6 @@ func getVersionInfo() (*versionInfo, error) {
 	}
 
 	vi := &versionInfo{
-		name:    osrelease["NAME"],
 		id:      osrelease["ID"],
 		group:   updateconf["GROUP"],
 		version: osrelease["VERSION"],
