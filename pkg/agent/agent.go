@@ -313,15 +313,15 @@ func (k *Klocksmith) updateStatusCallback(s updateengine.Status) {
 
 // setInfoLabels labels our node with helpful info about Flatcar Container Linux.
 func (k *Klocksmith) setInfoLabels() error {
-	vi, err := GetVersionInfo()
+	vi, err := getVersionInfo()
 	if err != nil {
 		return fmt.Errorf("failed to get version info: %w", err)
 	}
 
 	labels := map[string]string{
-		constants.LabelID:      vi.ID,
-		constants.LabelGroup:   vi.Group,
-		constants.LabelVersion: vi.Version,
+		constants.LabelID:      vi.id,
+		constants.LabelGroup:   vi.group,
+		constants.LabelVersion: vi.version,
 	}
 
 	if err := k8sutil.SetNodeLabels(k.nc, k.node, labels); err != nil {
@@ -515,12 +515,12 @@ func splitNewlineEnv(m map[string]string, envs string) {
 	}
 }
 
-// VersionInfo contains Flatcar version and update information.
-type VersionInfo struct {
-	Name    string
-	ID      string
-	Group   string
-	Version string
+// versionInfo contains Flatcar version and update information.
+type versionInfo struct {
+	name    string
+	id      string
+	group   string
+	version string
 }
 
 func getUpdateMap() (map[string]string, error) {
@@ -565,7 +565,7 @@ func getReleaseMap() (map[string]string, error) {
 // GetVersionInfo returns VersionInfo from the current Flatcar system.
 //
 // Should probably live in a different package.
-func GetVersionInfo() (*VersionInfo, error) {
+func getVersionInfo() (*versionInfo, error) {
 	updateconf, err := getUpdateMap()
 	if err != nil {
 		return nil, fmt.Errorf("unable to get update configuration: %w", err)
@@ -576,11 +576,11 @@ func GetVersionInfo() (*VersionInfo, error) {
 		return nil, fmt.Errorf("unable to get os release info: %w", err)
 	}
 
-	vi := &VersionInfo{
-		Name:    osrelease["NAME"],
-		ID:      osrelease["ID"],
-		Group:   updateconf["GROUP"],
-		Version: osrelease["VERSION"],
+	vi := &versionInfo{
+		name:    osrelease["NAME"],
+		id:      osrelease["ID"],
+		group:   updateconf["GROUP"],
+		version: osrelease["VERSION"],
 	}
 
 	return vi, nil
