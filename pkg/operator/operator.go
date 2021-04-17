@@ -335,7 +335,7 @@ func (k *Kontroller) cleanupState() error {
 	}
 
 	for _, n := range nodelist.Items {
-		err = k8sutil.UpdateNodeRetry(k.nc, n.Name, func(node *corev1.Node) {
+		err = k8sutil.UpdateNodeRetry(context.TODO(), k.nc, n.Name, func(node *corev1.Node) {
 			// Make sure that nodes with the before-reboot label actually
 			// still wants to reboot.
 			if _, exists := node.Labels[constants.LabelBeforeReboot]; !exists {
@@ -388,7 +388,7 @@ func (k *Kontroller) checkReboot(req *labels.Requirement, annotations []string, 
 		klog.V(4).Infof("Deleting label %q for %q", label, n.Name)
 		klog.V(4).Infof("Setting annotation %q to %q for %q", constants.AnnotationOkToReboot, okToReboot, n.Name)
 
-		if err := k8sutil.UpdateNodeRetry(k.nc, n.Name, func(node *corev1.Node) {
+		if err := k8sutil.UpdateNodeRetry(context.TODO(), k.nc, n.Name, func(node *corev1.Node) {
 			delete(node.Labels, label)
 
 			// Cleanup the annotations.
@@ -536,7 +536,7 @@ func (k *Kontroller) mark(nodeName, label, annotationsType string, annotations [
 	klog.V(4).Infof("Deleting annotations %v for %q", annotations, nodeName)
 	klog.V(4).Infof("Setting label %q to %q for node %q", label, constants.True, nodeName)
 
-	err := k8sutil.UpdateNodeRetry(k.nc, nodeName, func(node *corev1.Node) {
+	err := k8sutil.UpdateNodeRetry(context.TODO(), k.nc, nodeName, func(node *corev1.Node) {
 		for _, annotation := range annotations {
 			delete(node.Annotations, annotation)
 		}

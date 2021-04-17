@@ -112,7 +112,7 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 
 	klog.Info("Checking annotations")
 
-	node, err := k8sutil.GetNodeRetry(k.nc, k.node)
+	node, err := k8sutil.GetNodeRetry(context.TODO(), k.nc, k.node)
 	if err != nil {
 		return fmt.Errorf("getting node %q: %w", k.node, err)
 	}
@@ -136,7 +136,7 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 
 	klog.Infof("Setting annotations %#v", anno)
 
-	if err := k8sutil.SetNodeAnnotationsLabels(k.nc, k.node, anno, labels); err != nil {
+	if err := k8sutil.SetNodeAnnotationsLabels(context.TODO(), k.nc, k.node, anno, labels); err != nil {
 		return fmt.Errorf("setting node %q labels and annotations: %w", k.node, err)
 	}
 
@@ -150,7 +150,7 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 		// We are schedulable now.
 		klog.Info("Marking node as schedulable")
 
-		if err := k8sutil.Unschedulable(k.nc, k.node, false); err != nil {
+		if err := k8sutil.Unschedulable(context.TODO(), k.nc, k.node, false); err != nil {
 			return fmt.Errorf("marking node %q as unschedulable: %w", k.node, err)
 		}
 
@@ -160,7 +160,7 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 
 		klog.Infof("Setting annotations %#v", anno)
 
-		if err := k8sutil.SetNodeAnnotations(k.nc, k.node, anno); err != nil {
+		if err := k8sutil.SetNodeAnnotations(context.TODO(), k.nc, k.node, anno); err != nil {
 			return fmt.Errorf("setting node %q annotations: %w", k.node, err)
 		}
 	} else if madeUnschedulableAnnotationExists { // Annotation exists so node was marked unschedulable by external source.
@@ -185,7 +185,7 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 
 	klog.Info("Checking if node is already unschedulable")
 
-	node, err = k8sutil.GetNodeRetry(k.nc, k.node)
+	node, err = k8sutil.GetNodeRetry(context.TODO(), k.nc, k.node)
 	if err != nil {
 		return fmt.Errorf("getting node %q: %w", k.node, err)
 	}
@@ -203,7 +203,7 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 
 	klog.Infof("Setting annotations %#v", anno)
 
-	if err := k8sutil.SetNodeAnnotations(k.nc, k.node, anno); err != nil {
+	if err := k8sutil.SetNodeAnnotations(context.TODO(), k.nc, k.node, anno); err != nil {
 		return fmt.Errorf("setting node %q annotations: %w", k.node, err)
 	}
 
@@ -217,7 +217,7 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 	if !alreadyUnschedulable {
 		klog.Info("Marking node as unschedulable")
 
-		if err := k8sutil.Unschedulable(k.nc, k.node, true); err != nil {
+		if err := k8sutil.Unschedulable(context.TODO(), k.nc, k.node, true); err != nil {
 			return fmt.Errorf("marking node %q as unschedulable: %w", k.node, err)
 		}
 	} else {
@@ -298,7 +298,7 @@ func (k *Klocksmith) updateStatusCallback(s updateengine.Status) {
 	}
 
 	err := wait.PollUntil(defaultPollInterval, func() (bool, error) {
-		if err := k8sutil.SetNodeAnnotationsLabels(k.nc, k.node, anno, labels); err != nil {
+		if err := k8sutil.SetNodeAnnotationsLabels(context.TODO(), k.nc, k.node, anno, labels); err != nil {
 			klog.Errorf("Failed to set annotation %q: %v", constants.AnnotationStatus, err)
 
 			return false, nil
@@ -324,7 +324,7 @@ func (k *Klocksmith) setInfoLabels() error {
 		constants.LabelVersion: vi.version,
 	}
 
-	if err := k8sutil.SetNodeLabels(k.nc, k.node, labels); err != nil {
+	if err := k8sutil.SetNodeLabels(context.TODO(), k.nc, k.node, labels); err != nil {
 		return fmt.Errorf("setting node %q labels: %w", k.node, err)
 	}
 
@@ -450,7 +450,7 @@ func (k *Klocksmith) waitForNotOkToReboot() error {
 }
 
 func (k *Klocksmith) getPodsForDeletion() ([]corev1.Pod, error) {
-	pods, err := k8sutil.GetPodsForDeletion(k.kc, k.node)
+	pods, err := k8sutil.GetPodsForDeletion(context.TODO(), k.kc, k.node)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get list of pods for deletion: %w", err)
 	}

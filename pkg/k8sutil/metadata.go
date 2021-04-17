@@ -31,11 +31,11 @@ func NodeAnnotationCondition(selector fields.Selector) watchtools.ConditionFunc 
 }
 
 // GetNodeRetry gets a node object, retrying up to DefaultBackoff number of times if it fails.
-func GetNodeRetry(nc v1core.NodeInterface, node string) (*v1api.Node, error) {
+func GetNodeRetry(ctx context.Context, nc v1core.NodeInterface, node string) (*v1api.Node, error) {
 	var apiNode *v1api.Node
 
 	err := retry.OnError(retry.DefaultBackoff, func(error) bool { return true }, func() error {
-		n, getErr := nc.Get(context.TODO(), node, v1meta.GetOptions{})
+		n, getErr := nc.Get(ctx, node, v1meta.GetOptions{})
 		if getErr != nil {
 			return fmt.Errorf("failed to get node %q: %w", node, getErr)
 		}
@@ -56,16 +56,16 @@ func GetNodeRetry(nc v1core.NodeInterface, node string) (*v1api.Node, error) {
 // number of times.
 // f will be called each time since the node object will likely have changed if
 // a retry is necessary.
-func UpdateNodeRetry(nc v1core.NodeInterface, node string, f func(*v1api.Node)) error {
+func UpdateNodeRetry(ctx context.Context, nc v1core.NodeInterface, node string, f func(*v1api.Node)) error {
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		n, getErr := nc.Get(context.TODO(), node, v1meta.GetOptions{})
+		n, getErr := nc.Get(ctx, node, v1meta.GetOptions{})
 		if getErr != nil {
 			return fmt.Errorf("failed to get node %q: %w", node, getErr)
 		}
 
 		f(n)
 
-		_, err := nc.Update(context.TODO(), n, v1meta.UpdateOptions{})
+		_, err := nc.Update(ctx, n, v1meta.UpdateOptions{})
 
 		return err
 	})
@@ -79,8 +79,8 @@ func UpdateNodeRetry(nc v1core.NodeInterface, node string, f func(*v1api.Node)) 
 
 // SetNodeLabels sets all keys in m to their respective values in
 // node's labels.
-func SetNodeLabels(nc v1core.NodeInterface, node string, m map[string]string) error {
-	return UpdateNodeRetry(nc, node, func(n *v1api.Node) {
+func SetNodeLabels(ctx context.Context, nc v1core.NodeInterface, node string, m map[string]string) error {
+	return UpdateNodeRetry(ctx, nc, node, func(n *v1api.Node) {
 		for k, v := range m {
 			n.Labels[k] = v
 		}
@@ -89,8 +89,8 @@ func SetNodeLabels(nc v1core.NodeInterface, node string, m map[string]string) er
 
 // SetNodeAnnotations sets all keys in m to their respective values in
 // node's annotations.
-func SetNodeAnnotations(nc v1core.NodeInterface, node string, m map[string]string) error {
-	return UpdateNodeRetry(nc, node, func(n *v1api.Node) {
+func SetNodeAnnotations(ctx context.Context, nc v1core.NodeInterface, node string, m map[string]string) error {
+	return UpdateNodeRetry(ctx, nc, node, func(n *v1api.Node) {
 		for k, v := range m {
 			n.Annotations[k] = v
 		}
@@ -99,8 +99,8 @@ func SetNodeAnnotations(nc v1core.NodeInterface, node string, m map[string]strin
 
 // SetNodeAnnotationsLabels sets all keys in a and l to their values in
 // node's annotations and labels, respectively.
-func SetNodeAnnotationsLabels(nc v1core.NodeInterface, node string, a, l map[string]string) error {
-	return UpdateNodeRetry(nc, node, func(n *v1api.Node) {
+func SetNodeAnnotationsLabels(ctx context.Context, nc v1core.NodeInterface, node string, a, l map[string]string) error {
+	return UpdateNodeRetry(ctx, nc, node, func(n *v1api.Node) {
 		for k, v := range a {
 			n.Annotations[k] = v
 		}
@@ -112,8 +112,8 @@ func SetNodeAnnotationsLabels(nc v1core.NodeInterface, node string, a, l map[str
 }
 
 // DeleteNodeLabels deletes all keys in ks.
-func DeleteNodeLabels(nc v1core.NodeInterface, node string, ks []string) error {
-	return UpdateNodeRetry(nc, node, func(n *v1api.Node) {
+func DeleteNodeLabels(ctx context.Context, nc v1core.NodeInterface, node string, ks []string) error {
+	return UpdateNodeRetry(ctx, nc, node, func(n *v1api.Node) {
 		for _, k := range ks {
 			delete(n.Labels, k)
 		}
@@ -121,8 +121,8 @@ func DeleteNodeLabels(nc v1core.NodeInterface, node string, ks []string) error {
 }
 
 // DeleteNodeAnnotations deletes all annotations with keys in ks.
-func DeleteNodeAnnotations(nc v1core.NodeInterface, node string, ks []string) error {
-	return UpdateNodeRetry(nc, node, func(n *v1api.Node) {
+func DeleteNodeAnnotations(ctx context.Context, nc v1core.NodeInterface, node string, ks []string) error {
+	return UpdateNodeRetry(ctx, nc, node, func(n *v1api.Node) {
 		for _, k := range ks {
 			delete(n.Annotations, k)
 		}
@@ -130,8 +130,8 @@ func DeleteNodeAnnotations(nc v1core.NodeInterface, node string, ks []string) er
 }
 
 // Unschedulable marks node as schedulable or unschedulable according to sched.
-func Unschedulable(nc v1core.NodeInterface, node string, sched bool) error {
-	n, err := nc.Get(context.TODO(), node, v1meta.GetOptions{})
+func Unschedulable(ctx context.Context, nc v1core.NodeInterface, node string, sched bool) error {
+	n, err := nc.Get(ctx, node, v1meta.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to get node %q: %w", node, err)
 	}
@@ -139,7 +139,7 @@ func Unschedulable(nc v1core.NodeInterface, node string, sched bool) error {
 	n.Spec.Unschedulable = sched
 
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
-		n, err = nc.Update(context.TODO(), n, v1meta.UpdateOptions{})
+		n, err = nc.Update(ctx, n, v1meta.UpdateOptions{})
 
 		return
 	}); err != nil {

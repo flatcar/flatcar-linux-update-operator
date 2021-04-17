@@ -53,7 +53,7 @@ func (k *Kontroller) legacyLabeler() {
 	for _, node := range nodesToLabel {
 		klog.Infof("Setting label 'agent=true' on %q", node.Name)
 
-		if err := k8sutil.SetNodeLabels(k.nc, node.Name, enableUpdateAgentLabel); err != nil {
+		if err := k8sutil.SetNodeLabels(context.TODO(), k.nc, node.Name, enableUpdateAgentLabel); err != nil {
 			klog.Errorf("Failed setting label 'agent=true' on %q", node.Name)
 		}
 	}
