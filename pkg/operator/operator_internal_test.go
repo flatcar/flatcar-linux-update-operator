@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,6 +22,91 @@ const (
 	testAfterRebootAnnotation         = "test-after-annotation"
 	testAnotherAfterRebootAnnotation  = "test-another-after-annotation"
 )
+
+func Test_Operator_stops_reconciliation_loop_when_control_channel_is_closed(t *testing.T) {
+	t.Parallel()
+
+	rebootCancelledNode := rebootCancelledNode()
+
+	k := kontrollerWithObjects(rebootCancelledNode)
+	k.beforeRebootAnnotations = []string{testBeforeRebootAnnotation}
+	k.reconciliationPeriod = 1 * time.Second
+
+	stop := make(chan struct{})
+
+	runOperator(t, k, stop)
+
+	time.Sleep(k.reconciliationPeriod)
+
+	n := node(t, k.nc, rebootCancelledNode.Name)
+
+	if _, ok := n.Labels[constants.LabelBeforeReboot]; ok {
+		t.Fatalf("Expected label %q to be removed from Node after waiting the reconciliation period",
+			constants.LabelBeforeReboot)
+	}
+
+	close(stop)
+
+	time.Sleep(k.reconciliationPeriod * 2)
+
+	n.Labels[constants.LabelBeforeReboot] = constants.True
+	n.Annotations[testBeforeRebootAnnotation] = constants.True
+
+	if _, err := k.nc.Update(contextWithDeadline(t), n, metav1.UpdateOptions{}); err != nil {
+		t.Fatalf("Updating Node object: %v", err)
+	}
+
+	time.Sleep(k.reconciliationPeriod * 2)
+
+	n = node(t, k.nc, rebootCancelledNode.Name)
+
+	if _, ok := n.Labels[constants.LabelBeforeReboot]; !ok {
+		t.Fatalf("Expected label %q to remain on Node", constants.LabelBeforeReboot)
+	}
+}
+
+func Test_Operator_reconciles_objects_every_configured_period(t *testing.T) {
+	t.Parallel()
+
+	rebootCancelledNode := rebootCancelledNode()
+
+	k := kontrollerWithObjects(rebootCancelledNode)
+	k.beforeRebootAnnotations = []string{testBeforeRebootAnnotation}
+	k.reconciliationPeriod = 1 * time.Second
+
+	stop := make(chan struct{})
+
+	t.Cleanup(func() {
+		close(stop)
+	})
+
+	runOperator(t, k, stop)
+
+	time.Sleep(k.reconciliationPeriod)
+
+	n := node(t, k.nc, rebootCancelledNode.Name)
+
+	if _, ok := n.Labels[constants.LabelBeforeReboot]; ok {
+		t.Fatalf("Expected label %q to be removed from Node after waiting the reconciliation period",
+			constants.LabelBeforeReboot)
+	}
+
+	n.Labels[constants.LabelBeforeReboot] = constants.True
+	n.Annotations[testBeforeRebootAnnotation] = constants.True
+
+	if _, err := k.nc.Update(contextWithDeadline(t), n, metav1.UpdateOptions{}); err != nil {
+		t.Fatalf("Updating Node object: %v", err)
+	}
+
+	time.Sleep(k.reconciliationPeriod * 2)
+
+	n = node(t, k.nc, rebootCancelledNode.Name)
+
+	if _, ok := n.Labels[constants.LabelBeforeReboot]; ok {
+		t.Fatalf("Expected label %q to be removed from Node after waiting another reconciliation period",
+			constants.LabelBeforeReboot)
+	}
+}
 
 // before-reboot label is intended to be used as a selector for pre-reboot hooks, so it should only
 // be set for nodes, which are ready to start rebooting any minute.
@@ -675,6 +761,34 @@ func Test_Operator_finishes_reboot_process_by(t *testing.T) {
 			t.Fatalf("Expected annotation %q value %q, got %q", constants.AnnotationOkToReboot, constants.False, v)
 		}
 	})
+}
+
+func contextWithDeadline(t *testing.T) context.Context {
+	t.Helper()
+
+	deadline, ok := t.Deadline()
+	if !ok {
+		return context.Background()
+	}
+
+	// Arbitrary amount of time to let tests exit cleanly before main process terminates.
+	timeoutGracePeriod := 10 * time.Second
+
+	ctx, cancel := context.WithDeadline(context.Background(), deadline.Truncate(timeoutGracePeriod))
+	t.Cleanup(cancel)
+
+	return ctx
+}
+
+func runOperator(t *testing.T, k *Kontroller, stopCh <-chan struct{}) {
+	t.Helper()
+
+	go func() {
+		if err := k.Run(stopCh); err != nil {
+			fmt.Printf("Error running operator: %v\n", err)
+			t.Fail()
+		}
+	}()
 }
 
 func kontrollerWithObjects(objects ...runtime.Object) *Kontroller {
