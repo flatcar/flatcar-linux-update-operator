@@ -179,7 +179,7 @@ func New(config Config) (*Kontroller, error) {
 // channel is closed.
 func (k *Kontroller) Run(stop <-chan struct{}) error {
 	if err := k.withLeaderElection(); err != nil {
-		return err
+		return fmt.Errorf("finishing leader election: %w", err)
 	}
 
 	// Start Flatcar Container Linux node auto-labeler.
