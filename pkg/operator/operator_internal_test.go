@@ -799,6 +799,7 @@ func kontrollerWithObjects(objects ...runtime.Object) *Kontroller {
 		nc:                   fakeClient.CoreV1().Nodes(),
 		maxRebootingNodes:    1,
 		reconciliationPeriod: defaultReconciliationPeriod,
+		leaderElectionLease:  defaultLeaderElectionLease,
 	}
 }
 

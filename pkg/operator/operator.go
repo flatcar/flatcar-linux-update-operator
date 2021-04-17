@@ -33,7 +33,7 @@ const (
 	leaderElectionResourceName = "flatcar-linux-update-operator-lock"
 
 	// Arbitrarily copied from KVO.
-	leaderElectionLease = 90 * time.Second
+	defaultLeaderElectionLease = 90 * time.Second
 	// ReconciliationPeriod.
 	defaultReconciliationPeriod = 30 * time.Second
 )
@@ -106,6 +106,8 @@ type Kontroller struct {
 	maxRebootingNodes int
 
 	reconciliationPeriod time.Duration
+
+	leaderElectionLease time.Duration
 }
 
 // Config configures a Kontroller.
@@ -172,6 +174,7 @@ func New(config Config) (*Kontroller, error) {
 		rebootWindow:                rebootWindow,
 		maxRebootingNodes:           maxRebootingNodes,
 		reconciliationPeriod:        defaultReconciliationPeriod,
+		leaderElectionLease:         defaultLeaderElectionLease,
 	}, nil
 }
 
@@ -230,13 +233,13 @@ func (k *Kontroller) withLeaderElection() error {
 		// https://github.com/kubernetes/kubernetes/blob/fc31dae165f406026142f0dd9a98cada8474682a/pkg/client/leaderelection/leaderelection.go#L17
 		leaderelection.RunOrDie(context.TODO(), leaderelection.LeaderElectionConfig{
 			Lock:          resLock,
-			LeaseDuration: leaderElectionLease,
+			LeaseDuration: k.leaderElectionLease,
 			//nolint:gomnd // Set renew deadline to 2/3rd of the lease duration to give
 			//             // controller enough time to renew the lease.
-			RenewDeadline: leaderElectionLease * 2 / 3,
+			RenewDeadline: k.leaderElectionLease * 2 / 3,
 			//nolint:gomnd // Retry duration is usually around 1/10th of lease duration,
 			//             // but given low dynamics of FLUO, 1/3rd should also be fine.
-			RetryPeriod: leaderElectionLease / 3,
+			RetryPeriod: k.leaderElectionLease / 3,
 			Callbacks: leaderelection.LeaderCallbacks{
 				OnStartedLeading: func(ctx context.Context) { // was: func(stop <-chan struct{
 					klog.V(5).Info("started leading")
