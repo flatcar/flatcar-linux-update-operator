@@ -36,7 +36,7 @@ const (
 	// Arbitrarily copied from KVO.
 	leaderElectionLease = 90 * time.Second
 	// ReconciliationPeriod.
-	reconciliationPeriod = 30 * time.Second
+	defaultReconciliationPeriod = 30 * time.Second
 )
 
 var (
@@ -106,6 +106,8 @@ type Kontroller struct {
 	rebootWindow *timeutil.Periodic
 
 	maxRebootingNodes int
+
+	reconciliationPeriod time.Duration
 }
 
 // Config configures a Kontroller.
@@ -182,6 +184,7 @@ func New(config Config) (*Kontroller, error) {
 		autoLabelContainerLinux:     config.AutoLabelContainerLinux,
 		rebootWindow:                rebootWindow,
 		maxRebootingNodes:           maxRebootingNodes,
+		reconciliationPeriod:        defaultReconciliationPeriod,
 	}, nil
 }
 
@@ -194,13 +197,13 @@ func (k *Kontroller) Run(stop <-chan struct{}) error {
 
 	// Start Flatcar Container Linux node auto-labeler.
 	if k.autoLabelContainerLinux {
-		go wait.Until(k.legacyLabeler, reconciliationPeriod, stop)
+		go wait.Until(k.legacyLabeler, k.reconciliationPeriod, stop)
 	}
 
 	klog.V(5).Info("starting controller")
 
 	// Call the process loop each period, until stop is closed.
-	wait.Until(k.process, reconciliationPeriod, stop)
+	wait.Until(k.process, k.reconciliationPeriod, stop)
 
 	klog.V(5).Info("stopping controller")
 

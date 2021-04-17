@@ -691,9 +691,10 @@ func kontrollerWithObjects(objects ...runtime.Object) *Kontroller {
 	fakeClient := fake.NewSimpleClientset(objects...)
 
 	return &Kontroller{
-		kc:                fakeClient,
-		nc:                fakeClient.CoreV1().Nodes(),
-		maxRebootingNodes: 1,
+		kc:                   fakeClient,
+		nc:                   fakeClient.CoreV1().Nodes(),
+		maxRebootingNodes:    1,
+		reconciliationPeriod: defaultReconciliationPeriod,
 	}
 }
 
