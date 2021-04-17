@@ -60,7 +60,7 @@ func New(node string, reapTimeout time.Duration) (*Klocksmith, error) {
 	// Set up kubernetes in-cluster client.
 	kc, err := k8sutil.GetClient("")
 	if err != nil {
-		return nil, fmt.Errorf("error creating kubernetes client: %w", err)
+		return nil, fmt.Errorf("creating Kubernetes client: %w", err)
 	}
 
 	// Node interface.
@@ -69,13 +69,13 @@ func New(node string, reapTimeout time.Duration) (*Klocksmith, error) {
 	// Set up update_engine client.
 	ue, err := updateengine.New()
 	if err != nil {
-		return nil, fmt.Errorf("error establishing connection to update_engine dbus: %w", err)
+		return nil, fmt.Errorf("establishing connection to update_engine dbus: %w", err)
 	}
 
 	// Set up login1 client for our eventual reboot.
 	lc, err := login1.New()
 	if err != nil {
-		return nil, fmt.Errorf("error establishing connection to logind dbus: %w", err)
+		return nil, fmt.Errorf("establishing connection to logind dbus: %w", err)
 	}
 
 	return &Klocksmith{
@@ -107,7 +107,7 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 	klog.Info("Setting info labels")
 
 	if err := k.setInfoLabels(); err != nil {
-		return fmt.Errorf("failed to set node info: %w", err)
+		return fmt.Errorf("setting node info: %w", err)
 	}
 
 	klog.Info("Checking annotations")
@@ -315,7 +315,7 @@ func (k *Klocksmith) updateStatusCallback(s updateengine.Status) {
 func (k *Klocksmith) setInfoLabels() error {
 	vi, err := getVersionInfo()
 	if err != nil {
-		return fmt.Errorf("failed to get version info: %w", err)
+		return fmt.Errorf("getting version info: %w", err)
 	}
 
 	labels := map[string]string{
@@ -351,7 +351,7 @@ func (k *Klocksmith) watchUpdateStatus(update func(s updateengine.Status), stop 
 func (k *Klocksmith) waitForOkToReboot() error {
 	n, err := k.nc.Get(context.TODO(), k.node, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to get self node (%q): %w", k.node, err)
+		return fmt.Errorf("getting self node (%q): %w", k.node, err)
 	}
 
 	okToReboot := n.Annotations[constants.AnnotationOkToReboot] == constants.True
@@ -367,7 +367,7 @@ func (k *Klocksmith) waitForOkToReboot() error {
 		ResourceVersion: n.ResourceVersion,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to watch self node (%q): %w", k.node, err)
+		return fmt.Errorf("creating watcher for self node (%q): %w", k.node, err)
 	}
 
 	// Hopefully 24 hours is enough time between indicating we need a
@@ -395,7 +395,7 @@ func (k *Klocksmith) waitForOkToReboot() error {
 func (k *Klocksmith) waitForNotOkToReboot() error {
 	n, err := k.nc.Get(context.TODO(), k.node, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to get self node (%q): %w", k.node, err)
+		return fmt.Errorf("getting self node (%q): %w", k.node, err)
 	}
 
 	if n.Annotations[constants.AnnotationOkToReboot] != constants.True {
@@ -408,7 +408,7 @@ func (k *Klocksmith) waitForNotOkToReboot() error {
 		ResourceVersion: n.ResourceVersion,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to watch self node (%q): %w", k.node, err)
+		return fmt.Errorf("creating watcher for self node (%q): %w", k.node, err)
 	}
 
 	// Within 24 hours of indicating we don't need a reboot we should be given a not-ok.
@@ -423,7 +423,7 @@ func (k *Klocksmith) waitForNotOkToReboot() error {
 	ev, err := watchtools.UntilWithoutRetry(ctx, watcher, watchtools.ConditionFunc(func(event watch.Event) (bool, error) {
 		switch event.Type {
 		case watch.Error:
-			return false, fmt.Errorf("error watching node: %v", event.Object)
+			return false, fmt.Errorf("watching node: %v", event.Object)
 		case watch.Deleted:
 			return false, fmt.Errorf("our node was deleted while we were waiting for ready")
 		case watch.Added, watch.Modified:
@@ -433,7 +433,7 @@ func (k *Klocksmith) waitForNotOkToReboot() error {
 		}
 	}))
 	if err != nil {
-		return fmt.Errorf("waiting for annotation %q failed: %w", constants.AnnotationOkToReboot, err)
+		return fmt.Errorf("waiting for annotation %q: %w", constants.AnnotationOkToReboot, err)
 	}
 
 	// Sanity check.
@@ -443,7 +443,7 @@ func (k *Klocksmith) waitForNotOkToReboot() error {
 	}
 
 	if no.Annotations[constants.AnnotationOkToReboot] == constants.True {
-		panic("event did not contain annotation expected")
+		panic("event did not contain expected annotation")
 	}
 
 	return nil
@@ -452,7 +452,7 @@ func (k *Klocksmith) waitForNotOkToReboot() error {
 func (k *Klocksmith) getPodsForDeletion() ([]corev1.Pod, error) {
 	pods, err := k8sutil.GetPodsForDeletion(context.TODO(), k.kc, k.node)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get list of pods for deletion: %w", err)
+		return nil, fmt.Errorf("getting list of pods for deletion: %w", err)
 	}
 
 	// XXX: ignoring kube-system is a simple way to avoid eviciting
@@ -567,12 +567,12 @@ func getReleaseMap() (map[string]string, error) {
 func getVersionInfo() (*versionInfo, error) {
 	updateconf, err := getUpdateMap()
 	if err != nil {
-		return nil, fmt.Errorf("unable to get update configuration: %w", err)
+		return nil, fmt.Errorf("getting update configuration: %w", err)
 	}
 
 	osrelease, err := getReleaseMap()
 	if err != nil {
-		return nil, fmt.Errorf("unable to get os release info: %w", err)
+		return nil, fmt.Errorf("getting OS release info: %w", err)
 	}
 
 	vi := &versionInfo{
