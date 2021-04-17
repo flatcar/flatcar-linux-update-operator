@@ -16,7 +16,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
@@ -92,7 +91,6 @@ type Kontroller struct {
 	beforeRebootAnnotations []string
 	afterRebootAnnotations  []string
 
-	leaderElectionClient        *kubernetes.Clientset
 	leaderElectionEventRecorder record.EventRecorder
 	// Namespace is the kubernetes namespace any resources (e.g. locks,
 	// configmaps, agents) should be created and read under.
@@ -154,19 +152,9 @@ func New(config Config) (*Kontroller, error) {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(&corev1client.EventSinkImpl{Interface: kc.CoreV1().Events("")})
 
-	leaderElectionClientConfig, err := rest.InClusterConfig()
-	if err != nil {
-		return nil, fmt.Errorf("error creating leader election client config: %w", err)
-	}
-
-	leaderElectionClient, err := kubernetes.NewForConfig(leaderElectionClientConfig)
-	if err != nil {
-		return nil, fmt.Errorf("error creating leader election client: %w", err)
-	}
-
 	leaderElectionBroadcaster := record.NewBroadcaster()
 	leaderElectionBroadcaster.StartRecordingToSink(&corev1client.EventSinkImpl{
-		Interface: corev1client.New(leaderElectionClient.CoreV1().RESTClient()).Events(""),
+		Interface: corev1client.New(config.Client.CoreV1().RESTClient()).Events(""),
 	})
 
 	leaderElectionEventRecorder := leaderElectionBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{
@@ -178,7 +166,6 @@ func New(config Config) (*Kontroller, error) {
 		nc:                          kc.CoreV1().Nodes(),
 		beforeRebootAnnotations:     config.BeforeRebootAnnotations,
 		afterRebootAnnotations:      config.AfterRebootAnnotations,
-		leaderElectionClient:        leaderElectionClient,
 		leaderElectionEventRecorder: leaderElectionEventRecorder,
 		namespace:                   namespace,
 		autoLabelContainerLinux:     config.AutoLabelContainerLinux,
@@ -227,7 +214,7 @@ func (k *Kontroller) withLeaderElection() error {
 			Namespace: k.namespace,
 			Name:      leaderElectionResourceName,
 		},
-		Client: k.leaderElectionClient.CoreV1(),
+		Client: k.kc.CoreV1(),
 		LockConfig: resourcelock.ResourceLockConfig{
 			Identity:      id,
 			EventRecorder: k.leaderElectionEventRecorder,
