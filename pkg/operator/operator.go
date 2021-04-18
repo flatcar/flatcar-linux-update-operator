@@ -226,7 +226,8 @@ func (k *Kontroller) withLeaderElection() {
 	}
 
 	waitLeading := make(chan struct{})
-	go func(waitLeading chan<- struct{}) {
+
+	go func() {
 		// Lease values inspired by a combination of
 		// https://github.com/kubernetes/kubernetes/blob/f7c07a121d2afadde7aa15b12a9d02858b30a0a9/pkg/apis/componentconfig/v1alpha1/defaults.go#L163-L174
 		// and the KVO values
@@ -251,7 +252,7 @@ func (k *Kontroller) withLeaderElection() {
 				},
 			},
 		})
-	}(waitLeading)
+	}()
 
 	<-waitLeading
 }
