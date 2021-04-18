@@ -143,7 +143,7 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 	// Since we set 'reboot-needed=false', 'ok-to-reboot' should clear.
 	// Wait for it to do so, else we might start reboot-looping.
 	if err := k.waitForNotOkToReboot(); err != nil {
-		return err
+		return fmt.Errorf("waiting for not ok to reboot signal from operator: %w", err)
 	}
 
 	if makeSchedulable {
@@ -228,7 +228,7 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 
 	pods, err := k.getPodsForDeletion()
 	if err != nil {
-		return err
+		return fmt.Errorf("getting list of pods for deletion: %w", err)
 	}
 
 	// Delete the pods.
