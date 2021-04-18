@@ -29,17 +29,7 @@ const (
 func Test_Operator_cleans_up_nodes_which_cannot_be_rebooted(t *testing.T) {
 	t.Parallel()
 
-	beforeRebootNode := &corev1.Node{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "foo",
-			Labels: map[string]string{
-				constants.LabelBeforeReboot: constants.True,
-			},
-			Annotations: map[string]string{
-				testBeforeRebootAnnotation: constants.True,
-			},
-		},
-	}
+	rebootCancelledNode := rebootCancelledNode()
 
 	toBeRebootedNode := &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{
@@ -50,12 +40,12 @@ func Test_Operator_cleans_up_nodes_which_cannot_be_rebooted(t *testing.T) {
 		},
 	}
 
-	k := kontrollerWithObjects(beforeRebootNode, toBeRebootedNode)
+	k := kontrollerWithObjects(rebootCancelledNode, toBeRebootedNode)
 	k.beforeRebootAnnotations = []string{testBeforeRebootAnnotation}
 
 	k.process()
 
-	n := node(t, k.nc, beforeRebootNode.Name)
+	n := node(t, k.nc, rebootCancelledNode.Name)
 
 	t.Run("by", func(t *testing.T) {
 		t.Parallel()
@@ -72,7 +62,7 @@ func Test_Operator_cleans_up_nodes_which_cannot_be_rebooted(t *testing.T) {
 			t.Parallel()
 
 			if _, ok := n.Annotations[testBeforeRebootAnnotation]; ok {
-				t.Fatalf("Unexpected annotation %q found for node %q", testBeforeRebootAnnotation, beforeRebootNode.Name)
+				t.Fatalf("Unexpected annotation %q found for node %q", testBeforeRebootAnnotation, rebootCancelledNode.Name)
 			}
 
 			nn := node(t, k.nc, toBeRebootedNode.Name)
@@ -743,6 +733,21 @@ func scheduledForRebootNode() *corev1.Node {
 				constants.AnnotationRebootNeeded:     constants.True,
 				constants.AnnotationOkToReboot:       constants.False,
 				constants.AnnotationRebootInProgress: constants.False,
+			},
+		},
+	}
+}
+
+// Node which has run pre-reboot hooks, but no longer needs a reboot.
+func rebootCancelledNode() *corev1.Node {
+	return &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "before-reboot",
+			Labels: map[string]string{
+				constants.LabelBeforeReboot: constants.True,
+			},
+			Annotations: map[string]string{
+				testBeforeRebootAnnotation: constants.True,
 			},
 		},
 	}
