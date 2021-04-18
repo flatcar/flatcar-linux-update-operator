@@ -23,6 +23,71 @@ const (
 	testAnotherAfterRebootAnnotation  = "test-another-after-annotation"
 )
 
+//nolint:funlen
+func Test_Operator_waits_for_leader_election_before_reconciliation(t *testing.T) {
+	t.Parallel()
+
+	rebootCancelledNode := rebootCancelledNode()
+
+	k := kontrollerWithObjects(rebootCancelledNode)
+	k.beforeRebootAnnotations = []string{testBeforeRebootAnnotation}
+	k.reconciliationPeriod = 1 * time.Second
+
+	stop := make(chan struct{})
+	stopped := make(chan struct{})
+
+	go func() {
+		if err := k.Run(stop); err != nil {
+			fmt.Printf("Error running operator: %v\n", err)
+			t.Fail()
+		}
+		stopped <- struct{}{}
+	}()
+
+	time.Sleep(k.reconciliationPeriod)
+
+	close(stop)
+
+	<-stopped
+
+	n := node(t, k.nc, rebootCancelledNode.Name)
+
+	if _, ok := n.Labels[constants.LabelBeforeReboot]; ok {
+		t.Fatalf("Expected label %q to be removed from Node after waiting the reconciliation period",
+			constants.LabelBeforeReboot)
+	}
+
+	n.Labels[constants.LabelBeforeReboot] = constants.True
+	n.Annotations[testBeforeRebootAnnotation] = constants.True
+
+	if _, err := k.nc.Update(contextWithDeadline(t), n, metav1.UpdateOptions{}); err != nil {
+		t.Fatalf("Updating Node object: %v", err)
+	}
+
+	ak := kontrollerWithObjects()
+	ak.kc = k.kc
+	ak.nc = k.nc
+	ak.beforeRebootAnnotations = k.beforeRebootAnnotations
+	ak.reconciliationPeriod = k.reconciliationPeriod
+	ak.lockID = "bar"
+
+	stop = make(chan struct{})
+
+	t.Cleanup(func() {
+		close(stop)
+	})
+
+	runOperator(t, ak, stop)
+
+	time.Sleep(ak.reconciliationPeriod)
+
+	n = node(t, k.nc, rebootCancelledNode.Name)
+
+	if _, ok := n.Labels[constants.LabelBeforeReboot]; !ok {
+		t.Fatalf("Expected label %q to remain on Node", constants.LabelBeforeReboot)
+	}
+}
+
 func Test_Operator_stops_reconciliation_loop_when_control_channel_is_closed(t *testing.T) {
 	t.Parallel()
 
