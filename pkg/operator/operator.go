@@ -108,6 +108,8 @@ type Kontroller struct {
 	reconciliationPeriod time.Duration
 
 	leaderElectionLease time.Duration
+
+	lockID string
 }
 
 // Config configures a Kontroller.
@@ -135,6 +137,15 @@ func New(config Config) (*Kontroller, error) {
 	if namespace == "" {
 		return nil, fmt.Errorf("unable to determine operator namespace: please ensure POD_NAMESPACE " +
 			"environment variable is set")
+	}
+
+	// TODO: a better id might be necessary.
+	// Currently, KVO uses env.POD_NAME and the upstream controller-manager uses this.
+	// Both end up having the same value in general, but Hostname is
+	// more likely to have a value.
+	hostname, err := os.Hostname()
+	if err != nil {
+		return nil, fmt.Errorf("getting hostname: %w", err)
 	}
 
 	var rebootWindow *timeutil.Periodic
@@ -175,15 +186,14 @@ func New(config Config) (*Kontroller, error) {
 		maxRebootingNodes:           maxRebootingNodes,
 		reconciliationPeriod:        defaultReconciliationPeriod,
 		leaderElectionLease:         defaultLeaderElectionLease,
+		lockID:                      hostname,
 	}, nil
 }
 
 // Run starts the operator reconcilitation process and runs until the stop
 // channel is closed.
 func (k *Kontroller) Run(stop <-chan struct{}) error {
-	if err := k.withLeaderElection(); err != nil {
-		return fmt.Errorf("finishing leader election: %w", err)
-	}
+	k.withLeaderElection()
 
 	// Start Flatcar Container Linux node auto-labeler.
 	if k.autoLabelContainerLinux {
@@ -202,16 +212,7 @@ func (k *Kontroller) Run(stop <-chan struct{}) error {
 
 // withLeaderElection creates a new context which is cancelled when this
 // operator does not hold a lock to operate on the cluster.
-func (k *Kontroller) withLeaderElection() error {
-	// TODO: a better id might be necessary.
-	// Currently, KVO uses env.POD_NAME and the upstream controller-manager uses this.
-	// Both end up having the same value in general, but Hostname is
-	// more likely to have a value.
-	id, err := os.Hostname()
-	if err != nil {
-		return fmt.Errorf("getting hostname: %w", err)
-	}
-
+func (k *Kontroller) withLeaderElection() {
 	resLock := &resourcelock.ConfigMapLock{
 		ConfigMapMeta: metav1.ObjectMeta{
 			Namespace: k.namespace,
@@ -219,7 +220,7 @@ func (k *Kontroller) withLeaderElection() error {
 		},
 		Client: k.kc.CoreV1(),
 		LockConfig: resourcelock.ResourceLockConfig{
-			Identity:      id,
+			Identity:      k.lockID,
 			EventRecorder: k.leaderElectionEventRecorder,
 		},
 	}
@@ -253,8 +254,6 @@ func (k *Kontroller) withLeaderElection() error {
 	}(waitLeading)
 
 	<-waitLeading
-
-	return nil
 }
 
 // process performs the reconcilitation to coordinate reboots.

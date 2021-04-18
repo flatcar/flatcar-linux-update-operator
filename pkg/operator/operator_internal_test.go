@@ -800,6 +800,7 @@ func kontrollerWithObjects(objects ...runtime.Object) *Kontroller {
 		maxRebootingNodes:    1,
 		reconciliationPeriod: defaultReconciliationPeriod,
 		leaderElectionLease:  defaultLeaderElectionLease,
+		lockID:               "foo",
 	}
 }
 
