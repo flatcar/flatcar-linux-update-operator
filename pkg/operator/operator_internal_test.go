@@ -2,6 +2,7 @@ package operator
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -46,6 +47,180 @@ func Test_Operator_exits_gracefully_when_user_requests_shutdown(t *testing.T) {
 
 	if _, ok := n.Labels[constants.LabelBeforeReboot]; ok {
 		t.Fatalf("Expected label %q to be removed from Node", constants.LabelBeforeReboot)
+	}
+}
+
+//nolint:funlen
+func Test_Operator_shuts_down_leader_election_process_when_user_requests_shutdown(t *testing.T) {
+	t.Parallel()
+
+	rebootCancelledNode := rebootCancelledNode()
+
+	k := kontrollerWithObjects(rebootCancelledNode)
+	k.beforeRebootAnnotations = []string{testBeforeRebootAnnotation}
+	k.reconciliationPeriod = 1 * time.Second
+	k.leaderElectionLease = 2 * time.Second
+
+	stop := make(chan struct{})
+	stopped := make(chan struct{})
+
+	go func() {
+		if err := k.Run(stop); err != nil {
+			fmt.Printf("Error running operator: %v\n", err)
+			t.Fail()
+		}
+		stopped <- struct{}{}
+	}()
+
+	// Wait for one reconciliation cycle to run.
+	time.Sleep(k.reconciliationPeriod)
+
+	n := node(t, k.nc, rebootCancelledNode.Name)
+
+	if _, ok := n.Labels[constants.LabelBeforeReboot]; ok {
+		t.Fatalf("Expected label %q to be removed from Node after waiting the reconciliation period",
+			constants.LabelBeforeReboot)
+	}
+
+	close(stop)
+
+	<-stopped
+
+	n.Labels[constants.LabelBeforeReboot] = constants.True
+	n.Annotations[testBeforeRebootAnnotation] = constants.True
+
+	if _, err := k.nc.Update(context.TODO(), n, metav1.UpdateOptions{}); err != nil {
+		t.Fatalf("Updating Node object: %v", err)
+	}
+
+	ak := kontrollerWithObjects(rebootCancelledNode)
+	ak.kc = k.kc
+	ak.nc = k.nc
+	ak.beforeRebootAnnotations = []string{testBeforeRebootAnnotation}
+	ak.reconciliationPeriod = k.reconciliationPeriod
+	ak.leaderElectionLease = k.leaderElectionLease
+	ak.lockID = "bar"
+
+	stop = make(chan struct{})
+
+	t.Cleanup(func() {
+		close(stop)
+	})
+
+	go func() {
+		if err := ak.Run(stop); err != nil {
+			fmt.Printf("Error running operator: %v\n", err)
+			t.Fail()
+		}
+	}()
+
+	time.Sleep(k.leaderElectionLease * 2)
+
+	n = node(t, k.nc, rebootCancelledNode.Name)
+
+	if _, ok := n.Labels[constants.LabelBeforeReboot]; ok {
+		t.Fatalf("Expected label %q to be removed from Node after waiting the reconciliation period",
+			constants.LabelBeforeReboot)
+	}
+}
+
+//nolint:funlen
+func Test_Operator_returns_error_when_leadership_is_lost(t *testing.T) {
+	t.Parallel()
+
+	rebootCancelledNode := rebootCancelledNode()
+
+	k := kontrollerWithObjects(rebootCancelledNode)
+	k.beforeRebootAnnotations = []string{testBeforeRebootAnnotation}
+	k.reconciliationPeriod = 1 * time.Second
+	k.leaderElectionLease = 2 * time.Second
+
+	stop := make(chan struct{})
+
+	t.Cleanup(func() {
+		close(stop)
+	})
+
+	errCh := make(chan error, 1)
+
+	go func() {
+		errCh <- k.Run(stop)
+	}()
+
+	// Wait for one reconciliation cycle to run.
+	time.Sleep(k.reconciliationPeriod)
+
+	// Ensure operator is functional.
+	n := node(t, k.nc, rebootCancelledNode.Name)
+
+	if _, ok := n.Labels[constants.LabelBeforeReboot]; ok {
+		t.Fatalf("Expected label %q to be removed from Node after waiting the reconciliation period",
+			constants.LabelBeforeReboot)
+	}
+
+	// Force-steal leader election.
+	ctx := contextWithDeadline(t)
+
+	configMapClient := k.kc.CoreV1().ConfigMaps("")
+
+	lock, err := configMapClient.Get(ctx, leaderElectionResourceName, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("getting lock ConfigMap %q: %v", leaderElectionResourceName, err)
+	}
+
+	leaderAnnotation := "control-plane.alpha.kubernetes.io/leader"
+
+	leader, ok := lock.Annotations[leaderAnnotation]
+	if !ok {
+		t.Fatalf("expected annotation %q not found", leaderAnnotation)
+	}
+
+	leaderLease := &struct {
+		HolderIdentity       string
+		LeaseDurationSeconds int
+		AcquireTime          time.Time
+		RenewTime            time.Time
+		LeaderTransitions    int
+	}{}
+
+	if err := json.Unmarshal([]byte(leader), leaderLease); err != nil {
+		t.Fatalf("Decoding leader annotation data %q: %v", leader, err)
+	}
+
+	leaderLease.HolderIdentity = "baz"
+
+	leaderBytes, err := json.Marshal(leaderLease)
+	if err != nil {
+		t.Fatalf("Encoding leader annotation data: %q: %v", leader, err)
+	}
+
+	lock.Annotations[leaderAnnotation] = string(leaderBytes)
+
+	if _, err := configMapClient.Update(ctx, lock, metav1.UpdateOptions{}); err != nil {
+		t.Fatalf("Updating lock ConfigMap %q: %v", leaderElectionResourceName, err)
+	}
+
+	// Wait lease time to ensure operator lost it.
+	time.Sleep(k.leaderElectionLease)
+
+	// Patch node object again to verify if operator is functional.
+	n.Labels[constants.LabelBeforeReboot] = constants.True
+	n.Annotations[testBeforeRebootAnnotation] = constants.True
+
+	if _, err := k.nc.Update(contextWithDeadline(t), n, metav1.UpdateOptions{}); err != nil {
+		t.Fatalf("Updating Node object: %v", err)
+	}
+
+	time.Sleep(k.reconciliationPeriod)
+
+	n = node(t, k.nc, rebootCancelledNode.Name)
+
+	if _, ok := n.Labels[constants.LabelBeforeReboot]; !ok {
+		t.Fatalf("Expected label %q to remain on Node", constants.LabelBeforeReboot)
+	}
+
+	if err := <-errCh; err == nil {
+		t.Fatalf("Expected operator to return error when leader election is lost")
 	}
 }
 

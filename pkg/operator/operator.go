@@ -193,36 +193,30 @@ func New(config Config) (*Kontroller, error) {
 // Run starts the operator reconcilitation process and runs until the stop
 // channel is closed.
 func (k *Kontroller) Run(stop <-chan struct{}) error {
-	// To preserve existing behavior, we do not cancel this context, but we let it run as long as it needs.
-	// Usually reconciliation loop (process function) should be quite fast and when control channel get closed,
-	// it won't be executed again.
-	//
-	// However, if it occurs that any of Kubernetes API calls hangs, operator will hang and not exit gracefully.
-	// The operator should be safe to be stopped at any point however.
-	//
-	// In the future, we should add some graceful time for shutdown here.
-	ctx := context.Background()
+	err := make(chan error, 1)
 
-	k.withLeaderElection(ctx)
+	// Leader election is responsible for shutting down the controller, so when leader election
+	// is lost, controller is immediately stopped, as shared context will be cancelled.
+	ctx := k.withLeaderElection(stop, err)
 
 	// Start Flatcar Container Linux node auto-labeler.
 	if k.autoLabelContainerLinux {
-		go wait.Until(func() { k.legacyLabeler(ctx) }, k.reconciliationPeriod, stop)
+		go wait.Until(func() { k.legacyLabeler(ctx) }, k.reconciliationPeriod, ctx.Done())
 	}
 
 	klog.V(5).Info("starting controller")
 
 	// Call the process loop each period, until stop is closed.
-	wait.Until(func() { k.process(ctx) }, k.reconciliationPeriod, stop)
+	wait.Until(func() { k.process(ctx) }, k.reconciliationPeriod, ctx.Done())
 
 	klog.V(5).Info("stopping controller")
 
-	return nil
+	return <-err
 }
 
 // withLeaderElection creates a new context which is cancelled when this
 // operator does not hold a lock to operate on the cluster.
-func (k *Kontroller) withLeaderElection(ctx context.Context) {
+func (k *Kontroller) withLeaderElection(stop <-chan struct{}, err chan<- error) context.Context {
 	resLock := &resourcelock.ConfigMapLock{
 		ConfigMapMeta: metav1.ObjectMeta{
 			Namespace: k.namespace,
@@ -234,6 +228,16 @@ func (k *Kontroller) withLeaderElection(ctx context.Context) {
 			EventRecorder: k.leaderElectionEventRecorder,
 		},
 	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	go func() {
+		// When user requests to stop the controller, cancel context to interrupt any ongoing operation.
+		<-stop
+		err <- nil
+
+		cancel()
+	}()
 
 	waitLeading := make(chan struct{})
 
@@ -258,13 +262,16 @@ func (k *Kontroller) withLeaderElection(ctx context.Context) {
 					waitLeading <- struct{}{}
 				},
 				OnStoppedLeading: func() {
-					klog.Fatalf("leaderelection lost")
+					err <- fmt.Errorf("leaderelection lost")
+					cancel()
 				},
 			},
 		})
 	}()
 
 	<-waitLeading
+
+	return ctx
 }
 
 // process performs the reconcilitation to coordinate reboots.
