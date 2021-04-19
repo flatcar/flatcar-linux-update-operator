@@ -194,7 +194,7 @@ func Test_Operator_cleans_up_nodes_which_cannot_be_rebooted(t *testing.T) {
 	k := kontrollerWithObjects(rebootCancelledNode, toBeRebootedNode)
 	k.beforeRebootAnnotations = []string{testBeforeRebootAnnotation}
 
-	k.process()
+	k.process(contextWithDeadline(t))
 
 	n := node(t, k.nc, rebootCancelledNode.Name)
 
@@ -238,6 +238,8 @@ func Test_Operator_cleans_up_nodes_which_cannot_be_rebooted(t *testing.T) {
 func Test_Operator_does_not_count_nodes_as_rebooting_which(t *testing.T) {
 	t.Parallel()
 
+	ctx := contextWithDeadline(t)
+
 	cases := map[string]*corev1.Node{
 		"has_finished_rebooting": finishedRebootingNode(),
 		"are_idle":               idleNode(),
@@ -255,7 +257,7 @@ func Test_Operator_does_not_count_nodes_as_rebooting_which(t *testing.T) {
 
 			k := kontrollerWithObjects(extraNode, rebootableNode)
 
-			k.process()
+			k.process(ctx)
 
 			n := node(t, k.nc, rebootableNode.Name)
 
@@ -275,6 +277,8 @@ func Test_Operator_does_not_count_nodes_as_rebooting_which(t *testing.T) {
 // not do anything.
 func Test_Operator_counts_nodes_as_rebooting_which(t *testing.T) {
 	t.Parallel()
+
+	ctx := contextWithDeadline(t)
 
 	cases := map[string]*corev1.Node{
 		"are_scheduled_for_reboot_already": scheduledForRebootNode(),
@@ -299,7 +303,7 @@ func Test_Operator_counts_nodes_as_rebooting_which(t *testing.T) {
 			// it gets removed before we schedule nodes for rebooting.
 			k.beforeRebootAnnotations = []string{testBeforeRebootAnnotation}
 
-			k.process()
+			k.process(ctx)
 
 			n := node(t, k.nc, rebootableNode.Name)
 
@@ -312,6 +316,8 @@ func Test_Operator_counts_nodes_as_rebooting_which(t *testing.T) {
 
 func Test_Operator_does_not_count_nodes_as_rebootable_which(t *testing.T) {
 	t.Parallel()
+
+	ctx := contextWithDeadline(t)
 
 	cases := map[string]func(*corev1.Node){
 		"do_not_require_reboot": func(n *corev1.Node) {
@@ -349,7 +355,7 @@ func Test_Operator_does_not_count_nodes_as_rebootable_which(t *testing.T) {
 			k.maxRebootingNodes = 2
 			k.beforeRebootAnnotations = []string{testBeforeRebootAnnotation, testAnotherBeforeRebootAnnotation}
 
-			k.process()
+			k.process(ctx)
 
 			n := node(t, k.nc, rebootableNode.Name)
 
@@ -367,7 +373,7 @@ func Test_Operator_counts_nodes_as_rebootable_which_needs_reboot_and_has_all_oth
 
 	k := kontrollerWithObjects(rebootableNode)
 
-	k.process()
+	k.process(contextWithDeadline(t))
 
 	n := node(t, k.nc, rebootableNode.Name)
 
@@ -391,7 +397,7 @@ func Test_Operator_does_not_schedules_reboot_process_outside_reboot_window(t *te
 
 	k.rebootWindow = rw
 
-	k.process()
+	k.process(contextWithDeadline(t))
 
 	n := node(t, k.nc, rebootableNode.Name)
 	if v, ok := n.Labels[constants.LabelBeforeReboot]; ok && v == constants.True {
@@ -404,6 +410,8 @@ func Test_Operator_does_not_schedules_reboot_process_outside_reboot_window(t *te
 //nolint:funlen
 func Test_Operator_schedules_reboot_process(t *testing.T) {
 	t.Parallel()
+
+	ctx := contextWithDeadline(t)
 
 	t.Run("only_during_reboot_window", func(t *testing.T) {
 		t.Parallel()
@@ -419,7 +427,7 @@ func Test_Operator_schedules_reboot_process(t *testing.T) {
 
 		k.rebootWindow = rw
 
-		k.process()
+		k.process(ctx)
 
 		n := node(t, k.nc, rebootableNode.Name)
 		if _, ok := n.Labels[constants.LabelBeforeReboot]; !ok {
@@ -434,7 +442,7 @@ func Test_Operator_schedules_reboot_process(t *testing.T) {
 
 		k := kontrollerWithObjects(rebootableNode, rebootNotConfirmedNode())
 
-		k.process()
+		k.process(ctx)
 
 		n := node(t, k.nc, rebootableNode.Name)
 		if v, ok := n.Labels[constants.LabelBeforeReboot]; ok && v == constants.True {
@@ -449,7 +457,7 @@ func Test_Operator_schedules_reboot_process(t *testing.T) {
 
 		k := kontrollerWithObjects(scheduledForRebootNode)
 
-		k.process()
+		k.process(ctx)
 
 		n := node(t, k.nc, scheduledForRebootNode.Name)
 
@@ -467,7 +475,7 @@ func Test_Operator_schedules_reboot_process(t *testing.T) {
 		k := kontrollerWithObjects(rebootableNode)
 		k.beforeRebootAnnotations = []string{testBeforeRebootAnnotation}
 
-		k.process()
+		k.process(ctx)
 
 		n := node(t, k.nc, rebootableNode.Name)
 
@@ -496,6 +504,8 @@ func Test_Operator_schedules_reboot_process(t *testing.T) {
 
 func Test_Operator_approves_reboot_process_for_nodes_which_have(t *testing.T) {
 	t.Parallel()
+
+	ctx := contextWithDeadline(t)
 
 	cases := map[string]struct {
 		mutateF        func(*corev1.Node)
@@ -535,7 +545,7 @@ func Test_Operator_approves_reboot_process_for_nodes_which_have(t *testing.T) {
 			// label, but it cannot be removed yet.
 			k.beforeRebootAnnotations = []string{testBeforeRebootAnnotation}
 
-			k.process()
+			k.process(ctx)
 
 			n := node(t, k.nc, readyToRebootNode.Name)
 
@@ -560,7 +570,7 @@ func Test_Operator_approves_reboot_process_by(t *testing.T) {
 	k := kontrollerWithObjects(readyToRebootNode)
 	k.beforeRebootAnnotations = []string{testBeforeRebootAnnotation}
 
-	k.process()
+	k.process(contextWithDeadline(t))
 
 	n := node(t, k.nc, readyToRebootNode.Name)
 
@@ -603,6 +613,8 @@ func Test_Operator_approves_reboot_process_by(t *testing.T) {
 //nolint:funlen,cyclop
 func Test_Operator_counts_nodes_as_just_rebooted_which(t *testing.T) {
 	t.Parallel()
+
+	ctx := contextWithDeadline(t)
 
 	cases := map[string]struct {
 		mutateF            func(*corev1.Node)
@@ -651,7 +663,7 @@ func Test_Operator_counts_nodes_as_just_rebooted_which(t *testing.T) {
 			k := kontrollerWithObjects(justRebootedNode)
 			k.afterRebootAnnotations = []string{testAfterRebootAnnotation, testAnotherAfterRebootAnnotation}
 
-			k.process()
+			k.process(ctx)
 
 			n := node(t, k.nc, justRebootedNode.Name)
 
@@ -691,7 +703,7 @@ func Test_Operator_confirms_reboot_process_by(t *testing.T) {
 	k := kontrollerWithObjects(justRebootedNode)
 	k.afterRebootAnnotations = []string{testAfterRebootAnnotation, testAnotherAfterRebootAnnotation}
 
-	k.process()
+	k.process(contextWithDeadline(t))
 
 	n := node(t, k.nc, justRebootedNode.Name)
 
@@ -726,6 +738,8 @@ func Test_Operator_confirms_reboot_process_by(t *testing.T) {
 // Test opposite conditions starting from base to make sure all cases are covered.
 func Test_Operator_counts_nodes_as_which_finished_rebooting_which_has(t *testing.T) {
 	t.Parallel()
+
+	ctx := contextWithDeadline(t)
 
 	cases := map[string]struct {
 		mutateF                 func(*corev1.Node)
@@ -762,7 +776,7 @@ func Test_Operator_counts_nodes_as_which_finished_rebooting_which_has(t *testing
 			k := kontrollerWithObjects(finishedRebootingNode)
 			k.afterRebootAnnotations = []string{testAfterRebootAnnotation, testAnotherAfterRebootAnnotation}
 
-			k.process()
+			k.process(ctx)
 
 			n := node(t, k.nc, finishedRebootingNode.Name)
 
@@ -787,7 +801,7 @@ func Test_Operator_finishes_reboot_process_by(t *testing.T) {
 	k := kontrollerWithObjects(finishedRebootingNode)
 	k.afterRebootAnnotations = []string{testAfterRebootAnnotation, testAnotherAfterRebootAnnotation}
 
-	k.process()
+	k.process(contextWithDeadline(t))
 
 	n := node(t, k.nc, finishedRebootingNode.Name)
 

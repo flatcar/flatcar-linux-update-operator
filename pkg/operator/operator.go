@@ -193,17 +193,27 @@ func New(config Config) (*Kontroller, error) {
 // Run starts the operator reconcilitation process and runs until the stop
 // channel is closed.
 func (k *Kontroller) Run(stop <-chan struct{}) error {
-	k.withLeaderElection()
+	// To preserve existing behavior, we do not cancel this context, but we let it run as long as it needs.
+	// Usually reconciliation loop (process function) should be quite fast and when control channel get closed,
+	// it won't be executed again.
+	//
+	// However, if it occurs that any of Kubernetes API calls hangs, operator will hang and not exit gracefully.
+	// The operator should be safe to be stopped at any point however.
+	//
+	// In the future, we should add some graceful time for shutdown here.
+	ctx := context.Background()
+
+	k.withLeaderElection(ctx)
 
 	// Start Flatcar Container Linux node auto-labeler.
 	if k.autoLabelContainerLinux {
-		go wait.Until(k.legacyLabeler, k.reconciliationPeriod, stop)
+		go wait.Until(func() { k.legacyLabeler(ctx) }, k.reconciliationPeriod, stop)
 	}
 
 	klog.V(5).Info("starting controller")
 
 	// Call the process loop each period, until stop is closed.
-	wait.Until(k.process, k.reconciliationPeriod, stop)
+	wait.Until(func() { k.process(ctx) }, k.reconciliationPeriod, stop)
 
 	klog.V(5).Info("stopping controller")
 
@@ -212,7 +222,7 @@ func (k *Kontroller) Run(stop <-chan struct{}) error {
 
 // withLeaderElection creates a new context which is cancelled when this
 // operator does not hold a lock to operate on the cluster.
-func (k *Kontroller) withLeaderElection() {
+func (k *Kontroller) withLeaderElection(ctx context.Context) {
 	resLock := &resourcelock.ConfigMapLock{
 		ConfigMapMeta: metav1.ObjectMeta{
 			Namespace: k.namespace,
@@ -233,7 +243,7 @@ func (k *Kontroller) withLeaderElection() {
 		// and the KVO values
 		// See also
 		// https://github.com/kubernetes/kubernetes/blob/fc31dae165f406026142f0dd9a98cada8474682a/pkg/client/leaderelection/leaderelection.go#L17
-		leaderelection.RunOrDie(context.TODO(), leaderelection.LeaderElectionConfig{
+		leaderelection.RunOrDie(ctx, leaderelection.LeaderElectionConfig{
 			Lock:          resLock,
 			LeaseDuration: k.leaderElectionLease,
 			//nolint:gomnd // Set renew deadline to 2/3rd of the lease duration to give
@@ -258,7 +268,7 @@ func (k *Kontroller) withLeaderElection() {
 }
 
 // process performs the reconcilitation to coordinate reboots.
-func (k *Kontroller) process() {
+func (k *Kontroller) process(ctx context.Context) {
 	klog.V(4).Info("Going through a loop cycle")
 
 	// First make sure that all of our nodes are in a well-defined state with
@@ -266,7 +276,7 @@ func (k *Kontroller) process() {
 	// fix them.
 	klog.V(4).Info("Cleaning up node state")
 
-	if err := k.cleanupState(); err != nil {
+	if err := k.cleanupState(ctx); err != nil {
 		klog.Errorf("Failed to cleanup node state: %v", err)
 
 		return
@@ -278,7 +288,7 @@ func (k *Kontroller) process() {
 	// the reboot has completed.
 	klog.V(4).Info("Checking if configured after-reboot annotations are set to true")
 
-	if err := k.checkAfterReboot(); err != nil {
+	if err := k.checkAfterReboot(ctx); err != nil {
 		klog.Errorf("Failed to check after reboot: %v", err)
 
 		return
@@ -288,7 +298,7 @@ func (k *Kontroller) process() {
 	// remove after-reboot annotations and add the after-reboot=true label.
 	klog.V(4).Info("Labeling rebooted nodes with after-reboot label")
 
-	if err := k.markAfterReboot(); err != nil {
+	if err := k.markAfterReboot(ctx); err != nil {
 		klog.Errorf("Failed to update recently rebooted nodes: %v", err)
 
 		return
@@ -300,7 +310,7 @@ func (k *Kontroller) process() {
 	// time to reboot.
 	klog.V(4).Info("Checking if configured before-reboot annotations are set to true")
 
-	if err := k.checkBeforeReboot(); err != nil {
+	if err := k.checkBeforeReboot(ctx); err != nil {
 		klog.Errorf("Failed to check before reboot: %v", err)
 
 		return
@@ -310,7 +320,7 @@ func (k *Kontroller) process() {
 	// annotations and add the before-reboot=true label.
 	klog.V(4).Info("Labeling rebootable nodes with before-reboot label")
 
-	if err := k.markBeforeReboot(); err != nil {
+	if err := k.markBeforeReboot(ctx); err != nil {
 		klog.Errorf("Failed to update rebootable nodes: %v", err)
 
 		return
@@ -321,14 +331,14 @@ func (k *Kontroller) process() {
 // performing state changes on them.
 // If there is an error getting the list of nodes or updating any of them, an
 // error is immediately returned.
-func (k *Kontroller) cleanupState() error {
-	nodelist, err := k.nc.List(context.TODO(), metav1.ListOptions{})
+func (k *Kontroller) cleanupState(ctx context.Context) error {
+	nodelist, err := k.nc.List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("listing nodes: %w", err)
 	}
 
 	for _, n := range nodelist.Items {
-		err = k8sutil.UpdateNodeRetry(context.TODO(), k.nc, n.Name, func(node *corev1.Node) {
+		err = k8sutil.UpdateNodeRetry(ctx, k.nc, n.Name, func(node *corev1.Node) {
 			// Make sure that nodes with the before-reboot label actually
 			// still wants to reboot.
 			if _, exists := node.Labels[constants.LabelBeforeReboot]; !exists {
@@ -372,8 +382,8 @@ type checkRebootOptions struct {
 //
 // If there is an error getting the list of nodes or updating any of them, an
 // error is immediately returned.
-func (k *Kontroller) checkReboot(opt checkRebootOptions) error {
-	nodelist, err := k.nc.List(context.TODO(), metav1.ListOptions{})
+func (k *Kontroller) checkReboot(ctx context.Context, opt checkRebootOptions) error {
+	nodelist, err := k.nc.List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("listing nodes: %w", err)
 	}
@@ -389,7 +399,7 @@ func (k *Kontroller) checkReboot(opt checkRebootOptions) error {
 		klog.V(4).Infof("Setting annotation %q to %q for %q",
 			constants.AnnotationOkToReboot, opt.okToReboot, n.Name)
 
-		if err := k8sutil.UpdateNodeRetry(context.TODO(), k.nc, n.Name, func(node *corev1.Node) {
+		if err := k8sutil.UpdateNodeRetry(ctx, k.nc, n.Name, func(node *corev1.Node) {
 			delete(node.Labels, opt.label)
 
 			// Cleanup the annotations.
@@ -413,7 +423,7 @@ func (k *Kontroller) checkReboot(opt checkRebootOptions) error {
 // the agent that it is ready to start the actual reboot process.
 // If there is an error getting the list of nodes or updating any of them, an
 // error is immediately returned.
-func (k *Kontroller) checkBeforeReboot() error {
+func (k *Kontroller) checkBeforeReboot(ctx context.Context) error {
 	opt := checkRebootOptions{
 		req:         beforeRebootReq,
 		annotations: k.beforeRebootAnnotations,
@@ -430,7 +440,7 @@ func (k *Kontroller) checkBeforeReboot() error {
 // the agent that it has completed it's reboot successfully.
 // If there is an error getting the list of nodes or updating any of them, an
 // error is immediately returned.
-func (k *Kontroller) checkAfterReboot() error {
+func (k *Kontroller) checkAfterReboot(ctx context.Context) error {
 	opt := checkRebootOptions{
 		req:         afterRebootReq,
 		annotations: k.afterRebootAnnotations,
@@ -451,8 +461,8 @@ func (k *Kontroller) checkAfterReboot() error {
 // case there are any left over from the last reboot.
 // If there is an error getting the list of nodes or updating any of them, an
 // error is immediately returned.
-func (k *Kontroller) markBeforeReboot() error {
-	nodelist, err := k.nc.List(context.TODO(), metav1.ListOptions{})
+func (k *Kontroller) markBeforeReboot(ctx context.Context) error {
+	nodelist, err := k.nc.List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("listing nodes: %w", err)
 	}
@@ -505,7 +515,7 @@ func (k *Kontroller) markBeforeReboot() error {
 	klog.Infof("Found %d nodes that need a reboot", len(chosenNodes))
 
 	for _, n := range chosenNodes {
-		err = k.mark(n.Name, constants.LabelBeforeReboot, "before-reboot", k.beforeRebootAnnotations)
+		err = k.mark(ctx, n.Name, constants.LabelBeforeReboot, "before-reboot", k.beforeRebootAnnotations)
 		if err != nil {
 			return fmt.Errorf("labeling node for before reboot checks: %w", err)
 		}
@@ -522,8 +532,8 @@ func (k *Kontroller) markBeforeReboot() error {
 // case there are any left over from the last reboot.
 // If there is an error getting the list of nodes or updating any of them, an
 // error is immediately returned.
-func (k *Kontroller) markAfterReboot() error {
-	nodelist, err := k.nc.List(context.TODO(), metav1.ListOptions{
+func (k *Kontroller) markAfterReboot(ctx context.Context) error {
+	nodelist, err := k.nc.List(ctx, metav1.ListOptions{
 		// Filter out any nodes that are already labeled with after-reboot=true.
 		LabelSelector: fmt.Sprintf("%s!=%s", constants.LabelAfterReboot, constants.True),
 	})
@@ -538,7 +548,7 @@ func (k *Kontroller) markAfterReboot() error {
 
 	// For all the nodes which just rebooted, remove any old annotations and add the after-reboot=true label.
 	for _, n := range justRebootedNodes {
-		err = k.mark(n.Name, constants.LabelAfterReboot, "after-reboot", k.afterRebootAnnotations)
+		err = k.mark(ctx, n.Name, constants.LabelAfterReboot, "after-reboot", k.afterRebootAnnotations)
 		if err != nil {
 			return fmt.Errorf("labeling node for after reboot checks: %w", err)
 		}
@@ -547,11 +557,11 @@ func (k *Kontroller) markAfterReboot() error {
 	return nil
 }
 
-func (k *Kontroller) mark(nodeName, label, annotationsType string, annotations []string) error {
+func (k *Kontroller) mark(ctx context.Context, nodeName, label, annotationsType string, annotations []string) error {
 	klog.V(4).Infof("Deleting annotations %v for %q", annotations, nodeName)
 	klog.V(4).Infof("Setting label %q to %q for node %q", label, constants.True, nodeName)
 
-	err := k8sutil.UpdateNodeRetry(context.TODO(), k.nc, nodeName, func(node *corev1.Node) {
+	err := k8sutil.UpdateNodeRetry(ctx, k.nc, nodeName, func(node *corev1.Node) {
 		for _, annotation := range annotations {
 			delete(node.Annotations, annotation)
 		}
