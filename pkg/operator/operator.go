@@ -354,6 +354,13 @@ func (k *Kontroller) cleanupState() error {
 	return nil
 }
 
+type checkRebootOptions struct {
+	req         *labels.Requirement
+	annotations []string
+	label       string
+	okToReboot  string
+}
+
 // checkReboot gets all nodes with a given requirement and checks if all of the given annotations are set to true.
 //
 // If they are, it deletes given annotations and label, then sets ok-to-reboot annotation to either true or false,
@@ -365,32 +372,33 @@ func (k *Kontroller) cleanupState() error {
 //
 // If there is an error getting the list of nodes or updating any of them, an
 // error is immediately returned.
-func (k *Kontroller) checkReboot(req *labels.Requirement, annotations []string, label, okToReboot string) error {
+func (k *Kontroller) checkReboot(opt checkRebootOptions) error {
 	nodelist, err := k.nc.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("listing nodes: %w", err)
 	}
 
-	nodes := k8sutil.FilterNodesByRequirement(nodelist.Items, req)
+	nodes := k8sutil.FilterNodesByRequirement(nodelist.Items, opt.req)
 
 	for _, n := range nodes {
-		if !hasAllAnnotations(n, annotations) {
+		if !hasAllAnnotations(n, opt.annotations) {
 			continue
 		}
 
-		klog.V(4).Infof("Deleting label %q for %q", label, n.Name)
-		klog.V(4).Infof("Setting annotation %q to %q for %q", constants.AnnotationOkToReboot, okToReboot, n.Name)
+		klog.V(4).Infof("Deleting label %q for %q", opt.label, n.Name)
+		klog.V(4).Infof("Setting annotation %q to %q for %q",
+			constants.AnnotationOkToReboot, opt.okToReboot, n.Name)
 
 		if err := k8sutil.UpdateNodeRetry(context.TODO(), k.nc, n.Name, func(node *corev1.Node) {
-			delete(node.Labels, label)
+			delete(node.Labels, opt.label)
 
 			// Cleanup the annotations.
-			for _, annotation := range annotations {
+			for _, annotation := range opt.annotations {
 				klog.V(4).Infof("Deleting annotation %q from node %q", annotation, node.Name)
 				delete(node.Annotations, annotation)
 			}
 
-			node.Annotations[constants.AnnotationOkToReboot] = okToReboot
+			node.Annotations[constants.AnnotationOkToReboot] = opt.okToReboot
 		}); err != nil {
 			return fmt.Errorf("updating node %q: %w", n.Name, err)
 		}
@@ -406,7 +414,14 @@ func (k *Kontroller) checkReboot(req *labels.Requirement, annotations []string, 
 // If there is an error getting the list of nodes or updating any of them, an
 // error is immediately returned.
 func (k *Kontroller) checkBeforeReboot() error {
-	return k.checkReboot(beforeRebootReq, k.beforeRebootAnnotations, constants.LabelBeforeReboot, constants.True)
+	opt := checkRebootOptions{
+		req:         beforeRebootReq,
+		annotations: k.beforeRebootAnnotations,
+		label:       constants.LabelBeforeReboot,
+		okToReboot:  constants.True,
+	}
+
+	return k.checkReboot(ctx, opt)
 }
 
 // checkAfterReboot gets all nodes with the after-reboot=true label and checks
@@ -416,7 +431,14 @@ func (k *Kontroller) checkBeforeReboot() error {
 // If there is an error getting the list of nodes or updating any of them, an
 // error is immediately returned.
 func (k *Kontroller) checkAfterReboot() error {
-	return k.checkReboot(afterRebootReq, k.afterRebootAnnotations, constants.LabelAfterReboot, constants.False)
+	opt := checkRebootOptions{
+		req:         afterRebootReq,
+		annotations: k.afterRebootAnnotations,
+		label:       constants.LabelAfterReboot,
+		okToReboot:  constants.False,
+	}
+
+	return k.checkReboot(ctx, opt)
 }
 
 // markBeforeReboot gets nodes which want to reboot and marks them with the
