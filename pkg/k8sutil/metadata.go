@@ -1,12 +1,8 @@
 package k8sutil
 
 import (
-	"bufio"
 	"context"
 	"fmt"
-	"io/ioutil"
-	"os"
-	"strings"
 
 	v1api "k8s.io/api/core/v1"
 	v1meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -15,13 +11,6 @@ import (
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/klog/v2"
-)
-
-const (
-	updateConfPath         = "/usr/share/flatcar/update.conf"
-	updateConfOverridePath = "/etc/flatcar/update.conf"
-	osReleasePath          = "/etc/os-release"
 )
 
 // NodeAnnotationCondition returns a condition function that succeeds when a
@@ -42,11 +31,11 @@ func NodeAnnotationCondition(selector fields.Selector) watchtools.ConditionFunc 
 }
 
 // GetNodeRetry gets a node object, retrying up to DefaultBackoff number of times if it fails.
-func GetNodeRetry(nc v1core.NodeInterface, node string) (*v1api.Node, error) {
+func GetNodeRetry(ctx context.Context, nc v1core.NodeInterface, node string) (*v1api.Node, error) {
 	var apiNode *v1api.Node
 
 	err := retry.OnError(retry.DefaultBackoff, func(error) bool { return true }, func() error {
-		n, getErr := nc.Get(context.TODO(), node, v1meta.GetOptions{})
+		n, getErr := nc.Get(ctx, node, v1meta.GetOptions{})
 		if getErr != nil {
 			return fmt.Errorf("failed to get node %q: %w", node, getErr)
 		}
@@ -67,16 +56,16 @@ func GetNodeRetry(nc v1core.NodeInterface, node string) (*v1api.Node, error) {
 // number of times.
 // f will be called each time since the node object will likely have changed if
 // a retry is necessary.
-func UpdateNodeRetry(nc v1core.NodeInterface, node string, f func(*v1api.Node)) error {
+func UpdateNodeRetry(ctx context.Context, nc v1core.NodeInterface, node string, f func(*v1api.Node)) error {
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		n, getErr := nc.Get(context.TODO(), node, v1meta.GetOptions{})
+		n, getErr := nc.Get(ctx, node, v1meta.GetOptions{})
 		if getErr != nil {
 			return fmt.Errorf("failed to get node %q: %w", node, getErr)
 		}
 
 		f(n)
 
-		_, err := nc.Update(context.TODO(), n, v1meta.UpdateOptions{})
+		_, err := nc.Update(ctx, n, v1meta.UpdateOptions{})
 
 		return err
 	})
@@ -90,8 +79,8 @@ func UpdateNodeRetry(nc v1core.NodeInterface, node string, f func(*v1api.Node)) 
 
 // SetNodeLabels sets all keys in m to their respective values in
 // node's labels.
-func SetNodeLabels(nc v1core.NodeInterface, node string, m map[string]string) error {
-	return UpdateNodeRetry(nc, node, func(n *v1api.Node) {
+func SetNodeLabels(ctx context.Context, nc v1core.NodeInterface, node string, m map[string]string) error {
+	return UpdateNodeRetry(ctx, nc, node, func(n *v1api.Node) {
 		for k, v := range m {
 			n.Labels[k] = v
 		}
@@ -100,8 +89,8 @@ func SetNodeLabels(nc v1core.NodeInterface, node string, m map[string]string) er
 
 // SetNodeAnnotations sets all keys in m to their respective values in
 // node's annotations.
-func SetNodeAnnotations(nc v1core.NodeInterface, node string, m map[string]string) error {
-	return UpdateNodeRetry(nc, node, func(n *v1api.Node) {
+func SetNodeAnnotations(ctx context.Context, nc v1core.NodeInterface, node string, m map[string]string) error {
+	return UpdateNodeRetry(ctx, nc, node, func(n *v1api.Node) {
 		for k, v := range m {
 			n.Annotations[k] = v
 		}
@@ -110,8 +99,8 @@ func SetNodeAnnotations(nc v1core.NodeInterface, node string, m map[string]strin
 
 // SetNodeAnnotationsLabels sets all keys in a and l to their values in
 // node's annotations and labels, respectively.
-func SetNodeAnnotationsLabels(nc v1core.NodeInterface, node string, a, l map[string]string) error {
-	return UpdateNodeRetry(nc, node, func(n *v1api.Node) {
+func SetNodeAnnotationsLabels(ctx context.Context, nc v1core.NodeInterface, node string, a, l map[string]string) error {
+	return UpdateNodeRetry(ctx, nc, node, func(n *v1api.Node) {
 		for k, v := range a {
 			n.Annotations[k] = v
 		}
@@ -123,8 +112,8 @@ func SetNodeAnnotationsLabels(nc v1core.NodeInterface, node string, a, l map[str
 }
 
 // DeleteNodeLabels deletes all keys in ks.
-func DeleteNodeLabels(nc v1core.NodeInterface, node string, ks []string) error {
-	return UpdateNodeRetry(nc, node, func(n *v1api.Node) {
+func DeleteNodeLabels(ctx context.Context, nc v1core.NodeInterface, node string, ks []string) error {
+	return UpdateNodeRetry(ctx, nc, node, func(n *v1api.Node) {
 		for _, k := range ks {
 			delete(n.Labels, k)
 		}
@@ -132,8 +121,8 @@ func DeleteNodeLabels(nc v1core.NodeInterface, node string, ks []string) error {
 }
 
 // DeleteNodeAnnotations deletes all annotations with keys in ks.
-func DeleteNodeAnnotations(nc v1core.NodeInterface, node string, ks []string) error {
-	return UpdateNodeRetry(nc, node, func(n *v1api.Node) {
+func DeleteNodeAnnotations(ctx context.Context, nc v1core.NodeInterface, node string, ks []string) error {
+	return UpdateNodeRetry(ctx, nc, node, func(n *v1api.Node) {
 		for _, k := range ks {
 			delete(n.Annotations, k)
 		}
@@ -141,8 +130,8 @@ func DeleteNodeAnnotations(nc v1core.NodeInterface, node string, ks []string) er
 }
 
 // Unschedulable marks node as schedulable or unschedulable according to sched.
-func Unschedulable(nc v1core.NodeInterface, node string, sched bool) error {
-	n, err := nc.Get(context.TODO(), node, v1meta.GetOptions{})
+func Unschedulable(ctx context.Context, nc v1core.NodeInterface, node string, sched bool) error {
+	n, err := nc.Get(ctx, node, v1meta.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to get node %q: %w", node, err)
 	}
@@ -150,7 +139,7 @@ func Unschedulable(nc v1core.NodeInterface, node string, sched bool) error {
 	n.Spec.Unschedulable = sched
 
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
-		n, err = nc.Update(context.TODO(), n, v1meta.UpdateOptions{})
+		n, err = nc.Update(ctx, n, v1meta.UpdateOptions{})
 
 		return
 	}); err != nil {
@@ -158,90 +147,4 @@ func Unschedulable(nc v1core.NodeInterface, node string, sched bool) error {
 	}
 
 	return nil
-}
-
-// splitNewlineEnv splits newline-delimited KEY=VAL pairs and update map.
-func splitNewlineEnv(m map[string]string, envs string) {
-	sc := bufio.NewScanner(strings.NewReader(envs))
-	for sc.Scan() {
-		spl := strings.SplitN(sc.Text(), "=", 2)
-
-		// Just skip empty lines or lines without a value.
-		if len(spl) == 1 {
-			continue
-		}
-
-		m[spl[0]] = spl[1]
-	}
-}
-
-// VersionInfo contains Flatcar version and update information.
-type VersionInfo struct {
-	Name    string
-	ID      string
-	Group   string
-	Version string
-}
-
-func getUpdateMap() (map[string]string, error) {
-	infomap := map[string]string{}
-
-	// This file should always be present on Flatcar.
-	b, err := ioutil.ReadFile(updateConfPath)
-	if err != nil {
-		return nil, fmt.Errorf("reading file %q: %w", updateConfPath, err)
-	}
-
-	splitNewlineEnv(infomap, string(b))
-
-	updateConfOverride, err := ioutil.ReadFile(updateConfOverridePath)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			return nil, fmt.Errorf("reading file %q: %w", updateConfOverridePath, err)
-		}
-
-		klog.Infof("Skipping missing update.conf: %w", err)
-	}
-
-	splitNewlineEnv(infomap, string(updateConfOverride))
-
-	return infomap, nil
-}
-
-func getReleaseMap() (map[string]string, error) {
-	infomap := map[string]string{}
-
-	// This file should always be present on Flatcar.
-	b, err := ioutil.ReadFile(osReleasePath)
-	if err != nil {
-		return nil, fmt.Errorf("reading file %q: %w", osReleasePath, err)
-	}
-
-	splitNewlineEnv(infomap, string(b))
-
-	return infomap, nil
-}
-
-// GetVersionInfo returns VersionInfo from the current Flatcar system.
-//
-// Should probably live in a different package.
-func GetVersionInfo() (*VersionInfo, error) {
-	updateconf, err := getUpdateMap()
-	if err != nil {
-		return nil, fmt.Errorf("unable to get update configuration: %w", err)
-	}
-
-	osrelease, err := getReleaseMap()
-	if err != nil {
-		return nil, fmt.Errorf("unable to get os release info: %w", err)
-	}
-
-	vi := &VersionInfo{
-		Name:    osrelease["NAME"],
-		ID:      osrelease["ID"],
-		Group:   updateconf["GROUP"],
-		Version: osrelease["VERSION"],
-	}
-
-	return vi, nil
 }

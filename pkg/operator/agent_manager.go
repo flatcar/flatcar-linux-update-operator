@@ -33,10 +33,10 @@ var (
 // all current nodes are labeled, auto-scaling groups may create nodes lacking
 // the label. Retain this behavior to support upgrades of Tectonic clusters
 // created at 1.6.
-func (k *Kontroller) legacyLabeler() {
+func (k *Kontroller) legacyLabeler(ctx context.Context) {
 	klog.V(6).Infof("Starting Flatcar Container Linux node auto-labeler")
 
-	nodelist, err := k.nc.List(context.TODO(), metav1.ListOptions{})
+	nodelist, err := k.nc.List(ctx, metav1.ListOptions{})
 	if err != nil {
 		klog.Infof("Failed listing nodes %v", err)
 
@@ -53,7 +53,7 @@ func (k *Kontroller) legacyLabeler() {
 	for _, node := range nodesToLabel {
 		klog.Infof("Setting label 'agent=true' on %q", node.Name)
 
-		if err := k8sutil.SetNodeLabels(k.nc, node.Name, enableUpdateAgentLabel); err != nil {
+		if err := k8sutil.SetNodeLabels(ctx, k.nc, node.Name, enableUpdateAgentLabel); err != nil {
 			klog.Errorf("Failed setting label 'agent=true' on %q", node.Name)
 		}
 	}

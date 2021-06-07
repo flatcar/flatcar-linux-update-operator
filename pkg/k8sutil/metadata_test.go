@@ -68,7 +68,7 @@ func TestUpdateNodeRetryHandlesConflict(t *testing.T) {
 		mockNi.EXPECT().Update(context.TODO(), mockNode, metav1.UpdateOptions{}).Return(mockNode, nil),
 	)
 
-	err := k8sutil.UpdateNodeRetry(mockNi, "mock_node", atomicCounterIncrement(t))
+	err := k8sutil.UpdateNodeRetry(context.TODO(), mockNi, "mock_node", atomicCounterIncrement(t))
 	if err != nil {
 		t.Errorf("unexpected error: expected increment to succeed")
 	}

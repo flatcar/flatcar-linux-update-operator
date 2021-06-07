@@ -16,8 +16,8 @@ import (
 // This code mimics pod filtering behavior in
 // https://github.com/kubernetes/kubernetes/blob/v1.5.4/pkg/kubectl/cmd/drain.go#L234-L245
 // See DrainOptions.getPodsForDeletion and callees.
-func GetPodsForDeletion(kc kubernetes.Interface, node string) (pods []corev1.Pod, err error) {
-	podList, err := kc.CoreV1().Pods(corev1.NamespaceAll).List(context.TODO(), metav1.ListOptions{
+func GetPodsForDeletion(ctx context.Context, kc kubernetes.Interface, node string) (pods []corev1.Pod, err error) {
+	podList, err := kc.CoreV1().Pods(corev1.NamespaceAll).List(ctx, metav1.ListOptions{
 		FieldSelector: fields.SelectorFromSet(fields.Set{"spec.nodeName": node}).String(),
 	})
 	if err != nil {
@@ -34,7 +34,7 @@ func GetPodsForDeletion(kc kubernetes.Interface, node string) (pods []corev1.Pod
 		}
 
 		// check if pod is a daemonset owner
-		if _, err = getOwnerDaemonset(kc, pod); err == nil {
+		if _, err = getOwnerDaemonset(ctx, kc, pod); err == nil {
 			continue
 		}
 
@@ -45,7 +45,7 @@ func GetPodsForDeletion(kc kubernetes.Interface, node string) (pods []corev1.Pod
 }
 
 // getOwnerDaemonset returns an existing DaemonSet owner if it exists.
-func getOwnerDaemonset(kc kubernetes.Interface, pod corev1.Pod) (interface{}, error) {
+func getOwnerDaemonset(ctx context.Context, kc kubernetes.Interface, pod corev1.Pod) (interface{}, error) {
 	if len(pod.OwnerReferences) == 0 {
 		return nil, fmt.Errorf("pod %q has no owner objects", pod.Name)
 	}
@@ -55,7 +55,7 @@ func getOwnerDaemonset(kc kubernetes.Interface, pod corev1.Pod) (interface{}, er
 
 		// skip pod if it is owned by an existing daemonset
 		if ownerRef.Kind == "DaemonSet" {
-			ds, err := getDaemonsetController(kc, pod.Namespace, ownerRef)
+			ds, err := getDaemonsetController(ctx, kc, pod.Namespace, ownerRef)
 			if err == nil {
 				// daemonset owner exists
 				return ds, nil
@@ -73,9 +73,9 @@ func getOwnerDaemonset(kc kubernetes.Interface, pod corev1.Pod) (interface{}, er
 // Stripped down version of https://github.com/kubernetes/kubernetes/blob/1bc56825a2dff06f29663a024ee339c25e6e6280/pkg/kubectl/cmd/drain.go#L272
 //
 //nolint:lll
-func getDaemonsetController(kc kubernetes.Interface, namespace string, controllerRef metav1.OwnerReference) (interface{}, error) {
+func getDaemonsetController(ctx context.Context, kc kubernetes.Interface, namespace string, controllerRef metav1.OwnerReference) (interface{}, error) {
 	if controllerRef.Kind == "DaemonSet" {
-		return kc.AppsV1().DaemonSets(namespace).Get(context.TODO(), controllerRef.Name, metav1.GetOptions{})
+		return kc.AppsV1().DaemonSets(namespace).Get(ctx, controllerRef.Name, metav1.GetOptions{})
 	}
 
 	return nil, fmt.Errorf("unknown controller kind %q", controllerRef.Kind)
