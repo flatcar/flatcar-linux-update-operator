@@ -1036,7 +1036,7 @@ func finishedRebootingNode() *corev1.Node {
 func node(t *testing.T, nodeClient corev1client.NodeInterface, name string) *corev1.Node {
 	t.Helper()
 
-	node, err := nodeClient.Get(context.TODO(), name, metav1.GetOptions{})
+	node, err := nodeClient.Get(contextWithDeadline(t), name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Getting node %q: %v", name, err)
 	}
