@@ -71,6 +71,8 @@ linters:
     - interfacer
     # This linter has been deprecated.
     - scopelint
+    # This linter has been deprecated.
+    - golint
   enable:
     - asciicheck
     - bodyclose
@@ -97,7 +99,6 @@ linters:
     - gofumpt
     - goheader
     - goimports
-    - golint
     - gomnd
     - gomoddirectives
     - gomodguard
@@ -117,11 +118,13 @@ linters:
     - paralleltest
     - prealloc
     - predeclared
+    - promlinter
     - revive
     - rowserrcheck
     - sqlclosecheck
     - structcheck
     - stylecheck
+    - tagliatelle
     - testpackage
     - thelper
     - tparallel
