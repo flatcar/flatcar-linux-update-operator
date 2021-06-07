@@ -23,6 +23,32 @@ const (
 	testAnotherAfterRebootAnnotation  = "test-another-after-annotation"
 )
 
+func Test_Operator_exits_gracefully_when_user_requests_shutdown(t *testing.T) {
+	t.Parallel()
+
+	rebootCancelledNode := rebootCancelledNode()
+
+	k := kontrollerWithObjects(rebootCancelledNode)
+	k.reconciliationPeriod = 1 * time.Second
+
+	stop := make(chan struct{})
+
+	go func() {
+		time.Sleep(k.reconciliationPeriod)
+		close(stop)
+	}()
+
+	if err := k.Run(stop); err != nil {
+		t.Fatalf("Unexpected run error: %v", err)
+	}
+
+	n := node(t, k.nc, rebootCancelledNode.Name)
+
+	if _, ok := n.Labels[constants.LabelBeforeReboot]; ok {
+		t.Fatalf("Expected label %q to be removed from Node", constants.LabelBeforeReboot)
+	}
+}
+
 //nolint:funlen
 func Test_Operator_waits_for_leader_election_before_reconciliation(t *testing.T) {
 	t.Parallel()
