@@ -80,6 +80,20 @@ func main() {
 		klog.Fatalf("Failed to create Kubernetes client: %v", err)
 	}
 
+	namespace := os.Getenv("POD_NAMESPACE")
+	if namespace == "" {
+		klog.Fatalf("Unable to determine operator namespace: please ensure POD_NAMESPACE environment variable is set")
+	}
+
+	// TODO: a better id might be necessary.
+	// Currently, KVO uses env.POD_NAME and the upstream controller-manager uses this.
+	// Both end up having the same value in general, but Hostname is
+	// more likely to have a value.
+	hostname, err := os.Hostname()
+	if err != nil {
+		klog.Fatalf("Getting hostname: %v", err)
+	}
+
 	// Construct update-operator.
 	o, err := operator.New(operator.Config{
 		Client:                  client,
@@ -88,6 +102,8 @@ func main() {
 		AfterRebootAnnotations:  f.afterRebootAnnotations,
 		RebootWindowStart:       *f.rebootWindowStart,
 		RebootWindowLength:      *f.rebootWindowLength,
+		Namespace:               namespace,
+		LockID:                  hostname,
 	})
 	if err != nil {
 		klog.Fatalf("Failed to initialize %s: %v", os.Args[0], err)
