@@ -131,20 +131,7 @@ func DeleteNodeAnnotations(ctx context.Context, nc v1core.NodeInterface, node st
 
 // Unschedulable marks node as schedulable or unschedulable according to sched.
 func Unschedulable(ctx context.Context, nc v1core.NodeInterface, node string, sched bool) error {
-	n, err := nc.Get(ctx, node, v1meta.GetOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to get node %q: %w", node, err)
-	}
-
-	n.Spec.Unschedulable = sched
-
-	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
-		n, err = nc.Update(ctx, n, v1meta.UpdateOptions{})
-
-		return
-	}); err != nil {
-		return fmt.Errorf("unable to set 'Unschedulable' property of node %q to %t: %w", node, sched, err)
-	}
-
-	return nil
+	return UpdateNodeRetry(ctx, nc, node, func(n *v1api.Node) {
+		n.Spec.Unschedulable = sched
+	})
 }
