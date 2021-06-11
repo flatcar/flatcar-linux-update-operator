@@ -4,7 +4,6 @@ package operator
 import (
 	"context"
 	"fmt"
-	"os"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -124,6 +123,8 @@ type Config struct {
 	// Reboot window.
 	RebootWindowStart  string
 	RebootWindowLength string
+	Namespace          string
+	LockID             string
 }
 
 // New initializes a new Kontroller.
@@ -133,19 +134,12 @@ func New(config Config) (*Kontroller, error) {
 		return nil, fmt.Errorf("kubernetes client must not be nil")
 	}
 
-	namespace := os.Getenv("POD_NAMESPACE")
-	if namespace == "" {
-		return nil, fmt.Errorf("unable to determine operator namespace: please ensure POD_NAMESPACE " +
-			"environment variable is set")
+	if config.Namespace == "" {
+		return nil, fmt.Errorf("namespace must not be empty")
 	}
 
-	// TODO: a better id might be necessary.
-	// Currently, KVO uses env.POD_NAME and the upstream controller-manager uses this.
-	// Both end up having the same value in general, but Hostname is
-	// more likely to have a value.
-	hostname, err := os.Hostname()
-	if err != nil {
-		return nil, fmt.Errorf("getting hostname: %w", err)
+	if config.LockID == "" {
+		return nil, fmt.Errorf("lockID must not be empty")
 	}
 
 	var rebootWindow *timeutil.Periodic
@@ -180,13 +174,13 @@ func New(config Config) (*Kontroller, error) {
 		beforeRebootAnnotations:     config.BeforeRebootAnnotations,
 		afterRebootAnnotations:      config.AfterRebootAnnotations,
 		leaderElectionEventRecorder: leaderElectionEventRecorder,
-		namespace:                   namespace,
+		namespace:                   config.Namespace,
 		autoLabelContainerLinux:     config.AutoLabelContainerLinux,
 		rebootWindow:                rebootWindow,
 		maxRebootingNodes:           maxRebootingNodes,
 		reconciliationPeriod:        defaultReconciliationPeriod,
 		leaderElectionLease:         defaultLeaderElectionLease,
-		lockID:                      hostname,
+		lockID:                      config.LockID,
 	}, nil
 }
 
