@@ -32,6 +32,12 @@ import (
 	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/updateengine"
 )
 
+// Config represents configurable options for agent.
+type Config struct {
+	NodeName               string
+	PodDeletionGracePeriod time.Duration
+}
+
 // Klocksmith implements agent part of FLUO.
 type Klocksmith struct {
 	node        string
@@ -57,7 +63,7 @@ var shouldRebootSelector = fields.Set(map[string]string{
 }).AsSelector()
 
 // New returns initialized Klocksmith.
-func New(node string, reapTimeout time.Duration) (*Klocksmith, error) {
+func New(config *Config) (*Klocksmith, error) {
 	// Set up kubernetes in-cluster client.
 	kc, err := k8sutil.GetClient("")
 	if err != nil {
@@ -80,12 +86,12 @@ func New(node string, reapTimeout time.Duration) (*Klocksmith, error) {
 	}
 
 	return &Klocksmith{
-		node:        node,
+		node:        config.NodeName,
 		kc:          kc,
 		nc:          nc,
 		ue:          updateEngineClient,
 		lc:          lc,
-		reapTimeout: reapTimeout,
+		reapTimeout: config.PodDeletionGracePeriod,
 	}, nil
 }
 

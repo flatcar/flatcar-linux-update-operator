@@ -43,9 +43,12 @@ func main() {
 		klog.Fatal("-node is required")
 	}
 
-	rt := time.Duration(*reapTimeout) * time.Second
+	config := &agent.Config{
+		NodeName:               *node,
+		PodDeletionGracePeriod: time.Duration(*reapTimeout) * time.Second,
+	}
 
-	a, err := agent.New(*node, rt)
+	agent, err := agent.New(config)
 	if err != nil {
 		klog.Fatalf("Failed to initialize %s: %v", os.Args[0], err)
 	}
@@ -55,5 +58,5 @@ func main() {
 	// Run agent until the stop channel is closed
 	stop := make(chan struct{})
 	defer close(stop)
-	a.Run(stop)
+	agent.Run(stop)
 }
