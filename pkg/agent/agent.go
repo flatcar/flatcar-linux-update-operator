@@ -71,9 +71,6 @@ func New(config *Config) (*Klocksmith, error) {
 		return nil, fmt.Errorf("creating Kubernetes client: %w", err)
 	}
 
-	// Node interface.
-	nc := kc.CoreV1().Nodes()
-
 	// Set up update_engine client.
 	updateEngineClient, err := updateengine.New(dbus.SystemPrivateConnector)
 	if err != nil {
@@ -90,7 +87,7 @@ func New(config *Config) (*Klocksmith, error) {
 		node:        config.NodeName,
 		pg:          kc.CoreV1(),
 		dsg:         kc.AppsV1(),
-		nc:          nc,
+		nc:          kc.CoreV1().Nodes(),
 		ue:          updateEngineClient,
 		lc:          lc,
 		reapTimeout: config.PodDeletionGracePeriod,
