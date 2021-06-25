@@ -21,7 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/kubernetes"
+	appsv1client "k8s.io/client-go/kubernetes/typed/apps/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/klog/v2"
@@ -41,8 +41,9 @@ type Config struct {
 // Klocksmith implements agent part of FLUO.
 type Klocksmith struct {
 	node        string
-	kc          kubernetes.Interface
+	pg          corev1client.PodsGetter
 	nc          corev1client.NodeInterface
+	dsg         appsv1client.DaemonSetsGetter
 	ue          updateengine.Client
 	lc          *login1.Conn
 	reapTimeout time.Duration
@@ -87,7 +88,8 @@ func New(config *Config) (*Klocksmith, error) {
 
 	return &Klocksmith{
 		node:        config.NodeName,
-		kc:          kc,
+		pg:          kc.CoreV1(),
+		dsg:         kc.AppsV1(),
 		nc:          nc,
 		ue:          updateEngineClient,
 		lc:          lc,
@@ -246,7 +248,7 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 	for _, pod := range pods {
 		klog.Infof("Terminating pod %q...", pod.Name)
 
-		if err := k.kc.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{}); err != nil {
+		if err := k.pg.Pods(pod.Namespace).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{}); err != nil {
 			// Continue anyways, the reboot should terminate it.
 			klog.Errorf("failed terminating pod %q: %v", pod.Name, err)
 		}
@@ -457,7 +459,7 @@ func (k *Klocksmith) waitForNotOkToReboot() error {
 }
 
 func (k *Klocksmith) getPodsForDeletion() ([]corev1.Pod, error) {
-	pods, err := k8sutil.GetPodsForDeletion(context.TODO(), k.kc, k.node)
+	pods, err := k8sutil.GetPodsForDeletion(context.TODO(), k.pg, k.dsg, k.node)
 	if err != nil {
 		return nil, fmt.Errorf("getting list of pods for deletion: %w", err)
 	}
@@ -476,7 +478,7 @@ func (k *Klocksmith) getPodsForDeletion() ([]corev1.Pod, error) {
 // waitForPodDeletion waits for a pod to be deleted.
 func (k *Klocksmith) waitForPodDeletion(pod corev1.Pod) error {
 	return wait.PollImmediate(defaultPollInterval, k.reapTimeout, func() (bool, error) {
-		p, err := k.kc.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
+		p, err := k.pg.Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		if errors.IsNotFound(err) || (p != nil && p.ObjectMeta.UID != pod.ObjectMeta.UID) {
 			klog.Infof("Deleted pod %q", pod.Name)
 
