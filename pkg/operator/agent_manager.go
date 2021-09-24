@@ -7,8 +7,8 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/klog/v2"
 
-	"github.com/kinvolk/flatcar-linux-update-operator/pkg/constants"
-	"github.com/kinvolk/flatcar-linux-update-operator/pkg/k8sutil"
+	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/constants"
+	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/k8sutil"
 )
 
 var (

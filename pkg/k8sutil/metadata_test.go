@@ -12,8 +12,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/kinvolk/flatcar-linux-update-operator/pkg/k8sutil"
-	mock_v1 "github.com/kinvolk/flatcar-linux-update-operator/pkg/k8sutil/mocks"
+	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/k8sutil"
+	mock_v1 "github.com/flatcar-linux/flatcar-linux-update-operator/pkg/k8sutil/mocks"
 )
 
 func atomicCounterIncrement(t *testing.T) func(n *corev1.Node) {

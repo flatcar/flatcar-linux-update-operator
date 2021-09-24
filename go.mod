@@ -1,4 +1,4 @@
-module github.com/kinvolk/flatcar-linux-update-operator
+module github.com/flatcar-linux/flatcar-linux-update-operator
 
 go 1.16
 

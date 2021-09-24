@@ -9,8 +9,8 @@ import (
 	"github.com/coreos/pkg/flagutil"
 	"k8s.io/klog/v2"
 
-	"github.com/kinvolk/flatcar-linux-update-operator/pkg/agent"
-	"github.com/kinvolk/flatcar-linux-update-operator/pkg/version"
+	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/agent"
+	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/version"
 )
 
 var (

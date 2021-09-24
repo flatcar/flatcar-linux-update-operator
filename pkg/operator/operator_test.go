@@ -5,7 +5,7 @@ import (
 
 	"k8s.io/client-go/kubernetes/fake"
 
-	"github.com/kinvolk/flatcar-linux-update-operator/pkg/operator"
+	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/operator"
 )
 
 //nolint:funlen
