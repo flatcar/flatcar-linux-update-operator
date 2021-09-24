@@ -65,3 +65,23 @@ jobs:
 
       - name: Test building Docker image
         run: make image
+
+  changelog:
+    name: Changelog
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v2
+
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: '1.16'
+
+      - name: Install required binaries
+        run: GOBIN=/usr/local/bin make install-changelog
+
+      - name: Check changelog format
+        run: make test-changelog
