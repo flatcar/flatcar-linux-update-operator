@@ -107,6 +107,20 @@ test-integration: ## Runs integration tests using D-Bus running in Docker contai
 	FLUO_TEST_DBUS_SOCKET=$$(realpath ./test/test_bus_socket) go test -mod=vendor -count 1 ./...
 	make test-down
 
+.PHONY: install-changelog
+install-changelog:
+	go install github.com/rcmachado/changelog@0.7.0
+
+.PHONY: format-changelog
+format-changelog: ## Formats changelog using github.com/rcmachado/changelog.
+	changelog fmt -o CHANGELOG.md.fmt
+	mv CHANGELOG.md.fmt CHANGELOG.md
+
+.PHONY: test-changelog
+test-changelog: check-working-tree-clean ## Verifies that changelog is properly formatted.
+	make format-changelog
+	@test -z "$$(git status --porcelain)" || (echo "Please run 'make format-changelog' and commit generated changes."; git diff; exit 1)
+
 .PHONY: help
 help: ## Prints help message.
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
