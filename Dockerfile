@@ -12,6 +12,8 @@ FROM alpine:3.14
 
 MAINTAINER Kinvolk
 
+LABEL org.opencontainers.image.source https://github.com/flatcar-linux/flatcar-linux-update-operator
+
 RUN apk add -U ca-certificates
 
 WORKDIR /bin
