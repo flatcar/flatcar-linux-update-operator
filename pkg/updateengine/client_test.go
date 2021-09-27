@@ -7,7 +7,7 @@ import (
 
 	dbus "github.com/godbus/dbus/v5"
 
-	"github.com/kinvolk/flatcar-linux-update-operator/pkg/updateengine"
+	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/updateengine"
 )
 
 //nolint:paralleltest // Test uses environment variables, which are global.
