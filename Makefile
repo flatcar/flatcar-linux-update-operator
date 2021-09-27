@@ -8,7 +8,7 @@ REPO=github.com/flatcar-linux/flatcar-linux-update-operator
 LD_FLAGS="-w -X $(REPO)/pkg/version.Version=$(RELEASE_VERSION) -X $(REPO)/pkg/version.Commit=$(COMMIT)"
 
 DOCKER_CMD ?= docker
-IMAGE_REPO?=quay.io/kinvolk/flatcar-linux-update-operator
+IMAGE_REPO?=ghcr.io/flatcar-linux/flatcar-linux-update-operator
 
 GOLANGCI_LINT_CONFIG_FILE ?= .golangci.yml
 
