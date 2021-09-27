@@ -16,10 +16,10 @@ spec:
       labels:
         app: flatcar-linux-update-agent
     spec:
-      serviceAccountName: flatcar-linux-update-agent
+      serviceAccountName: flatcar-linux-update-operator-sa
       containers:
       - name: update-agent
-        image: quay.io/kinvolk/flatcar-linux-update-operator:v0.7.3
+        image: ghcr.io/flatcar-linux/flatcar-linux-update-operator:v0.8.0-rc1
         command:
         - "/bin/update-agent"
         volumeMounts:
