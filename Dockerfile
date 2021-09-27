@@ -1,7 +1,5 @@
 FROM golang:1.16-alpine3.14 as builder
 
-MAINTAINER Kinvolk
-
 RUN apk add -U make git
 
 WORKDIR /usr/src/github.com/flatcar-linux/flatcar-linux-update-operator
