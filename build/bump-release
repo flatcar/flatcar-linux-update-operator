@@ -20,7 +20,7 @@ if ! [[ "$0" =~ "build/bump-release" ]]; then
 	exit 255
 fi
 
-if ! [[ "$1" =~ ^v[[:digit:]]+.[[:digit:]]+.[[:digit:]]$ ]]; then
+if ! [[ "$1" =~ ^v[[:digit:]]+.[[:digit:]]+.[[:digit:]] ]]; then
 	echo "Usage: build/bump-release <VERSION>"
 	echo "   where VERSION must be vX.Y.Z"
 	exit 255
