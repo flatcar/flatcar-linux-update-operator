@@ -19,7 +19,7 @@ spec:
       serviceAccountName: flatcar-linux-update-operator-sa
       containers:
       - name: update-agent
-        image: quay.io/kinvolk/flatcar-linux-update-operator:v${VERSION}
+        image: ghcr.io/flatcar-linux/flatcar-linux-update-operator:v${VERSION}
         command:
         - "/bin/update-agent"
         volumeMounts:

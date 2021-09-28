@@ -1,6 +1,4 @@
-FROM golang:1.16-alpine3.13 as builder
-
-MAINTAINER Kinvolk
+FROM golang:1.16-alpine3.14 as builder
 
 RUN apk add -U make git
 
@@ -10,9 +8,11 @@ COPY . .
 
 RUN make bin/update-agent bin/update-operator
 
-FROM alpine:3.13
+FROM alpine:3.14
 
 MAINTAINER Kinvolk
+
+LABEL org.opencontainers.image.source https://github.com/flatcar-linux/flatcar-linux-update-operator
 
 RUN apk add -U ca-certificates
 

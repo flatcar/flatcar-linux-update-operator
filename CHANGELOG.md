@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added unit tests for `pkg/operator`.
 
 ### Changed
+- Updated used Go version to 1.16 and Alpine version for container images to 3.14.
+- Container images will be now published to `ghcr.io/flatcar-linux/flatcar-linux-update-operator` instead of
+`quay.io/kinvolk/flatcar-linux-update-operator`.
 - `update-agent` now use a dedicated Service Account with lower privileges than the operator.
 - `update-agent` now use a dedicated Pod Security Policy.
 - `update-operator` now use more strict Pod Security Policy, as it no longer needs permissions
