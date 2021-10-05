@@ -9,6 +9,7 @@ require (
 	github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f
 	github.com/godbus/dbus v4.1.0+incompatible // indirect
 	github.com/godbus/dbus/v5 v5.0.4
+	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/mock v1.5.0
 	k8s.io/api v0.20.5
 	k8s.io/apimachinery v0.20.5
