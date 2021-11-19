@@ -7,20 +7,52 @@ import (
 	"time"
 )
 
-func Test_slitNewlineEnv_retain_map_values_when_given_empty_input(t *testing.T) {
+func Test_slitNewlineEnv(t *testing.T) {
 	t.Parallel()
 
-	expected := map[string]string{"foo": "bar"}
+	t.Run("retain_map_values_when_given_empty_input", func(t *testing.T) {
+		t.Parallel()
 
-	input := map[string]string{}
+		expected := map[string]string{"foo": "bar"}
 
-	splitNewlineEnv(input, "foo=bar")
+		input := map[string]string{}
 
-	splitNewlineEnv(input, "")
+		splitNewlineEnv(input, "foo=bar")
 
-	if !reflect.DeepEqual(expected, input) {
-		t.Fatalf("Should retain original map when given empty content")
-	}
+		splitNewlineEnv(input, "")
+
+		if !reflect.DeepEqual(expected, input) {
+			t.Fatalf("Should retain original map when given empty content")
+		}
+	})
+
+	t.Run("skips_lines_without_equal_sign", func(t *testing.T) {
+		t.Parallel()
+
+		expected := map[string]string{}
+
+		input := map[string]string{}
+
+		splitNewlineEnv(input, "foo")
+
+		if !reflect.DeepEqual(expected, input) {
+			t.Fatalf("Expected %q, got %q", expected, input)
+		}
+	})
+
+	t.Run("skips_empty_lines", func(t *testing.T) {
+		t.Parallel()
+
+		expected := map[string]string{}
+
+		input := map[string]string{}
+
+		splitNewlineEnv(input, "")
+
+		if !reflect.DeepEqual(expected, input) {
+			t.Fatalf("Expected %q, got %q", expected, input)
+		}
+	})
 }
 
 func Test_sleepOrDone_returns_when_given(t *testing.T) {
