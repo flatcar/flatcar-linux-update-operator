@@ -10,17 +10,6 @@ import (
 	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/updateengine"
 )
 
-//nolint:paralleltest // Test uses environment variables, which are global.
-func Test_Connecting_to_non_existing_system_bus_fails(t *testing.T) {
-	if err := os.Setenv("DBUS_SYSTEM_BUS_ADDRESS", "foo"); err != nil {
-		t.Fatalf("Setting systemd bus address: %v", err)
-	}
-
-	if _, err := updateengine.New(); err == nil {
-		t.Fatalf("Creating client should fail when unable to connect to system bus")
-	}
-}
-
 //nolint:funlen,tparallel // Test uses environment variables, which are global.
 func Test_Emitted_status_parses(t *testing.T) {
 	var (
@@ -86,6 +75,17 @@ func Test_Emitted_status_parses(t *testing.T) {
 			t.Errorf("Expected %v, got %v", newSize, status.NewSize)
 		}
 	})
+}
+
+//nolint:paralleltest // Test uses environment variables, which are global.
+func Test_Connecting_to_non_existing_system_bus_fails(t *testing.T) {
+	if err := os.Setenv("DBUS_SYSTEM_BUS_ADDRESS", "foo"); err != nil {
+		t.Fatalf("Setting systemd bus address: %v", err)
+	}
+
+	if _, err := updateengine.New(); err == nil {
+		t.Fatalf("Creating client should fail when unable to connect to system bus")
+	}
 }
 
 const (
