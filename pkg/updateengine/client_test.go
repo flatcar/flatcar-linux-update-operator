@@ -79,9 +79,7 @@ func Test_Emitted_status_parses(t *testing.T) {
 
 //nolint:paralleltest // Test uses environment variables, which are global.
 func Test_Connecting_to_non_existing_system_bus_fails(t *testing.T) {
-	if err := os.Setenv("DBUS_SYSTEM_BUS_ADDRESS", "foo"); err != nil {
-		t.Fatalf("Setting systemd bus address: %v", err)
-	}
+	t.Setenv("DBUS_SYSTEM_BUS_ADDRESS", "foo")
 
 	if _, err := updateengine.New(); err == nil {
 		t.Fatalf("Creating client should fail when unable to connect to system bus")
@@ -100,9 +98,7 @@ func testSystemConnection(t *testing.T) *dbus.Conn {
 		t.Skipf("%q environment variable empty", testDbusSocketEnv)
 	}
 
-	if err := os.Setenv("DBUS_SYSTEM_BUS_ADDRESS", fmt.Sprintf("unix:path=%s", socket)); err != nil {
-		t.Fatalf("Setting systemd bus address: %v", err)
-	}
+	t.Setenv("DBUS_SYSTEM_BUS_ADDRESS", fmt.Sprintf("unix:path=%s", socket))
 
 	conn, err := dbus.SystemBus()
 	if err != nil {
