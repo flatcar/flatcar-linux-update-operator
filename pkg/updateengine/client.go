@@ -98,7 +98,7 @@ func (c *Client) Close() error {
 // on the rcvr channel, until the stop channel is closed. An attempt is made to
 // get the initial status and send it on the rcvr channel before receiving
 // starts.
-func (c *Client) ReceiveStatuses(rcvr chan Status, stop <-chan struct{}) {
+func (c *Client) ReceiveStatuses(rcvr chan<- Status, stop <-chan struct{}) {
 	// If there is an error getting the current status, ignore it and just
 	// move onto the main loop.
 	st, _ := c.getStatus()
