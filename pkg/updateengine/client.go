@@ -44,25 +44,23 @@ type Client struct {
 func New() (*Client, error) {
 	c := new(Client)
 
-	var err error
-
-	c.conn, err = dbus.SystemBusPrivate()
+	conn, err := dbus.SystemBusPrivate()
 	if err != nil {
 		return nil, fmt.Errorf("opening private connection to system bus: %w", err)
 	}
 
 	methods := []dbus.Auth{dbus.AuthExternal(strconv.Itoa(os.Getuid()))}
 
-	if err := c.conn.Auth(methods); err != nil {
+	if err := conn.Auth(methods); err != nil {
 		// Best effort closing the connection.
-		_ = c.conn.Close()
+		_ = conn.Close()
 
 		return nil, fmt.Errorf("authenticating to system bus: %w", err)
 	}
 
-	if err := c.conn.Hello(); err != nil {
+	if err := conn.Hello(); err != nil {
 		// Best effort closing the connection.
-		_ = c.conn.Close()
+		_ = conn.Close()
 
 		return nil, fmt.Errorf("sending hello to system bus: %w", err)
 	}
@@ -70,13 +68,14 @@ func New() (*Client, error) {
 	// Setup the filter for the StatusUpdate signals.
 	match := fmt.Sprintf("type='signal',interface='%s',member='%s'", dbusInterface, dbusMember)
 
-	if call := c.conn.BusObject().Call("org.freedesktop.DBus.AddMatch", 0, match); call.Err != nil {
+	if call := conn.BusObject().Call("org.freedesktop.DBus.AddMatch", 0, match); call.Err != nil {
 		return nil, call.Err
 	}
 
 	c.ch = make(chan *dbus.Signal, signalBuffer)
-	c.conn.Signal(c.ch)
+	conn.Signal(c.ch)
 
+	c.conn = conn
 	c.object = c.conn.Object("com.coreos.update1", dbus.ObjectPath(dbusPath))
 
 	return c, nil
