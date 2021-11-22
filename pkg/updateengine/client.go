@@ -42,8 +42,6 @@ type Client struct {
 
 // New creates new instance of Client and initializes it.
 func New() (*Client, error) {
-	c := new(Client)
-
 	conn, err := dbus.SystemBusPrivate()
 	if err != nil {
 		return nil, fmt.Errorf("opening private connection to system bus: %w", err)
@@ -75,11 +73,11 @@ func New() (*Client, error) {
 	ch := make(chan *dbus.Signal, signalBuffer)
 	conn.Signal(ch)
 
-	c.ch = ch
-	c.conn = conn
-	c.object = c.conn.Object("com.coreos.update1", dbus.ObjectPath(dbusPath))
-
-	return c, nil
+	return &Client{
+		ch:     ch,
+		conn:   conn,
+		object: conn.Object("com.coreos.update1", dbus.ObjectPath(dbusPath)),
+	}, nil
 }
 
 // Close closes internal D-Bus connection.
