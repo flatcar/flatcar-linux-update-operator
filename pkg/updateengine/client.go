@@ -53,16 +53,14 @@ func New() (*Client, error) {
 
 	methods := []dbus.Auth{dbus.AuthExternal(strconv.Itoa(os.Getuid()))}
 
-	err = c.conn.Auth(methods)
-	if err != nil {
+	if err := c.conn.Auth(methods); err != nil {
 		// Best effort closing the connection.
 		_ = c.conn.Close()
 
 		return nil, fmt.Errorf("authenticating to system bus: %w", err)
 	}
 
-	err = c.conn.Hello()
-	if err != nil {
+	if err := c.conn.Hello(); err != nil {
 		// Best effort closing the connection.
 		_ = c.conn.Close()
 
@@ -74,8 +72,7 @@ func New() (*Client, error) {
 	// Setup the filter for the StatusUpdate signals.
 	match := fmt.Sprintf("type='signal',interface='%s',member='%s'", dbusInterface, dbusMember)
 
-	call := c.conn.BusObject().Call("org.freedesktop.DBus.AddMatch", 0, match)
-	if call.Err != nil {
+	if call := c.conn.BusObject().Call("org.freedesktop.DBus.AddMatch", 0, match); call.Err != nil {
 		return nil, call.Err
 	}
 
