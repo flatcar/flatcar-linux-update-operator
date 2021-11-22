@@ -67,7 +67,7 @@ func New() (*Client, error) {
 	match := fmt.Sprintf("type='signal',interface='%s',member='%s'", dbusInterface, dbusMember)
 
 	if call := conn.BusObject().Call("org.freedesktop.DBus.AddMatch", 0, match); call.Err != nil {
-		return nil, call.Err
+		return nil, fmt.Errorf("adding filter: %w", call.Err)
 	}
 
 	ch := make(chan *dbus.Signal, signalBuffer)
