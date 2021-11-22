@@ -24,7 +24,7 @@ func Test_Emitted_status_parses(t *testing.T) {
 		return lastCheckedTime, progress, currentOperation, newVersion, newSize, nil
 	})
 
-	c, err := updateengine.New()
+	client, err := updateengine.New()
 	if err != nil {
 		t.Fatalf("Creating client should succeed, got: %v", err)
 	}
@@ -32,7 +32,7 @@ func Test_Emitted_status_parses(t *testing.T) {
 	stop := make(chan struct{})
 	ch := make(chan updateengine.Status, 1)
 
-	go c.ReceiveStatuses(ch, stop)
+	go client.ReceiveStatuses(ch, stop)
 
 	status := <-ch
 
@@ -108,7 +108,7 @@ func testSystemConnection(t *testing.T) *dbus.Conn {
 	return conn
 }
 
-func withMockGetStatus(t *testing.T, fn interface{}) {
+func withMockGetStatus(t *testing.T, getStatusF interface{}) {
 	t.Helper()
 
 	conn := testSystemConnection(t)
@@ -118,7 +118,7 @@ func withMockGetStatus(t *testing.T, fn interface{}) {
 	}
 
 	tbl := map[string]interface{}{
-		"GetStatus": fn,
+		"GetStatus": getStatusF,
 	}
 
 	if err := conn.ExportMethodTable(tbl, "/com/coreos/update1", "com.coreos.update1.Manager"); err != nil {
