@@ -67,8 +67,6 @@ func New() (*Client, error) {
 		return nil, fmt.Errorf("sending hello to system bus: %w", err)
 	}
 
-	c.object = c.conn.Object("com.coreos.update1", dbus.ObjectPath(dbusPath))
-
 	// Setup the filter for the StatusUpdate signals.
 	match := fmt.Sprintf("type='signal',interface='%s',member='%s'", dbusInterface, dbusMember)
 
@@ -78,6 +76,8 @@ func New() (*Client, error) {
 
 	c.ch = make(chan *dbus.Signal, signalBuffer)
 	c.conn.Signal(c.ch)
+
+	c.object = c.conn.Object("com.coreos.update1", dbus.ObjectPath(dbusPath))
 
 	return c, nil
 }
