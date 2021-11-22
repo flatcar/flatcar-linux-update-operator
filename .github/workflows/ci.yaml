@@ -27,7 +27,7 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
-    container: golangci/golangci-lint:v1.40.1
+    container: golangci/golangci-lint:v1.43.0
     timeout-minutes: 10
     steps:
 

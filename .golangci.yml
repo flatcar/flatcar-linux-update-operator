@@ -75,7 +75,9 @@ linters:
     - golint
   enable:
     - asciicheck
+    - bidichk
     - bodyclose
+    - contextcheck
     - cyclop
     - deadcode
     - depguard
@@ -83,6 +85,7 @@ linters:
     - dupl
     - durationcheck
     - errcheck
+    - errname
     - errorlint
     - exhaustive
     - exportloopref
@@ -106,12 +109,14 @@ linters:
     - ifshort
     - importas
     - ineffassign
+    - ireturn
     - lll
     - makezero
     - misspell
     - nakedret
     - nestif
     - nilerr
+    - nilnil
     - nlreturn
     - noctx
     - nolintlint
@@ -125,6 +130,7 @@ linters:
     - structcheck
     - stylecheck
     - tagliatelle
+    - tenv
     - testpackage
     - thelper
     - tparallel
@@ -132,6 +138,7 @@ linters:
     - unconvert
     - unparam
     - varcheck
+    - varnamelen
     - wastedassign
     - whitespace
     - wrapcheck
