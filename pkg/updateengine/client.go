@@ -72,9 +72,10 @@ func New() (*Client, error) {
 		return nil, call.Err
 	}
 
-	c.ch = make(chan *dbus.Signal, signalBuffer)
-	conn.Signal(c.ch)
+	ch := make(chan *dbus.Signal, signalBuffer)
+	conn.Signal(ch)
 
+	c.ch = ch
 	c.conn = conn
 	c.object = c.conn.Object("com.coreos.update1", dbus.ObjectPath(dbusPath))
 
