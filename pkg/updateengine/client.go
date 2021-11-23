@@ -23,10 +23,11 @@ import (
 )
 
 const (
-	dbusPath      = "/com/coreos/update1"
-	dbusInterface = "com.coreos.update1.Manager"
-	dbusMember    = "StatusUpdate"
-	signalBuffer  = 32 // TODO(bp): What is a reasonable value here?
+	dbusPath        = "/com/coreos/update1"
+	dbusDestination = "com.coreos.update1"
+	dbusInterface   = dbusDestination + ".Manager"
+	dbusMember      = "StatusUpdate"
+	signalBuffer    = 32 // TODO(bp): What is a reasonable value here?
 )
 
 // Client allows reading update-engine status using D-Bus.
@@ -76,7 +77,7 @@ func New() (*Client, error) {
 	return &Client{
 		ch:     ch,
 		conn:   conn,
-		object: conn.Object("com.coreos.update1", dbus.ObjectPath(dbusPath)),
+		object: conn.Object(dbusDestination, dbus.ObjectPath(dbusPath)),
 	}, nil
 }
 
