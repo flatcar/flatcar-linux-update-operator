@@ -71,11 +71,13 @@ func New() (*Client, error) {
 		return nil, fmt.Errorf("sending hello to system bus: %w", err)
 	}
 
-	// Setup the filter for the StatusUpdate signals.
-	match := fmt.Sprintf("type='signal',interface='%s',member='%s'", DBusInterface, DBusSignalNameStatusUpdate)
+	matchOptions := []dbus.MatchOption{
+		dbus.WithMatchInterface(DBusInterface),
+		dbus.WithMatchMember(DBusSignalNameStatusUpdate),
+	}
 
-	if call := conn.BusObject().Call("org.freedesktop.DBus.AddMatch", 0, match); call.Err != nil {
-		return nil, fmt.Errorf("adding filter: %w", call.Err)
+	if err := conn.AddMatchSignal(matchOptions...); err != nil {
+		return nil, fmt.Errorf("adding filter: %w", err)
 	}
 
 	ch := make(chan *dbus.Signal, signalBuffer)
