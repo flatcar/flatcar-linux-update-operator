@@ -23,11 +23,11 @@ import (
 )
 
 const (
-	dbusPath        = "/com/coreos/update1"
-	dbusDestination = "com.coreos.update1"
-	dbusInterface   = dbusDestination + ".Manager"
-	dbusMember      = "StatusUpdate"
-	signalBuffer    = 32 // TODO(bp): What is a reasonable value here?
+	dbusPath                   = "/com/coreos/update1"
+	dbusDestination            = "com.coreos.update1"
+	dbusInterface              = dbusDestination + ".Manager"
+	dbusSignalNameStatusUpdate = "StatusUpdate"
+	signalBuffer               = 32 // TODO(bp): What is a reasonable value here?
 )
 
 // Client allows reading update-engine status using D-Bus.
@@ -65,7 +65,7 @@ func New() (*Client, error) {
 	}
 
 	// Setup the filter for the StatusUpdate signals.
-	match := fmt.Sprintf("type='signal',interface='%s',member='%s'", dbusInterface, dbusMember)
+	match := fmt.Sprintf("type='signal',interface='%s',member='%s'", dbusInterface, dbusSignalNameStatusUpdate)
 
 	if call := conn.BusObject().Call("org.freedesktop.DBus.AddMatch", 0, match); call.Err != nil {
 		return nil, fmt.Errorf("adding filter: %w", call.Err)
