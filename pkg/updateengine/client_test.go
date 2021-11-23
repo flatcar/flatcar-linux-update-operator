@@ -13,10 +13,11 @@ import (
 	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/updateengine"
 )
 
-//nolint:paralleltest // Test uses environment variables and D-Bus which are global.
+//nolint:paralleltest,funlen,cyclop // Test uses environment variables and D-Bus which are global.
+//                                     Just many subtests.
 func Test_Receiving_status(t *testing.T) {
 	t.Run("emits_first_status_immediately_after_start", func(t *testing.T) {
-		ch := testGetStatusReceiver(t, updateengine.Status{})
+		ch, _ := testGetStatusReceiver(t, updateengine.Status{})
 
 		timeout := time.NewTimer(time.Second)
 		select {
@@ -29,7 +30,7 @@ func Test_Receiving_status(t *testing.T) {
 	t.Run("parses_received_values_in_order_defined_by_update_engine", func(t *testing.T) {
 		expectedStatus := testStatus()
 
-		ch := testGetStatusReceiver(t, expectedStatus)
+		ch, _ := testGetStatusReceiver(t, expectedStatus)
 
 		timeout := time.NewTimer(time.Second)
 		select {
@@ -39,6 +40,40 @@ func Test_Receiving_status(t *testing.T) {
 			}
 		case <-timeout.C:
 			t.Fatal("Failed getting status within expected timeframe")
+		}
+	})
+
+	t.Run("forwards_status_updates_received_from_update_engine_to_given_receiver_channel", func(t *testing.T) {
+		firstExpectedStatus := updateengine.Status{}
+
+		statusCh, conn := testGetStatusReceiver(t, firstExpectedStatus)
+
+		secondExpectedStatus := testStatus()
+
+		lastCheckedTime, progress, currentOperation, newVersion, newSize, _ := statusToRawValues(secondExpectedStatus, nil)
+
+		withMockStatusUpdate(t, conn, lastCheckedTime, progress, currentOperation, newVersion, newSize)
+
+		timeout := time.NewTimer(time.Second)
+
+		select {
+		case status := <-statusCh:
+			if diff := cmp.Diff(firstExpectedStatus, status); diff != "" {
+				t.Fatalf("Unexpectected first status values received (-expected/+got):\n%s", diff)
+			}
+		case <-timeout.C:
+			t.Fatal("Failed getting first status within expected timeframe")
+		}
+
+		timeout.Reset(time.Second)
+
+		select {
+		case status := <-statusCh:
+			if diff := cmp.Diff(secondExpectedStatus, status); diff != "" {
+				t.Fatalf("Unexpectected second status values received:\n%s", diff)
+			}
+		case <-timeout.C:
+			t.Fatal("Failed getting second status within expected timeframe")
 		}
 	})
 }
@@ -54,14 +89,14 @@ func Test_Creating_client_fails_when(t *testing.T) {
 	})
 }
 
-func testGetStatusReceiver(t *testing.T, status updateengine.Status) chan updateengine.Status {
+func testGetStatusReceiver(t *testing.T, status updateengine.Status) (chan updateengine.Status, *dbus.Conn) {
 	t.Helper()
 
 	getStatusTestResponse := func(message dbus.Message) (int64, float64, string, string, int64, *dbus.Error) {
 		return statusToRawValues(status, nil)
 	}
 
-	withMockGetStatus(t, getStatusTestResponse)
+	conn := withMockGetStatus(t, getStatusTestResponse)
 
 	client, err := updateengine.New()
 	if err != nil {
@@ -83,7 +118,7 @@ func testGetStatusReceiver(t *testing.T, status updateengine.Status) chan update
 
 	go client.ReceiveStatuses(ch, stop)
 
-	return ch
+	return ch, conn
 }
 
 const (
@@ -122,7 +157,7 @@ func testSystemConnection(t *testing.T) *dbus.Conn {
 	return conn
 }
 
-func withMockGetStatus(t *testing.T, getStatusF interface{}) {
+func withMockGetStatus(t *testing.T, getStatusF interface{}) *dbus.Conn {
 	t.Helper()
 
 	conn := testSystemConnection(t)
@@ -161,4 +196,37 @@ func withMockGetStatus(t *testing.T, getStatusF interface{}) {
 			t.Fatalf("Failed resetting method table: %v", err)
 		}
 	})
+
+	return conn
+}
+
+func withMockStatusUpdate(t *testing.T, conn *dbus.Conn, values ...interface{}) {
+	t.Helper()
+
+	emitName := fmt.Sprintf("%s.%s", updateengine.DBusInterface, updateengine.DBusSignalNameStatusUpdate)
+
+	ticker := time.NewTicker(100 * time.Millisecond)
+	stopCh := make(chan struct{})
+	doneCh := make(chan struct{})
+
+	t.Cleanup(func() {
+		close(stopCh)
+		<-doneCh
+	})
+
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				if err := conn.Emit(updateengine.DBusPath, emitName, values...); err != nil {
+					t.Logf("Failed emitting mock status: %v", err)
+					t.Fail()
+				}
+			case <-stopCh:
+				close(doneCh)
+
+				return
+			}
+		}
+	}()
 }
