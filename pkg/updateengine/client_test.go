@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	dbus "github.com/godbus/dbus/v5"
 	"github.com/google/go-cmp/cmp"
@@ -12,20 +13,51 @@ import (
 )
 
 //nolint:paralleltest // Test uses environment variables and D-Bus which are global.
-func Test_Emitted_status_parses(t *testing.T) {
-	expectedStatus := updateengine.Status{
-		LastCheckedTime:  10,
-		Progress:         20,
-		CurrentOperation: updateengine.UpdateStatusVerifying,
-		NewVersion:       "1.2.3",
-		NewSize:          30,
-	}
+func Test_Receiving_status(t *testing.T) {
+	t.Run("emits_first_status_immediately_after_start", func(t *testing.T) {
+		ch := testGetStatusReceiver(t, updateengine.Status{})
 
-	// Order and types of returned values here are what we are really testing.
+		timeout := time.NewTimer(time.Second)
+		select {
+		case <-ch:
+		case <-timeout.C:
+			t.Fatal("Failed getting status within expected timeframe")
+		}
+	})
+
+	t.Run("parses_received_values_in_order_defined_by_update_engine", func(t *testing.T) {
+		expectedStatus := testStatus()
+
+		ch := testGetStatusReceiver(t, expectedStatus)
+
+		timeout := time.NewTimer(time.Second)
+		select {
+		case status := <-ch:
+			if diff := cmp.Diff(expectedStatus, status); diff != "" {
+				t.Fatalf("Unexpectected status values received:\n%s", diff)
+			}
+		case <-timeout.C:
+			t.Fatal("Failed getting status within expected timeframe")
+		}
+	})
+}
+
+//nolint:paralleltest // Test uses environment variables, which are global.
+func Test_Creating_client_fails_when(t *testing.T) {
+	t.Run("connecting_to_system_bus_fails", func(t *testing.T) {
+		t.Setenv("DBUS_SYSTEM_BUS_ADDRESS", "foo")
+
+		if _, err := updateengine.New(); err == nil {
+			t.Fatalf("Creating client should fail when unable to connect to system bus")
+		}
+	})
+}
+
+func testGetStatusReceiver(t *testing.T, status updateengine.Status) chan updateengine.Status {
+	t.Helper()
+
 	getStatusTestResponse := func(message dbus.Message) (int64, float64, string, string, int64, *dbus.Error) {
-		s := expectedStatus
-
-		return s.LastCheckedTime, s.Progress, s.CurrentOperation, s.NewVersion, s.NewSize, nil
+		return statusToRawValues(status, nil)
 	}
 
 	withMockGetStatus(t, getStatusTestResponse)
@@ -48,25 +80,26 @@ func Test_Emitted_status_parses(t *testing.T) {
 
 	go client.ReceiveStatuses(ch, stop)
 
-	status := <-ch
-
-	if diff := cmp.Diff(expectedStatus, status); diff != "" {
-		t.Fatalf("Unexpectected status values received:\n%s", diff)
-	}
-}
-
-//nolint:paralleltest // Test uses environment variables, which are global.
-func Test_Connecting_to_non_existing_system_bus_fails(t *testing.T) {
-	t.Setenv("DBUS_SYSTEM_BUS_ADDRESS", "foo")
-
-	if _, err := updateengine.New(); err == nil {
-		t.Fatalf("Creating client should fail when unable to connect to system bus")
-	}
+	return ch
 }
 
 const (
 	testDbusSocketEnv = "FLUO_TEST_DBUS_SOCKET"
 )
+
+func testStatus() updateengine.Status {
+	return updateengine.Status{
+		LastCheckedTime:  10,
+		Progress:         20,
+		CurrentOperation: updateengine.UpdateStatusVerifying,
+		NewVersion:       "1.2.3",
+		NewSize:          30,
+	}
+}
+
+func statusToRawValues(s updateengine.Status, err *dbus.Error) (int64, float64, string, string, int64, *dbus.Error) {
+	return s.LastCheckedTime, s.Progress, s.CurrentOperation, s.NewVersion, s.NewSize, err
+}
 
 func testSystemConnection(t *testing.T) *dbus.Conn {
 	t.Helper()
