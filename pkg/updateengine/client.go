@@ -27,6 +27,7 @@ const (
 	dbusDestination            = "com.coreos.update1"
 	dbusInterface              = dbusDestination + ".Manager"
 	dbusSignalNameStatusUpdate = "StatusUpdate"
+	dbusMethodNameGetStatus    = "GetStatus"
 	signalBuffer               = 32 // TODO(bp): What is a reasonable value here?
 )
 
@@ -112,7 +113,7 @@ func (c *Client) ReceiveStatuses(rcvr chan<- Status, stop <-chan struct{}) {
 
 // getStatus gets the current status from update_engine.
 func (c *Client) getStatus() (Status, error) {
-	call := c.object.Call(dbusInterface+".GetStatus", 0)
+	call := c.object.Call(dbusInterface+"."+dbusMethodNameGetStatus, 0)
 	if call.Err != nil {
 		return Status{}, call.Err
 	}
