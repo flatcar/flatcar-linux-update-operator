@@ -3,6 +3,7 @@ package updateengine_test
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"testing"
 	"time"
 
@@ -70,6 +71,8 @@ func testGetStatusReceiver(t *testing.T, status updateengine.Status) chan update
 	stop := make(chan struct{})
 
 	t.Cleanup(func() {
+		// Stopping receiver routine must be done before closing the client. See
+		// https://github.com/flatcar-linux/flatcar-linux-update-operator/issues/101 for more details.
 		close(stop)
 		if err := client.Close(); err != nil {
 			t.Fatalf("Failed closing client: %v", err)
@@ -111,7 +114,7 @@ func testSystemConnection(t *testing.T) *dbus.Conn {
 
 	t.Setenv("DBUS_SYSTEM_BUS_ADDRESS", fmt.Sprintf("unix:path=%s", socket))
 
-	conn, err := dbus.SystemBus()
+	conn, err := dbus.SystemBusPrivate()
 	if err != nil {
 		t.Fatalf("Opening private connection to system bus: %v", err)
 	}
@@ -124,9 +127,25 @@ func withMockGetStatus(t *testing.T, getStatusF interface{}) {
 
 	conn := testSystemConnection(t)
 
+	methods := []dbus.Auth{dbus.AuthExternal(strconv.Itoa(os.Getuid()))}
+
+	if err := conn.Auth(methods); err != nil {
+		t.Fatalf("Failed authenticating to system bus: %v", err)
+	}
+
+	if err := conn.Hello(); err != nil {
+		t.Fatalf("Failed sending hello to system bus: %v", err)
+	}
+
 	if _, err := conn.RequestName(updateengine.DBusDestination, 0); err != nil {
 		t.Fatalf("Requesting name: %v", err)
 	}
+
+	t.Cleanup(func() {
+		if _, err := conn.ReleaseName(updateengine.DBusDestination); err != nil {
+			t.Fatalf("Failed releasing name: %v", err)
+		}
+	})
 
 	tbl := map[string]interface{}{
 		updateengine.DBusMethodNameGetStatus: getStatusF,
@@ -135,4 +154,11 @@ func withMockGetStatus(t *testing.T, getStatusF interface{}) {
 	if err := conn.ExportMethodTable(tbl, updateengine.DBusPath, updateengine.DBusInterface); err != nil {
 		t.Fatalf("Exporting method table: %v", err)
 	}
+
+	t.Cleanup(func() {
+		tbl := map[string]interface{}{}
+		if err := conn.ExportMethodTable(tbl, updateengine.DBusPath, updateengine.DBusInterface); err != nil {
+			t.Fatalf("Failed resetting method table: %v", err)
+		}
+	})
 }
