@@ -6,23 +6,29 @@ import (
 	"testing"
 
 	dbus "github.com/godbus/dbus/v5"
+	"github.com/google/go-cmp/cmp"
 
 	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/updateengine"
 )
 
-//nolint:funlen,tparallel // Test uses environment variables, which are global.
+//nolint:paralleltest // Test uses environment variables and D-Bus which are global.
 func Test_Emitted_status_parses(t *testing.T) {
-	var (
-		lastCheckedTime  int64   = 10
-		progress         float64 = 20
-		currentOperation         = updateengine.UpdateStatusVerifying
-		newVersion               = "1.2.3"
-		newSize          int64   = 30
-	)
+	expectedStatus := updateengine.Status{
+		LastCheckedTime:  10,
+		Progress:         20,
+		CurrentOperation: updateengine.UpdateStatusVerifying,
+		NewVersion:       "1.2.3",
+		NewSize:          30,
+	}
 
-	withMockGetStatus(t, func(message dbus.Message) (int64, float64, string, string, int64, *dbus.Error) {
-		return lastCheckedTime, progress, currentOperation, newVersion, newSize, nil
-	})
+	// Order and types of returned values here are what we are really testing.
+	getStatusTestResponse := func(message dbus.Message) (int64, float64, string, string, int64, *dbus.Error) {
+		s := expectedStatus
+
+		return s.LastCheckedTime, s.Progress, s.CurrentOperation, s.NewVersion, s.NewSize, nil
+	}
+
+	withMockGetStatus(t, getStatusTestResponse)
 
 	client, err := updateengine.New()
 	if err != nil {
@@ -36,45 +42,9 @@ func Test_Emitted_status_parses(t *testing.T) {
 
 	status := <-ch
 
-	t.Run("first_value_as_last_checked_time", func(t *testing.T) {
-		t.Parallel()
-
-		if status.LastCheckedTime != lastCheckedTime {
-			t.Errorf("Expected %v, got %v", lastCheckedTime, status.LastCheckedTime)
-		}
-	})
-
-	t.Run("second_value_as_progress", func(t *testing.T) {
-		t.Parallel()
-
-		if status.Progress != progress {
-			t.Errorf("Expected %v, got %v", progress, status.Progress)
-		}
-	})
-
-	t.Run("third_value_as_current_operation", func(t *testing.T) {
-		t.Parallel()
-
-		if status.CurrentOperation != currentOperation {
-			t.Errorf("Expected %q, got %q", currentOperation, status.CurrentOperation)
-		}
-	})
-
-	t.Run("forth_value_as_new_version", func(t *testing.T) {
-		t.Parallel()
-
-		if status.NewVersion != newVersion {
-			t.Errorf("Expected %q, got %q", newVersion, status.NewVersion)
-		}
-	})
-
-	t.Run("fifth_value_as_new_size", func(t *testing.T) {
-		t.Parallel()
-
-		if status.NewSize != newSize {
-			t.Errorf("Expected %v, got %v", newSize, status.NewSize)
-		}
-	})
+	if diff := cmp.Diff(expectedStatus, status); diff != "" {
+		t.Fatalf("Unexpectected status values received:\n%s", diff)
+	}
 }
 
 //nolint:paralleltest // Test uses environment variables, which are global.
