@@ -83,15 +83,15 @@ func withMockGetStatus(t *testing.T, getStatusF interface{}) {
 
 	conn := testSystemConnection(t)
 
-	if _, err := conn.RequestName("com.coreos.update1", 0); err != nil {
+	if _, err := conn.RequestName(updateengine.DBusDestination, 0); err != nil {
 		t.Fatalf("Requesting name: %v", err)
 	}
 
 	tbl := map[string]interface{}{
-		"GetStatus": getStatusF,
+		updateengine.DBusMethodNameGetStatus: getStatusF,
 	}
 
-	if err := conn.ExportMethodTable(tbl, "/com/coreos/update1", "com.coreos.update1.Manager"); err != nil {
+	if err := conn.ExportMethodTable(tbl, updateengine.DBusPath, updateengine.DBusInterface); err != nil {
 		t.Fatalf("Exporting method table: %v", err)
 	}
 }
