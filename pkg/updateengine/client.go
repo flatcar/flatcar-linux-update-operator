@@ -23,12 +23,18 @@ import (
 )
 
 const (
-	dbusPath                   = "/com/coreos/update1"
-	dbusDestination            = "com.coreos.update1"
-	dbusInterface              = dbusDestination + ".Manager"
-	dbusSignalNameStatusUpdate = "StatusUpdate"
-	dbusMethodNameGetStatus    = "GetStatus"
-	signalBuffer               = 32 // TODO(bp): What is a reasonable value here?
+	// DBusPath is an object path used by update_engine.
+	DBusPath = "/com/coreos/update1"
+	// DBusDestination is a bus name of update_engine service.
+	DBusDestination = "com.coreos.update1"
+	// DBusInterface is a update_engine interface name.
+	DBusInterface = DBusDestination + ".Manager"
+	// DBusSignalNameStatusUpdate is a name of StatusUpdate signal from update_engine interface.
+	DBusSignalNameStatusUpdate = "StatusUpdate"
+	// DBusMethodNameGetStatus is a name of the method to get current update_engine status.
+	DBusMethodNameGetStatus = "GetStatus"
+
+	signalBuffer = 32 // TODO(bp): What is a reasonable value here?
 )
 
 // Client allows reading update-engine status using D-Bus.
@@ -66,7 +72,7 @@ func New() (*Client, error) {
 	}
 
 	// Setup the filter for the StatusUpdate signals.
-	match := fmt.Sprintf("type='signal',interface='%s',member='%s'", dbusInterface, dbusSignalNameStatusUpdate)
+	match := fmt.Sprintf("type='signal',interface='%s',member='%s'", DBusInterface, DBusSignalNameStatusUpdate)
 
 	if call := conn.BusObject().Call("org.freedesktop.DBus.AddMatch", 0, match); call.Err != nil {
 		return nil, fmt.Errorf("adding filter: %w", call.Err)
@@ -78,7 +84,7 @@ func New() (*Client, error) {
 	return &Client{
 		ch:     ch,
 		conn:   conn,
-		object: conn.Object(dbusDestination, dbus.ObjectPath(dbusPath)),
+		object: conn.Object(DBusDestination, dbus.ObjectPath(DBusPath)),
 	}, nil
 }
 
@@ -113,7 +119,7 @@ func (c *Client) ReceiveStatuses(rcvr chan<- Status, stop <-chan struct{}) {
 
 // getStatus gets the current status from update_engine.
 func (c *Client) getStatus() (Status, error) {
-	call := c.object.Call(dbusInterface+"."+dbusMethodNameGetStatus, 0)
+	call := c.object.Call(DBusInterface+"."+DBusMethodNameGetStatus, 0)
 	if call.Err != nil {
 		return Status{}, call.Err
 	}
