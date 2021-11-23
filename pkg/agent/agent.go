@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/coreos/go-systemd/login1"
+	"github.com/coreos/go-systemd/v22/login1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
