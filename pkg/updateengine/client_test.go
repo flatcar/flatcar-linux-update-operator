@@ -36,6 +36,14 @@ func Test_Emitted_status_parses(t *testing.T) {
 	}
 
 	stop := make(chan struct{})
+
+	t.Cleanup(func() {
+		close(stop)
+		if err := client.Close(); err != nil {
+			t.Fatalf("Failed closing client: %v", err)
+		}
+	})
+
 	ch := make(chan updateengine.Status, 1)
 
 	go client.ReceiveStatuses(ch, stop)
