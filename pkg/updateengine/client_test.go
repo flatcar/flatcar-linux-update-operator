@@ -76,6 +76,31 @@ func Test_Receiving_status(t *testing.T) {
 			t.Fatal("Failed getting second status within expected timeframe")
 		}
 	})
+
+	t.Run("returns_empty_status_when_getting_initial_status_fails", func(t *testing.T) {
+		expectedStatus := updateengine.Status{}
+
+		statusCh, conn := testGetStatusReceiver(t, expectedStatus)
+
+		// Reset method table so GetStatus updates immediately returns error.
+		// Once https://github.com/flatcar-linux/flatcar-linux-update-operator/issues/100 is solved,
+		// we can make method call to actually return an error.
+		tbl := map[string]interface{}{}
+		if err := conn.ExportMethodTable(tbl, updateengine.DBusPath, updateengine.DBusInterface); err != nil {
+			t.Fatalf("Failed resetting method table: %v", err)
+		}
+
+		timeout := time.NewTimer(time.Second)
+
+		select {
+		case status := <-statusCh:
+			if diff := cmp.Diff(expectedStatus, status); diff != "" {
+				t.Fatalf("Unexpectected status values received:\n%s", diff)
+			}
+		case <-timeout.C:
+			t.Fatal("Failed getting status within expected timeframe")
+		}
+	})
 }
 
 //nolint:paralleltest // Test uses environment variables, which are global.
