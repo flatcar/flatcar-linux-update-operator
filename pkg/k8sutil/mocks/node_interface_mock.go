@@ -13,6 +13,7 @@ import (
 	v10 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	v11 "k8s.io/client-go/applyconfigurations/core/v1"
 )
 
 // MockNodeInterface is a mock of NodeInterface interface.
@@ -36,6 +37,36 @@ func NewMockNodeInterface(ctrl *gomock.Controller) *MockNodeInterface {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockNodeInterface) EXPECT() *MockNodeInterfaceMockRecorder {
 	return m.recorder
+}
+
+// Apply mocks base method.
+func (m *MockNodeInterface) Apply(arg0 context.Context, arg1 *v11.NodeApplyConfiguration, arg2 v10.ApplyOptions) (*v1.Node, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Apply", arg0, arg1, arg2)
+	ret0, _ := ret[0].(*v1.Node)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Apply indicates an expected call of Apply.
+func (mr *MockNodeInterfaceMockRecorder) Apply(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Apply", reflect.TypeOf((*MockNodeInterface)(nil).Apply), arg0, arg1, arg2)
+}
+
+// ApplyStatus mocks base method.
+func (m *MockNodeInterface) ApplyStatus(arg0 context.Context, arg1 *v11.NodeApplyConfiguration, arg2 v10.ApplyOptions) (*v1.Node, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ApplyStatus", arg0, arg1, arg2)
+	ret0, _ := ret[0].(*v1.Node)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ApplyStatus indicates an expected call of ApplyStatus.
+func (mr *MockNodeInterfaceMockRecorder) ApplyStatus(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApplyStatus", reflect.TypeOf((*MockNodeInterface)(nil).ApplyStatus), arg0, arg1, arg2)
 }
 
 // Create mocks base method.

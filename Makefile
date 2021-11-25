@@ -99,7 +99,7 @@ test-up: ## Starts testing D-Bus instance in Docker container using docker-compo
 
 .PHONY: test-down
 test-down: ## Tears down testing D-Bus instance created by 'test-up'.
-	docker-compose -f test/docker-compose.yml down
+	env UID=$$(id -u) docker-compose -f test/docker-compose.yml down
 
 .PHONY: test-integration
 test-integration: test-up
