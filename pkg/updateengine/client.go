@@ -43,14 +43,32 @@ const (
 //
 // When finished using this object, Close() should be called to close D-Bus connection.
 type Client struct {
-	conn   *dbus.Conn
+	conn   DBusConnection
 	object dbus.BusObject
 	ch     chan *dbus.Signal
 }
 
+// DBusConnection is set of methods which client expects D-Bus connection to implement.
+type DBusConnection interface {
+	Auth([]dbus.Auth) error
+	Hello() error
+	Close() error
+	AddMatchSignal(...dbus.MatchOption) error
+	Signal(chan<- *dbus.Signal)
+	Object(string, dbus.ObjectPath) dbus.BusObject
+}
+
+// DBusConnector is a constructor function providing D-Bus connection.
+type DBusConnector func() (DBusConnection, error)
+
+// DBusSystemPrivateConnector is a standard update_engine connector using system bus.
+func DBusSystemPrivateConnector() (DBusConnection, error) {
+	return dbus.SystemBusPrivate()
+}
+
 // New creates new instance of Client and initializes it.
-func New() (*Client, error) {
-	conn, err := dbus.SystemBusPrivate()
+func New(newConnection DBusConnector) (*Client, error) {
+	conn, err := newConnection()
 	if err != nil {
 		return nil, fmt.Errorf("opening private connection to system bus: %w", err)
 	}

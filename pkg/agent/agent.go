@@ -67,7 +67,7 @@ func New(node string, reapTimeout time.Duration) (*Klocksmith, error) {
 	nc := kc.CoreV1().Nodes()
 
 	// Set up update_engine client.
-	ue, err := updateengine.New()
+	updateEngineClient, err := updateengine.New(updateengine.DBusSystemPrivateConnector)
 	if err != nil {
 		return nil, fmt.Errorf("establishing connection to update_engine dbus: %w", err)
 	}
@@ -82,7 +82,7 @@ func New(node string, reapTimeout time.Duration) (*Klocksmith, error) {
 		node:        node,
 		kc:          kc,
 		nc:          nc,
-		ue:          ue,
+		ue:          updateEngineClient,
 		lc:          lc,
 		reapTimeout: reapTimeout,
 	}, nil
