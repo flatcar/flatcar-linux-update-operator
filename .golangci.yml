@@ -4,6 +4,8 @@ output:
 run:
   modules-download-mode: vendor
   timeout: 5m
+  build-tags:
+    - integration
 
 issues:
   exclude-use-default: false
