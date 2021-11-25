@@ -67,6 +67,8 @@ linters:
     - exhaustivestruct
     # We do not care about the memory efficiency really.
     - maligned
+    # We allow returning interfaces for defensive programming.
+    - ireturn
     # This linter has been deprecated.
     - interfacer
     # This linter has been deprecated.
@@ -109,7 +111,6 @@ linters:
     - ifshort
     - importas
     - ineffassign
-    - ireturn
     - lll
     - makezero
     - misspell
