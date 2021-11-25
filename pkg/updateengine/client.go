@@ -50,12 +50,6 @@ type Client interface {
 	Close() error
 }
 
-type client struct {
-	conn   DBusConnection
-	object dbus.BusObject
-	ch     chan *dbus.Signal
-}
-
 // DBusConnection is set of methods which client expects D-Bus connection to implement.
 type DBusConnection interface {
 	Auth([]dbus.Auth) error
@@ -72,6 +66,12 @@ type DBusConnector func() (DBusConnection, error)
 // DBusSystemPrivateConnector is a standard update_engine connector using system bus.
 func DBusSystemPrivateConnector() (DBusConnection, error) {
 	return dbus.SystemBusPrivate()
+}
+
+type client struct {
+	conn   DBusConnection
+	object dbus.BusObject
+	ch     chan *dbus.Signal
 }
 
 // New creates new instance of Client and initializes it.
@@ -116,15 +116,6 @@ func New(newConnection DBusConnector) (Client, error) {
 	}, nil
 }
 
-// Close closes internal D-Bus connection.
-func (c *client) Close() error {
-	if c.conn != nil {
-		return c.conn.Close()
-	}
-
-	return nil
-}
-
 // ReceiveStatuses receives signal messages from dbus and sends them as Statues
 // on the rcvr channel, until the stop channel is closed. An attempt is made to
 // get the initial status and send it on the rcvr channel before receiving
@@ -143,6 +134,15 @@ func (c *client) ReceiveStatuses(rcvr chan<- Status, stop <-chan struct{}) {
 			rcvr <- NewStatus(signal.Body)
 		}
 	}
+}
+
+// Close closes internal D-Bus connection.
+func (c *client) Close() error {
+	if c.conn != nil {
+		return c.conn.Close()
+	}
+
+	return nil
 }
 
 // getStatus gets the current status from update_engine.
