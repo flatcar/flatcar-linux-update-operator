@@ -36,7 +36,7 @@ type Klocksmith struct {
 	node        string
 	kc          kubernetes.Interface
 	nc          corev1client.NodeInterface
-	ue          *updateengine.Client
+	ue          updateengine.Client
 	lc          *login1.Conn
 	reapTimeout time.Duration
 }

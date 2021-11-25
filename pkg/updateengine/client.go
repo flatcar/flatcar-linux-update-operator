@@ -37,12 +37,20 @@ const (
 	signalBuffer = 32 // TODO(bp): What is a reasonable value here?
 )
 
-// Client allows reading update-engine status using D-Bus.
-//
-// New instance should be initialized using New() function.
-//
-// When finished using this object, Close() should be called to close D-Bus connection.
-type Client struct {
+// Client allows reading update_engine status using D-Bus.
+type Client interface {
+	// ReceiveStatuses listens for D-Bus signals coming from update_engine and converts them to Statuses
+	// emitted into a given channel. It returns when stop channel gets closed or when the value is sent to it.
+	ReceiveStatuses(rcvr chan<- Status, stop <-chan struct{})
+
+	// Close closes underlying connection to the DBus broker. It is up to the user to close the connection
+	// and avoid leaking it.
+	//
+	// Receive statuses call must be stopped before closing the connection.
+	Close() error
+}
+
+type client struct {
 	conn   DBusConnection
 	object dbus.BusObject
 	ch     chan *dbus.Signal
@@ -67,7 +75,7 @@ func DBusSystemPrivateConnector() (DBusConnection, error) {
 }
 
 // New creates new instance of Client and initializes it.
-func New(newConnection DBusConnector) (*Client, error) {
+func New(newConnection DBusConnector) (Client, error) {
 	conn, err := newConnection()
 	if err != nil {
 		return nil, fmt.Errorf("opening private connection to system bus: %w", err)
@@ -101,7 +109,7 @@ func New(newConnection DBusConnector) (*Client, error) {
 	ch := make(chan *dbus.Signal, signalBuffer)
 	conn.Signal(ch)
 
-	return &Client{
+	return &client{
 		ch:     ch,
 		conn:   conn,
 		object: conn.Object(DBusDestination, dbus.ObjectPath(DBusPath)),
@@ -109,7 +117,7 @@ func New(newConnection DBusConnector) (*Client, error) {
 }
 
 // Close closes internal D-Bus connection.
-func (c *Client) Close() error {
+func (c *client) Close() error {
 	if c.conn != nil {
 		return c.conn.Close()
 	}
@@ -121,7 +129,7 @@ func (c *Client) Close() error {
 // on the rcvr channel, until the stop channel is closed. An attempt is made to
 // get the initial status and send it on the rcvr channel before receiving
 // starts.
-func (c *Client) ReceiveStatuses(rcvr chan<- Status, stop <-chan struct{}) {
+func (c *client) ReceiveStatuses(rcvr chan<- Status, stop <-chan struct{}) {
 	// If there is an error getting the current status, ignore it and just
 	// move onto the main loop.
 	st, _ := c.getStatus()
@@ -138,7 +146,7 @@ func (c *Client) ReceiveStatuses(rcvr chan<- Status, stop <-chan struct{}) {
 }
 
 // getStatus gets the current status from update_engine.
-func (c *Client) getStatus() (Status, error) {
+func (c *client) getStatus() (Status, error) {
 	call := c.object.Call(DBusInterface+"."+DBusMethodNameGetStatus, 0)
 	if call.Err != nil {
 		return Status{}, call.Err
