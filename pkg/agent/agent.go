@@ -240,7 +240,7 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 	}
 
 	// Delete the pods.
-	// TODO(mischief): explicitly don't terminate self? we'll probably just be a
+	// TODO(mischief): Explicitly don't terminate self? we'll probably just be a
 	// Mirror pod or daemonset anyway..
 	klog.Infof("Deleting %d pods", len(pods))
 
@@ -288,7 +288,8 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 // node.
 func (k *Klocksmith) updateStatusCallback(ctx context.Context, status updateengine.Status) {
 	klog.Info("Updating status")
-	// update our status
+
+	// update our status.
 	anno := map[string]string{
 		constants.AnnotationStatus:          status.CurrentOperation,
 		constants.AnnotationLastCheckedTime: fmt.Sprintf("%d", status.LastCheckedTime),
@@ -371,7 +372,7 @@ func (k *Klocksmith) waitForOkToReboot(ctx context.Context) error {
 		return nil
 	}
 
-	// XXX: set timeout > 0?
+	// XXX: Set timeout > 0?
 	watcher, err := k.nc.Watch(ctx, metav1.ListOptions{
 		FieldSelector:   fields.OneTermEqualSelector("metadata.name", node.Name).String(),
 		ResourceVersion: node.ResourceVersion,
@@ -413,7 +414,7 @@ func (k *Klocksmith) waitForNotOkToReboot(ctx context.Context) error {
 		return nil
 	}
 
-	// XXX: set timeout > 0?
+	// XXX: Set timeout > 0?
 	watcher, err := k.nc.Watch(ctx, metav1.ListOptions{
 		FieldSelector:   fields.OneTermEqualSelector("metadata.name", node.Name).String(),
 		ResourceVersion: node.ResourceVersion,
@@ -466,7 +467,7 @@ func (k *Klocksmith) getPodsForDeletion(ctx context.Context) ([]corev1.Pod, erro
 		return nil, fmt.Errorf("getting list of pods for deletion: %w", err)
 	}
 
-	// XXX: ignoring kube-system is a simple way to avoid eviciting
+	// XXX: Ignoring kube-system is a simple way to avoid eviciting
 	// critical components such as kube-scheduler and
 	// kube-controller-manager.
 
@@ -487,8 +488,7 @@ func (k *Klocksmith) waitForPodDeletion(ctx context.Context, pod corev1.Pod) err
 			return true, nil
 		}
 
-		// Most errors will be transient. log the error and continue
-		// polling.
+		// Most errors will be transient. Log the error and continue polling.
 		if err != nil {
 			klog.Errorf("Failed to get pod %q: %v", pod.Name, err)
 		}
@@ -497,7 +497,7 @@ func (k *Klocksmith) waitForPodDeletion(ctx context.Context, pod corev1.Pod) err
 	})
 }
 
-// sleepOrDone pauses the current goroutine until the done channel receives
+// sleepOrDone blocks until the done channel receives
 // or until at least the duration d has elapsed, whichever comes first. This
 // is similar to time.Sleep(d), except it can be interrupted.
 func sleepOrDone(d time.Duration, done <-chan struct{}) {
@@ -511,7 +511,7 @@ func sleepOrDone(d time.Duration, done <-chan struct{}) {
 	}
 }
 
-// splitNewlineEnv splits newline-delimited KEY=VAL pairs and update map.
+// splitNewlineEnv splits newline-delimited KEY=VAL pairs and puts values into given map.
 func splitNewlineEnv(m map[string]string, envs string) {
 	sc := bufio.NewScanner(strings.NewReader(envs))
 	for sc.Scan() {
