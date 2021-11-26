@@ -23,82 +23,104 @@ import (
 )
 
 const (
-	dbusPath      = "/com/coreos/update1"
-	dbusInterface = "com.coreos.update1.Manager"
-	dbusMember    = "StatusUpdate"
-	signalBuffer  = 32 // TODO(bp): What is a reasonable value here?
+	// DBusPath is an object path used by update_engine.
+	DBusPath = "/com/coreos/update1"
+	// DBusDestination is a bus name of update_engine service.
+	DBusDestination = "com.coreos.update1"
+	// DBusInterface is a update_engine interface name.
+	DBusInterface = DBusDestination + ".Manager"
+	// DBusSignalNameStatusUpdate is a name of StatusUpdate signal from update_engine interface.
+	DBusSignalNameStatusUpdate = "StatusUpdate"
+	// DBusMethodNameGetStatus is a name of the method to get current update_engine status.
+	DBusMethodNameGetStatus = "GetStatus"
+
+	signalBuffer = 32 // TODO(bp): What is a reasonable value here?
 )
 
-// Client allows reading update-engine status using D-Bus.
-//
-// New instance should be initialized using New() function.
-//
-// When finished using this object, Close() should be called to close D-Bus connection.
-type Client struct {
-	conn   *dbus.Conn
+// Client allows reading update_engine status using D-Bus.
+type Client interface {
+	// ReceiveStatuses listens for D-Bus signals coming from update_engine and converts them to Statuses
+	// emitted into a given channel. It returns when stop channel gets closed or when the value is sent to it.
+	ReceiveStatuses(rcvr chan<- Status, stop <-chan struct{})
+
+	// Close closes underlying connection to the DBus broker. It is up to the user to close the connection
+	// and avoid leaking it.
+	//
+	// Receive statuses call must be stopped before closing the connection.
+	Close() error
+}
+
+// DBusConnection is set of methods which client expects D-Bus connection to implement.
+type DBusConnection interface {
+	Auth([]dbus.Auth) error
+	Hello() error
+	Close() error
+	AddMatchSignal(...dbus.MatchOption) error
+	Signal(chan<- *dbus.Signal)
+	Object(string, dbus.ObjectPath) dbus.BusObject
+}
+
+// DBusConnector is a constructor function providing D-Bus connection.
+type DBusConnector func() (DBusConnection, error)
+
+// DBusSystemPrivateConnector is a standard update_engine connector using system bus.
+func DBusSystemPrivateConnector() (DBusConnection, error) {
+	return dbus.SystemBusPrivate()
+}
+
+type client struct {
+	conn   DBusConnection
 	object dbus.BusObject
 	ch     chan *dbus.Signal
 }
 
 // New creates new instance of Client and initializes it.
-func New() (*Client, error) {
-	c := new(Client)
-
-	var err error
-
-	c.conn, err = dbus.SystemBusPrivate()
+func New(newConnection DBusConnector) (Client, error) {
+	conn, err := newConnection()
 	if err != nil {
 		return nil, fmt.Errorf("opening private connection to system bus: %w", err)
 	}
 
 	methods := []dbus.Auth{dbus.AuthExternal(strconv.Itoa(os.Getuid()))}
 
-	err = c.conn.Auth(methods)
-	if err != nil {
+	if err := conn.Auth(methods); err != nil {
 		// Best effort closing the connection.
-		_ = c.conn.Close()
+		_ = conn.Close()
 
 		return nil, fmt.Errorf("authenticating to system bus: %w", err)
 	}
 
-	err = c.conn.Hello()
-	if err != nil {
+	if err := conn.Hello(); err != nil {
 		// Best effort closing the connection.
-		_ = c.conn.Close()
+		_ = conn.Close()
 
 		return nil, fmt.Errorf("sending hello to system bus: %w", err)
 	}
 
-	c.object = c.conn.Object("com.coreos.update1", dbus.ObjectPath(dbusPath))
-
-	// Setup the filter for the StatusUpdate signals.
-	match := fmt.Sprintf("type='signal',interface='%s',member='%s'", dbusInterface, dbusMember)
-
-	call := c.conn.BusObject().Call("org.freedesktop.DBus.AddMatch", 0, match)
-	if call.Err != nil {
-		return nil, call.Err
+	matchOptions := []dbus.MatchOption{
+		dbus.WithMatchInterface(DBusInterface),
+		dbus.WithMatchMember(DBusSignalNameStatusUpdate),
 	}
 
-	c.ch = make(chan *dbus.Signal, signalBuffer)
-	c.conn.Signal(c.ch)
-
-	return c, nil
-}
-
-// Close closes internal D-Bus connection.
-func (c *Client) Close() error {
-	if c.conn != nil {
-		return c.conn.Close()
+	if err := conn.AddMatchSignal(matchOptions...); err != nil {
+		return nil, fmt.Errorf("adding filter: %w", err)
 	}
 
-	return nil
+	ch := make(chan *dbus.Signal, signalBuffer)
+	conn.Signal(ch)
+
+	return &client{
+		ch:     ch,
+		conn:   conn,
+		object: conn.Object(DBusDestination, dbus.ObjectPath(DBusPath)),
+	}, nil
 }
 
 // ReceiveStatuses receives signal messages from dbus and sends them as Statues
 // on the rcvr channel, until the stop channel is closed. An attempt is made to
 // get the initial status and send it on the rcvr channel before receiving
 // starts.
-func (c *Client) ReceiveStatuses(rcvr chan Status, stop <-chan struct{}) {
+func (c *client) ReceiveStatuses(rcvr chan<- Status, stop <-chan struct{}) {
 	// If there is an error getting the current status, ignore it and just
 	// move onto the main loop.
 	st, _ := c.getStatus()
@@ -114,9 +136,18 @@ func (c *Client) ReceiveStatuses(rcvr chan Status, stop <-chan struct{}) {
 	}
 }
 
+// Close closes internal D-Bus connection.
+func (c *client) Close() error {
+	if c.conn != nil {
+		return c.conn.Close()
+	}
+
+	return nil
+}
+
 // getStatus gets the current status from update_engine.
-func (c *Client) getStatus() (Status, error) {
-	call := c.object.Call(dbusInterface+".GetStatus", 0)
+func (c *client) getStatus() (Status, error) {
+	call := c.object.Call(DBusInterface+"."+DBusMethodNameGetStatus, 0)
 	if call.Err != nil {
 		return Status{}, call.Err
 	}

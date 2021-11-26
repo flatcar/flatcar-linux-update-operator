@@ -24,7 +24,7 @@ build: ## Builds all binaries.
 
 .PHONY: build-test
 build-test: ## Compiles unit tests.
-	go test -run=nonexistent -mod=vendor ./...
+	go test -run=nonexistent -mod=vendor -tags integration ./...
 
 .PHONY: test
 test: ## Runs unit tests.
@@ -104,7 +104,7 @@ test-down: ## Tears down testing D-Bus instance created by 'test-up'.
 .PHONY: test-integration
 test-integration: test-up
 test-integration: ## Runs integration tests using D-Bus running in Docker container.
-	FLUO_TEST_DBUS_SOCKET=$$(realpath ./test/test_bus_socket) go test -mod=vendor -count 1 ./...
+	FLUO_TEST_DBUS_SOCKET=$$(realpath ./test/test_bus_socket) go test -mod=vendor -count 1 -tags integration ./...
 	make test-down
 
 .PHONY: install-changelog
