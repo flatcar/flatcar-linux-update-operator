@@ -40,7 +40,7 @@ type Config struct {
 
 // Klocksmith implements agent part of FLUO.
 type Klocksmith struct {
-	node        string
+	nodeName    string
 	pg          corev1client.PodsGetter
 	nc          corev1client.NodeInterface
 	dsg         appsv1client.DaemonSetsGetter
@@ -84,7 +84,7 @@ func New(config *Config) (*Klocksmith, error) {
 	}
 
 	return &Klocksmith{
-		node:        config.NodeName,
+		nodeName:    config.NodeName,
 		pg:          kc.CoreV1(),
 		dsg:         kc.AppsV1(),
 		nc:          kc.CoreV1().Nodes(),
@@ -120,9 +120,9 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 
 	klog.Info("Checking annotations")
 
-	node, err := k8sutil.GetNodeRetry(ctx, k.nc, k.node)
+	node, err := k8sutil.GetNodeRetry(ctx, k.nc, k.nodeName)
 	if err != nil {
-		return fmt.Errorf("getting node %q: %w", k.node, err)
+		return fmt.Errorf("getting node %q: %w", k.nodeName, err)
 	}
 
 	// Only make a node schedulable if a reboot was in progress. This prevents a node from being made schedulable
@@ -144,8 +144,8 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 
 	klog.Infof("Setting annotations %#v", anno)
 
-	if err := k8sutil.SetNodeAnnotationsLabels(ctx, k.nc, k.node, anno, labels); err != nil {
-		return fmt.Errorf("setting node %q labels and annotations: %w", k.node, err)
+	if err := k8sutil.SetNodeAnnotationsLabels(ctx, k.nc, k.nodeName, anno, labels); err != nil {
+		return fmt.Errorf("setting node %q labels and annotations: %w", k.nodeName, err)
 	}
 
 	// Since we set 'reboot-needed=false', 'ok-to-reboot' should clear.
@@ -158,8 +158,8 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 		// We are schedulable now.
 		klog.Info("Marking node as schedulable")
 
-		if err := k8sutil.Unschedulable(ctx, k.nc, k.node, false); err != nil {
-			return fmt.Errorf("marking node %q as unschedulable: %w", k.node, err)
+		if err := k8sutil.Unschedulable(ctx, k.nc, k.nodeName, false); err != nil {
+			return fmt.Errorf("marking node %q as unschedulable: %w", k.nodeName, err)
 		}
 
 		anno = map[string]string{
@@ -168,8 +168,8 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 
 		klog.Infof("Setting annotations %#v", anno)
 
-		if err := k8sutil.SetNodeAnnotations(ctx, k.nc, k.node, anno); err != nil {
-			return fmt.Errorf("setting node %q annotations: %w", k.node, err)
+		if err := k8sutil.SetNodeAnnotations(ctx, k.nc, k.nodeName, anno); err != nil {
+			return fmt.Errorf("setting node %q annotations: %w", k.nodeName, err)
 		}
 	} else if madeUnschedulableAnnotationExists { // Annotation exists so node was marked unschedulable by external source.
 		klog.Info("Skipping marking node as schedulable -- node was marked unschedulable by an external source")
@@ -193,9 +193,9 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 
 	klog.Info("Checking if node is already unschedulable")
 
-	node, err = k8sutil.GetNodeRetry(ctx, k.nc, k.node)
+	node, err = k8sutil.GetNodeRetry(ctx, k.nc, k.nodeName)
 	if err != nil {
-		return fmt.Errorf("getting node %q: %w", k.node, err)
+		return fmt.Errorf("getting node %q: %w", k.nodeName, err)
 	}
 
 	alreadyUnschedulable := node.Spec.Unschedulable
@@ -211,8 +211,8 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 
 	klog.Infof("Setting annotations %#v", anno)
 
-	if err := k8sutil.SetNodeAnnotations(ctx, k.nc, k.node, anno); err != nil {
-		return fmt.Errorf("setting node %q annotations: %w", k.node, err)
+	if err := k8sutil.SetNodeAnnotations(ctx, k.nc, k.nodeName, anno); err != nil {
+		return fmt.Errorf("setting node %q annotations: %w", k.nodeName, err)
 	}
 
 	// Drain self equates to:
@@ -225,8 +225,8 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 	if !alreadyUnschedulable {
 		klog.Info("Marking node as unschedulable")
 
-		if err := k8sutil.Unschedulable(ctx, k.nc, k.node, true); err != nil {
-			return fmt.Errorf("marking node %q as unschedulable: %w", k.node, err)
+		if err := k8sutil.Unschedulable(ctx, k.nc, k.nodeName, true); err != nil {
+			return fmt.Errorf("marking node %q as unschedulable: %w", k.nodeName, err)
 		}
 	} else {
 		klog.Info("Node already marked as unschedulable")
@@ -307,7 +307,7 @@ func (k *Klocksmith) updateStatusCallback(ctx context.Context, status updateengi
 	}
 
 	err := wait.PollUntil(defaultPollInterval, func() (bool, error) {
-		if err := k8sutil.SetNodeAnnotationsLabels(ctx, k.nc, k.node, anno, labels); err != nil {
+		if err := k8sutil.SetNodeAnnotationsLabels(ctx, k.nc, k.nodeName, anno, labels); err != nil {
 			klog.Errorf("Failed to set annotation %q: %v", constants.AnnotationStatus, err)
 
 			return false, nil
@@ -333,8 +333,8 @@ func (k *Klocksmith) setInfoLabels(ctx context.Context) error {
 		constants.LabelVersion: vi.version,
 	}
 
-	if err := k8sutil.SetNodeLabels(ctx, k.nc, k.node, labels); err != nil {
-		return fmt.Errorf("setting node %q labels: %w", k.node, err)
+	if err := k8sutil.SetNodeLabels(ctx, k.nc, k.nodeName, labels); err != nil {
+		return fmt.Errorf("setting node %q labels: %w", k.nodeName, err)
 	}
 
 	return nil
@@ -360,9 +360,9 @@ func (k *Klocksmith) watchUpdateStatus(ctx context.Context, update statusUpdateF
 
 // waitForOkToReboot waits for both 'ok-to-reboot' and 'needs-reboot' to be true.
 func (k *Klocksmith) waitForOkToReboot(ctx context.Context) error {
-	node, err := k.nc.Get(ctx, k.node, metav1.GetOptions{})
+	node, err := k.nc.Get(ctx, k.nodeName, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("getting self node (%q): %w", k.node, err)
+		return fmt.Errorf("getting self node (%q): %w", k.nodeName, err)
 	}
 
 	okToReboot := node.Annotations[constants.AnnotationOkToReboot] == constants.True
@@ -378,7 +378,7 @@ func (k *Klocksmith) waitForOkToReboot(ctx context.Context) error {
 		ResourceVersion: node.ResourceVersion,
 	})
 	if err != nil {
-		return fmt.Errorf("creating watcher for self node (%q): %w", k.node, err)
+		return fmt.Errorf("creating watcher for self node (%q): %w", k.nodeName, err)
 	}
 
 	// Hopefully 24 hours is enough time between indicating we need a
@@ -405,9 +405,9 @@ func (k *Klocksmith) waitForOkToReboot(ctx context.Context) error {
 
 //nolint:cyclop // We will deal with complexity once we have proper tests.
 func (k *Klocksmith) waitForNotOkToReboot(ctx context.Context) error {
-	node, err := k.nc.Get(ctx, k.node, metav1.GetOptions{})
+	node, err := k.nc.Get(ctx, k.nodeName, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("getting self node (%q): %w", k.node, err)
+		return fmt.Errorf("getting self node (%q): %w", k.nodeName, err)
 	}
 
 	if node.Annotations[constants.AnnotationOkToReboot] != constants.True {
@@ -420,7 +420,7 @@ func (k *Klocksmith) waitForNotOkToReboot(ctx context.Context) error {
 		ResourceVersion: node.ResourceVersion,
 	})
 	if err != nil {
-		return fmt.Errorf("creating watcher for self node (%q): %w", k.node, err)
+		return fmt.Errorf("creating watcher for self node (%q): %w", k.nodeName, err)
 	}
 
 	// Within 24 hours of indicating we don't need a reboot we should be given a not-ok.
@@ -462,7 +462,7 @@ func (k *Klocksmith) waitForNotOkToReboot(ctx context.Context) error {
 }
 
 func (k *Klocksmith) getPodsForDeletion(ctx context.Context) ([]corev1.Pod, error) {
-	pods, err := k8sutil.GetPodsForDeletion(ctx, k.pg, k.dsg, k.node)
+	pods, err := k8sutil.GetPodsForDeletion(ctx, k.pg, k.dsg, k.nodeName)
 	if err != nil {
 		return nil, fmt.Errorf("getting list of pods for deletion: %w", err)
 	}
