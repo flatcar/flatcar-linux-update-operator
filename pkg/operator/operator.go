@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/flatcar-linux/locksmith/pkg/timeutil"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -20,7 +21,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 
-	"github.com/coreos/locksmith/pkg/timeutil"
 	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/constants"
 	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/k8sutil"
 )

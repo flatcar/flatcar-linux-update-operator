@@ -7,13 +7,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/flatcar-linux/locksmith/pkg/timeutil"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 
-	"github.com/coreos/locksmith/pkg/timeutil"
 	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/constants"
 )
 
