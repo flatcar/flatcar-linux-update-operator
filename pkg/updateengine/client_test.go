@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	dbus "github.com/godbus/dbus/v5"
+	godbus "github.com/godbus/dbus/v5"
 
 	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/updateengine"
 )
@@ -28,7 +28,7 @@ func Test_Creating_client_fails_when(t *testing.T) {
 		closeCalled := false
 
 		connector := newMockDBusConnection()
-		connector.authF = func([]dbus.Auth) error { return expectedError }
+		connector.authF = func([]godbus.Auth) error { return expectedError }
 		connector.closeF = func() error {
 			closeCalled = true
 
@@ -88,7 +88,7 @@ func Test_Creating_client_fails_when(t *testing.T) {
 		expectedError := fmt.Errorf("match signal failed")
 
 		connector := newMockDBusConnection()
-		connector.addMatchSignalF = func(...dbus.MatchOption) error { return expectedError }
+		connector.addMatchSignalF = func(...godbus.MatchOption) error { return expectedError }
 
 		client, err := updateengine.New(func() (updateengine.DBusConnection, error) { return connector, nil })
 		if !errors.Is(err, expectedError) {
@@ -120,15 +120,15 @@ func Test_Closing_client_returns_error_when_closing_DBus_client_fails(t *testing
 }
 
 type mockDBusConnection struct {
-	authF           func([]dbus.Auth) error
+	authF           func([]godbus.Auth) error
 	helloF          func() error
 	closeF          func() error
-	addMatchSignalF func(...dbus.MatchOption) error
-	signalF         func(chan<- *dbus.Signal)
-	objectF         func(string, dbus.ObjectPath) dbus.BusObject
+	addMatchSignalF func(...godbus.MatchOption) error
+	signalF         func(chan<- *godbus.Signal)
+	objectF         func(string, godbus.ObjectPath) godbus.BusObject
 }
 
-func (m *mockDBusConnection) Auth(methods []dbus.Auth) error {
+func (m *mockDBusConnection) Auth(methods []godbus.Auth) error {
 	return m.authF(methods)
 }
 
@@ -140,25 +140,25 @@ func (m *mockDBusConnection) Close() error {
 	return m.closeF()
 }
 
-func (m *mockDBusConnection) AddMatchSignal(options ...dbus.MatchOption) error {
+func (m *mockDBusConnection) AddMatchSignal(options ...godbus.MatchOption) error {
 	return m.addMatchSignalF(options...)
 }
 
-func (m *mockDBusConnection) Signal(ch chan<- *dbus.Signal) {
+func (m *mockDBusConnection) Signal(ch chan<- *godbus.Signal) {
 	m.signalF(ch)
 }
 
-func (m *mockDBusConnection) Object(dest string, path dbus.ObjectPath) dbus.BusObject {
+func (m *mockDBusConnection) Object(dest string, path godbus.ObjectPath) godbus.BusObject {
 	return m.objectF(dest, path)
 }
 
 func newMockDBusConnection() *mockDBusConnection {
 	return &mockDBusConnection{
-		authF:           func([]dbus.Auth) error { return nil },
+		authF:           func([]godbus.Auth) error { return nil },
 		helloF:          func() error { return nil },
 		closeF:          func() error { return nil },
-		addMatchSignalF: func(...dbus.MatchOption) error { return nil },
-		signalF:         func(chan<- *dbus.Signal) {},
-		objectF:         func(string, dbus.ObjectPath) dbus.BusObject { return &dbus.Object{} },
+		addMatchSignalF: func(...godbus.MatchOption) error { return nil },
+		signalF:         func(chan<- *godbus.Signal) {},
+		objectF:         func(string, godbus.ObjectPath) godbus.BusObject { return &godbus.Object{} },
 	}
 }
