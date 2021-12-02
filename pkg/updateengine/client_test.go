@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/updateengine"
 	dbus "github.com/godbus/dbus/v5"
+
+	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/updateengine"
 )
 
 //nolint:paralleltest,funlen,tparallel // Test uses environment variables, which are global.
