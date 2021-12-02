@@ -27,6 +27,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/constants"
+	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/dbus"
 	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/k8sutil"
 	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/updateengine"
 )
@@ -67,7 +68,7 @@ func New(node string, reapTimeout time.Duration) (*Klocksmith, error) {
 	nc := kc.CoreV1().Nodes()
 
 	// Set up update_engine client.
-	updateEngineClient, err := updateengine.New(updateengine.DBusSystemPrivateConnector)
+	updateEngineClient, err := updateengine.New(dbus.SystemPrivateConnector)
 	if err != nil {
 		return nil, fmt.Errorf("establishing connection to update_engine dbus: %w", err)
 	}

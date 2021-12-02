@@ -16,10 +16,10 @@ package updateengine
 
 import (
 	"fmt"
-	"os"
-	"strconv"
 
 	godbus "github.com/godbus/dbus/v5"
+
+	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/dbus"
 )
 
 const (
@@ -52,49 +52,27 @@ type Client interface {
 
 // DBusConnection is set of methods which client expects D-Bus connection to implement.
 type DBusConnection interface {
-	Auth([]godbus.Auth) error
-	Hello() error
 	Close() error
 	AddMatchSignal(...godbus.MatchOption) error
 	Signal(chan<- *godbus.Signal)
 	Object(string, godbus.ObjectPath) godbus.BusObject
 }
 
-// DBusConnector is a constructor function providing D-Bus connection.
-type DBusConnector func() (DBusConnection, error)
-
-// DBusSystemPrivateConnector is a standard update_engine connector using system bus.
-func DBusSystemPrivateConnector() (DBusConnection, error) {
-	return godbus.SystemBusPrivate()
+type caller interface {
+	Call(method string, flags godbus.Flags, args ...interface{}) *godbus.Call
 }
 
 type client struct {
 	conn   DBusConnection
-	object godbus.BusObject
+	object caller
 	ch     chan *godbus.Signal
 }
 
 // New creates new instance of Client and initializes it.
-func New(newConnection DBusConnector) (Client, error) {
-	conn, err := newConnection()
+func New(connector dbus.Connector) (Client, error) {
+	conn, err := dbus.New(connector)
 	if err != nil {
-		return nil, fmt.Errorf("opening private connection to system bus: %w", err)
-	}
-
-	methods := []godbus.Auth{godbus.AuthExternal(strconv.Itoa(os.Getuid()))}
-
-	if err := conn.Auth(methods); err != nil {
-		// Best effort closing the connection.
-		_ = conn.Close()
-
-		return nil, fmt.Errorf("authenticating to system bus: %w", err)
-	}
-
-	if err := conn.Hello(); err != nil {
-		// Best effort closing the connection.
-		_ = conn.Close()
-
-		return nil, fmt.Errorf("sending hello to system bus: %w", err)
+		return nil, fmt.Errorf("creating D-Bus client: %w", err)
 	}
 
 	matchOptions := []godbus.MatchOption{
