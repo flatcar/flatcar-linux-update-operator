@@ -14,20 +14,19 @@ import (
 	"sync"
 	"time"
 
-	"github.com/coreos/go-systemd/v22/login1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/kubernetes"
 	appsv1client "k8s.io/client-go/kubernetes/typed/apps/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/klog/v2"
 
 	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/constants"
-	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/dbus"
 	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/k8sutil"
 	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/updateengine"
 )
@@ -36,6 +35,19 @@ import (
 type Config struct {
 	NodeName               string
 	PodDeletionGracePeriod time.Duration
+	Clientset              kubernetes.Interface
+	StatusReceiver         StatusReceiver
+	Rebooter               Rebooter
+}
+
+// StatusReceiver describe dependency of object providing status updates from update_engine.
+type StatusReceiver interface {
+	ReceiveStatuses(rcvr chan<- updateengine.Status, stop <-chan struct{})
+}
+
+// Rebooter describes dependency of object providing capability of rebooting host machine.
+type Rebooter interface {
+	Reboot(bool)
 }
 
 // Klocksmith implements agent part of FLUO.
@@ -44,8 +56,8 @@ type Klocksmith struct {
 	pg          corev1client.PodsGetter
 	nc          corev1client.NodeInterface
 	dsg         appsv1client.DaemonSetsGetter
-	ue          updateengine.Client
-	lc          *login1.Conn
+	ue          StatusReceiver
+	lc          Rebooter
 	reapTimeout time.Duration
 }
 
@@ -65,31 +77,25 @@ var shouldRebootSelector = fields.Set(map[string]string{
 
 // New returns initialized Klocksmith.
 func New(config *Config) (*Klocksmith, error) {
-	// Set up kubernetes in-cluster client.
-	kc, err := k8sutil.GetClient("")
-	if err != nil {
-		return nil, fmt.Errorf("creating Kubernetes client: %w", err)
+	if config.Clientset == nil {
+		return nil, fmt.Errorf("no clientset configured")
 	}
 
-	// Set up update_engine client.
-	updateEngineClient, err := updateengine.New(dbus.SystemPrivateConnector)
-	if err != nil {
-		return nil, fmt.Errorf("establishing connection to update_engine dbus: %w", err)
+	if config.StatusReceiver == nil {
+		return nil, fmt.Errorf("no status receiver configured")
 	}
 
-	// Set up login1 client for our eventual reboot.
-	lc, err := login1.New()
-	if err != nil {
-		return nil, fmt.Errorf("establishing connection to logind dbus: %w", err)
+	if config.Rebooter == nil {
+		return nil, fmt.Errorf("no rebooter given")
 	}
 
 	return &Klocksmith{
 		nodeName:    config.NodeName,
-		pg:          kc.CoreV1(),
-		dsg:         kc.AppsV1(),
-		nc:          kc.CoreV1().Nodes(),
-		ue:          updateEngineClient,
-		lc:          lc,
+		pg:          config.Clientset.CoreV1(),
+		dsg:         config.Clientset.AppsV1(),
+		nc:          config.Clientset.CoreV1().Nodes(),
+		ue:          config.StatusReceiver,
+		lc:          config.Rebooter,
 		reapTimeout: config.PodDeletionGracePeriod,
 	}, nil
 }

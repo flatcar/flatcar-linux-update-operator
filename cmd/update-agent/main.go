@@ -6,10 +6,14 @@ import (
 	"os"
 	"time"
 
+	"github.com/coreos/go-systemd/v22/login1"
 	"github.com/coreos/pkg/flagutil"
 	"k8s.io/klog/v2"
 
 	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/agent"
+	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/dbus"
+	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/k8sutil"
+	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/updateengine"
 	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/version"
 )
 
@@ -43,9 +47,33 @@ func main() {
 		klog.Fatal("-node is required")
 	}
 
+	clientset, err := k8sutil.GetClient("")
+	if err != nil {
+		klog.Fatalf("Failed creating Kubernetes client: %v", err)
+	}
+
+	updateEngineClient, err := updateengine.New(dbus.SystemPrivateConnector)
+	if err != nil {
+		klog.Fatalf("Failed establishing connection to update_engine dbus: %v", err)
+	}
+
+	defer func() {
+		if err := updateEngineClient.Close(); err != nil {
+			klog.Warningf("Failed gracefully closing update_engine client: %v", err)
+		}
+	}()
+
+	rebooter, err := login1.New()
+	if err != nil {
+		klog.Fatalf("Failed establishing connection to logind dbus: %v", err)
+	}
+
 	config := &agent.Config{
 		NodeName:               *node,
 		PodDeletionGracePeriod: time.Duration(*reapTimeout) * time.Second,
+		Clientset:              clientset,
+		StatusReceiver:         updateEngineClient,
+		Rebooter:               rebooter,
 	}
 
 	agent, err := agent.New(config)
