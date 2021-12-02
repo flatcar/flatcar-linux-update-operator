@@ -107,7 +107,7 @@ func (k *Klocksmith) Run(stop <-chan struct{}) {
 
 	// Agent process should reboot the node, no need to loop.
 	if err := k.process(stop); err != nil {
-		klog.Errorf("Error running agent process: %w", err)
+		klog.Errorf("Error running agent process: %v", err)
 	}
 
 	klog.V(5).Info("Stopping agent")
@@ -194,7 +194,7 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 			break
 		}
 
-		klog.Warningf("error waiting for an ok-to-reboot: %w", err)
+		klog.Warningf("error waiting for an ok-to-reboot: %v", err)
 	}
 
 	klog.Info("Checking if node is already unschedulable")
@@ -556,7 +556,7 @@ func getUpdateMap() (map[string]string, error) {
 			return nil, fmt.Errorf("reading file %q: %w", updateConfOverridePath, err)
 		}
 
-		klog.Infof("Skipping missing update.conf: %w", err)
+		klog.Infof("Skipping missing update.conf: %v", err)
 	}
 
 	splitNewlineEnv(infomap, string(updateConfOverride))
