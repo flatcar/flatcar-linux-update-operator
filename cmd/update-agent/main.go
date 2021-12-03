@@ -43,10 +43,6 @@ func main() {
 		os.Exit(0)
 	}
 
-	if *node == "" {
-		klog.Fatal("-node is required")
-	}
-
 	clientset, err := k8sutil.GetClient("")
 	if err != nil {
 		klog.Fatalf("Failed creating Kubernetes client: %v", err)

@@ -9,6 +9,7 @@ import (
 	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/updateengine"
 )
 
+//nolint:funlen // Just many subtests.
 func Test_Creating_new_agent_returns_error_when(t *testing.T) {
 	t.Parallel()
 
@@ -59,6 +60,22 @@ func Test_Creating_new_agent_returns_error_when(t *testing.T) {
 			t.Fatalf("No client should be returned when New failed")
 		}
 	})
+
+	t.Run("empty_node_name_is_given", func(t *testing.T) {
+		t.Parallel()
+
+		configWithoutStatusReceiver := testConfig()
+		configWithoutStatusReceiver.NodeName = ""
+
+		client, err := agent.New(configWithoutStatusReceiver)
+		if err == nil {
+			t.Fatalf("Expected error creating new agent")
+		}
+
+		if client != nil {
+			t.Fatalf("No client should be returned when New failed")
+		}
+	})
 }
 
 func testConfig() *agent.Config {
@@ -66,6 +83,7 @@ func testConfig() *agent.Config {
 		Clientset:      fake.NewSimpleClientset(),
 		StatusReceiver: &mockStatusReceiver{},
 		Rebooter:       &mockRebooter{},
+		NodeName:       "testNodeName",
 	}
 }
 

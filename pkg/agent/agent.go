@@ -89,6 +89,10 @@ func New(config *Config) (*Klocksmith, error) {
 		return nil, fmt.Errorf("no rebooter given")
 	}
 
+	if config.NodeName == "" {
+		return nil, fmt.Errorf("node name can't be empty")
+	}
+
 	return &Klocksmith{
 		nodeName:    config.NodeName,
 		pg:          config.Clientset.CoreV1(),
