@@ -50,8 +50,13 @@ type Rebooter interface {
 	Reboot(bool)
 }
 
+// Klocksmith represents capabilities of agent.
+type Klocksmith interface {
+	Run(stop <-chan struct{})
+}
+
 // Klocksmith implements agent part of FLUO.
-type Klocksmith struct {
+type klocksmith struct {
 	nodeName    string
 	pg          corev1client.PodsGetter
 	nc          corev1client.NodeInterface
@@ -75,8 +80,8 @@ var shouldRebootSelector = fields.Set(map[string]string{
 	constants.AnnotationRebootNeeded: constants.True,
 }).AsSelector()
 
-// New returns initialized Klocksmith.
-func New(config *Config) (*Klocksmith, error) {
+// New returns initialized klocksmith.
+func New(config *Config) (Klocksmith, error) {
 	if config.Clientset == nil {
 		return nil, fmt.Errorf("no clientset configured")
 	}
@@ -93,7 +98,7 @@ func New(config *Config) (*Klocksmith, error) {
 		return nil, fmt.Errorf("node name can't be empty")
 	}
 
-	return &Klocksmith{
+	return &klocksmith{
 		nodeName:    config.NodeName,
 		pg:          config.Clientset.CoreV1(),
 		dsg:         config.Clientset.AppsV1(),
@@ -106,7 +111,7 @@ func New(config *Config) (*Klocksmith, error) {
 
 // Run starts the agent to listen for an update_engine reboot signal and react
 // by draining pods and rebooting. Runs until the stop channel is closed.
-func (k *Klocksmith) Run(stop <-chan struct{}) {
+func (k *klocksmith) Run(stop <-chan struct{}) {
 	klog.V(5).Info("Starting agent")
 
 	// Agent process should reboot the node, no need to loop.
@@ -119,7 +124,9 @@ func (k *Klocksmith) Run(stop <-chan struct{}) {
 
 // process performs the agent reconciliation to reboot the node or stops when
 // the stop channel is closed.
-func (k *Klocksmith) process(stop <-chan struct{}) error {
+//
+//nolint:funlen,cyclop
+func (k *klocksmith) process(stop <-chan struct{}) error {
 	ctx := context.TODO()
 
 	klog.Info("Setting info labels")
@@ -296,7 +303,7 @@ func (k *Klocksmith) process(stop <-chan struct{}) error {
 // updateStatusCallback receives Status messages from update engine. If the
 // status is UpdateStatusUpdatedNeedReboot, indicate that with a label on our
 // node.
-func (k *Klocksmith) updateStatusCallback(ctx context.Context, status updateengine.Status) {
+func (k *klocksmith) updateStatusCallback(ctx context.Context, status updateengine.Status) {
 	klog.Info("Updating status")
 
 	// update our status.
@@ -331,7 +338,7 @@ func (k *Klocksmith) updateStatusCallback(ctx context.Context, status updateengi
 }
 
 // setInfoLabels labels our node with helpful info about Flatcar Container Linux.
-func (k *Klocksmith) setInfoLabels(ctx context.Context) error {
+func (k *klocksmith) setInfoLabels(ctx context.Context) error {
 	vi, err := getVersionInfo()
 	if err != nil {
 		return fmt.Errorf("getting version info: %w", err)
@@ -352,7 +359,7 @@ func (k *Klocksmith) setInfoLabels(ctx context.Context) error {
 
 type statusUpdateF func(context.Context, updateengine.Status)
 
-func (k *Klocksmith) watchUpdateStatus(ctx context.Context, update statusUpdateF, stop <-chan struct{}) {
+func (k *klocksmith) watchUpdateStatus(ctx context.Context, update statusUpdateF, stop <-chan struct{}) {
 	klog.Info("Beginning to watch update_engine status")
 
 	oldOperation := ""
@@ -369,7 +376,7 @@ func (k *Klocksmith) watchUpdateStatus(ctx context.Context, update statusUpdateF
 }
 
 // waitForOkToReboot waits for both 'ok-to-reboot' and 'needs-reboot' to be true.
-func (k *Klocksmith) waitForOkToReboot(ctx context.Context) error {
+func (k *klocksmith) waitForOkToReboot(ctx context.Context) error {
 	node, err := k.nc.Get(ctx, k.nodeName, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("getting self node (%q): %w", k.nodeName, err)
@@ -414,7 +421,7 @@ func (k *Klocksmith) waitForOkToReboot(ctx context.Context) error {
 }
 
 //nolint:cyclop // We will deal with complexity once we have proper tests.
-func (k *Klocksmith) waitForNotOkToReboot(ctx context.Context) error {
+func (k *klocksmith) waitForNotOkToReboot(ctx context.Context) error {
 	node, err := k.nc.Get(ctx, k.nodeName, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("getting self node (%q): %w", k.nodeName, err)
@@ -471,7 +478,7 @@ func (k *Klocksmith) waitForNotOkToReboot(ctx context.Context) error {
 	return nil
 }
 
-func (k *Klocksmith) getPodsForDeletion(ctx context.Context) ([]corev1.Pod, error) {
+func (k *klocksmith) getPodsForDeletion(ctx context.Context) ([]corev1.Pod, error) {
 	pods, err := k8sutil.GetPodsForDeletion(ctx, k.pg, k.dsg, k.nodeName)
 	if err != nil {
 		return nil, fmt.Errorf("getting list of pods for deletion: %w", err)
@@ -489,7 +496,7 @@ func (k *Klocksmith) getPodsForDeletion(ctx context.Context) ([]corev1.Pod, erro
 }
 
 // waitForPodDeletion waits for a pod to be deleted.
-func (k *Klocksmith) waitForPodDeletion(ctx context.Context, pod corev1.Pod) error {
+func (k *klocksmith) waitForPodDeletion(ctx context.Context, pod corev1.Pod) error {
 	return wait.PollImmediate(defaultPollInterval, k.reapTimeout, func() (bool, error) {
 		p, err := k.pg.Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 		if errors.IsNotFound(err) || (p != nil && p.ObjectMeta.UID != pod.ObjectMeta.UID) {
