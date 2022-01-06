@@ -16,10 +16,10 @@ package updateengine
 
 import (
 	"fmt"
-	"os"
-	"strconv"
 
-	dbus "github.com/godbus/dbus/v5"
+	godbus "github.com/godbus/dbus/v5"
+
+	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/dbus"
 )
 
 const (
@@ -52,67 +52,45 @@ type Client interface {
 
 // DBusConnection is set of methods which client expects D-Bus connection to implement.
 type DBusConnection interface {
-	Auth([]dbus.Auth) error
-	Hello() error
 	Close() error
-	AddMatchSignal(...dbus.MatchOption) error
-	Signal(chan<- *dbus.Signal)
-	Object(string, dbus.ObjectPath) dbus.BusObject
+	AddMatchSignal(...godbus.MatchOption) error
+	Signal(chan<- *godbus.Signal)
+	Object(string, godbus.ObjectPath) godbus.BusObject
 }
 
-// DBusConnector is a constructor function providing D-Bus connection.
-type DBusConnector func() (DBusConnection, error)
-
-// DBusSystemPrivateConnector is a standard update_engine connector using system bus.
-func DBusSystemPrivateConnector() (DBusConnection, error) {
-	return dbus.SystemBusPrivate()
+type caller interface {
+	Call(method string, flags godbus.Flags, args ...interface{}) *godbus.Call
 }
 
 type client struct {
 	conn   DBusConnection
-	object dbus.BusObject
-	ch     chan *dbus.Signal
+	object caller
+	ch     chan *godbus.Signal
 }
 
 // New creates new instance of Client and initializes it.
-func New(newConnection DBusConnector) (Client, error) {
-	conn, err := newConnection()
+func New(connector dbus.Connector) (Client, error) {
+	conn, err := dbus.New(connector)
 	if err != nil {
-		return nil, fmt.Errorf("opening private connection to system bus: %w", err)
+		return nil, fmt.Errorf("creating D-Bus client: %w", err)
 	}
 
-	methods := []dbus.Auth{dbus.AuthExternal(strconv.Itoa(os.Getuid()))}
-
-	if err := conn.Auth(methods); err != nil {
-		// Best effort closing the connection.
-		_ = conn.Close()
-
-		return nil, fmt.Errorf("authenticating to system bus: %w", err)
-	}
-
-	if err := conn.Hello(); err != nil {
-		// Best effort closing the connection.
-		_ = conn.Close()
-
-		return nil, fmt.Errorf("sending hello to system bus: %w", err)
-	}
-
-	matchOptions := []dbus.MatchOption{
-		dbus.WithMatchInterface(DBusInterface),
-		dbus.WithMatchMember(DBusSignalNameStatusUpdate),
+	matchOptions := []godbus.MatchOption{
+		godbus.WithMatchInterface(DBusInterface),
+		godbus.WithMatchMember(DBusSignalNameStatusUpdate),
 	}
 
 	if err := conn.AddMatchSignal(matchOptions...); err != nil {
 		return nil, fmt.Errorf("adding filter: %w", err)
 	}
 
-	ch := make(chan *dbus.Signal, signalBuffer)
+	ch := make(chan *godbus.Signal, signalBuffer)
 	conn.Signal(ch)
 
 	return &client{
 		ch:     ch,
 		conn:   conn,
-		object: conn.Object(DBusDestination, dbus.ObjectPath(DBusPath)),
+		object: conn.Object(DBusDestination, godbus.ObjectPath(DBusPath)),
 	}, nil
 }
 
