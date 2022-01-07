@@ -36,7 +36,7 @@ spec:
           name: etc-os-release
           readOnly: true
         env:
-        # read by update-agent as the node name to manage reboots for
+        # Read by update-agent as the node name to manage reboots for.
         - name: UPDATE_AGENT_NODE
           valueFrom:
             fieldRef:
