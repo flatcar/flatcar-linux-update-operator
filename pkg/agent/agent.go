@@ -52,7 +52,7 @@ type Rebooter interface {
 
 // Klocksmith represents capabilities of agent.
 type Klocksmith interface {
-	Run(stop <-chan struct{})
+	Run(stop <-chan struct{}) error
 }
 
 // Klocksmith implements agent part of FLUO.
@@ -111,21 +111,25 @@ func New(config *Config) (Klocksmith, error) {
 
 // Run starts the agent to listen for an update_engine reboot signal and react
 // by draining pods and rebooting. Runs until the stop channel is closed.
-func (k *klocksmith) Run(stop <-chan struct{}) {
+func (k *klocksmith) Run(stop <-chan struct{}) error {
 	klog.V(5).Info("Starting agent")
+
+	defer klog.V(5).Info("Stopping agent")
 
 	// Agent process should reboot the node, no need to loop.
 	if err := k.process(stop); err != nil {
 		klog.Errorf("Error running agent process: %v", err)
+
+		return fmt.Errorf("processing: %w", err)
 	}
 
-	klog.V(5).Info("Stopping agent")
+	return nil
 }
 
 // process performs the agent reconciliation to reboot the node or stops when
 // the stop channel is closed.
 //
-//nolint:funlen,cyclop
+//nolint:funlen,cyclop // This will be refactored once we have tests in place.
 func (k *klocksmith) process(stop <-chan struct{}) error {
 	ctx := context.TODO()
 
