@@ -10,71 +10,75 @@ import (
 )
 
 //nolint:funlen // Just many subtests.
-func Test_Creating_new_agent_returns_error_when(t *testing.T) {
+func Test_Creating_new_agent(t *testing.T) {
 	t.Parallel()
 
-	t.Run("no_clientset_is_configured", func(t *testing.T) {
+	t.Run("returns_error_when", func(t *testing.T) {
 		t.Parallel()
 
-		configWithoutClientset := testConfig()
-		configWithoutClientset.Clientset = nil
+		t.Run("no_clientset_is_configured", func(t *testing.T) {
+			t.Parallel()
 
-		client, err := agent.New(configWithoutClientset)
-		if err == nil {
-			t.Fatalf("Expected error creating new agent")
-		}
+			configWithoutClientset := testConfig()
+			configWithoutClientset.Clientset = nil
 
-		if client != nil {
-			t.Fatalf("No client should be returned when New failed")
-		}
-	})
+			client, err := agent.New(configWithoutClientset)
+			if err == nil {
+				t.Fatalf("Expected error creating new agent")
+			}
 
-	t.Run("no_status_receiver_is_configured", func(t *testing.T) {
-		t.Parallel()
+			if client != nil {
+				t.Fatalf("No client should be returned when New failed")
+			}
+		})
 
-		configWithoutStatusReceiver := testConfig()
-		configWithoutStatusReceiver.StatusReceiver = nil
+		t.Run("no_status_receiver_is_configured", func(t *testing.T) {
+			t.Parallel()
 
-		client, err := agent.New(configWithoutStatusReceiver)
-		if err == nil {
-			t.Fatalf("Expected error creating new agent")
-		}
+			configWithoutStatusReceiver := testConfig()
+			configWithoutStatusReceiver.StatusReceiver = nil
 
-		if client != nil {
-			t.Fatalf("No client should be returned when New failed")
-		}
-	})
+			client, err := agent.New(configWithoutStatusReceiver)
+			if err == nil {
+				t.Fatalf("Expected error creating new agent")
+			}
 
-	t.Run("no_rebooter_is_configured", func(t *testing.T) {
-		t.Parallel()
+			if client != nil {
+				t.Fatalf("No client should be returned when New failed")
+			}
+		})
 
-		configWithoutStatusReceiver := testConfig()
-		configWithoutStatusReceiver.Rebooter = nil
+		t.Run("no_rebooter_is_configured", func(t *testing.T) {
+			t.Parallel()
 
-		client, err := agent.New(configWithoutStatusReceiver)
-		if err == nil {
-			t.Fatalf("Expected error creating new agent")
-		}
+			configWithoutStatusReceiver := testConfig()
+			configWithoutStatusReceiver.Rebooter = nil
 
-		if client != nil {
-			t.Fatalf("No client should be returned when New failed")
-		}
-	})
+			client, err := agent.New(configWithoutStatusReceiver)
+			if err == nil {
+				t.Fatalf("Expected error creating new agent")
+			}
 
-	t.Run("empty_node_name_is_given", func(t *testing.T) {
-		t.Parallel()
+			if client != nil {
+				t.Fatalf("No client should be returned when New failed")
+			}
+		})
 
-		configWithoutStatusReceiver := testConfig()
-		configWithoutStatusReceiver.NodeName = ""
+		t.Run("empty_node_name_is_given", func(t *testing.T) {
+			t.Parallel()
 
-		client, err := agent.New(configWithoutStatusReceiver)
-		if err == nil {
-			t.Fatalf("Expected error creating new agent")
-		}
+			configWithoutStatusReceiver := testConfig()
+			configWithoutStatusReceiver.NodeName = ""
 
-		if client != nil {
-			t.Fatalf("No client should be returned when New failed")
-		}
+			client, err := agent.New(configWithoutStatusReceiver)
+			if err == nil {
+				t.Fatalf("Expected error creating new agent")
+			}
+
+			if client != nil {
+				t.Fatalf("No client should be returned when New failed")
+			}
+		})
 	})
 }
 
