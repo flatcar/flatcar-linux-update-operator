@@ -9,9 +9,22 @@ import (
 	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/updateengine"
 )
 
-//nolint:funlen // Just many subtests.
+//nolint:funlen,cyclop // Just many subtests.
 func Test_Creating_new_agent(t *testing.T) {
 	t.Parallel()
+
+	t.Run("returns_agent_when_all_dependencies_are_satisfied", func(t *testing.T) {
+		t.Parallel()
+
+		client, err := agent.New(testConfig())
+		if err != nil {
+			t.Fatalf("Unexpected error creating new agent: %v", err)
+		}
+
+		if client == nil {
+			t.Fatalf("Client should be returned when creating agent succeeds")
+		}
+	})
 
 	t.Run("returns_error_when", func(t *testing.T) {
 		t.Parallel()
