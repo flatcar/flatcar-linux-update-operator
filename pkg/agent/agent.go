@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -38,6 +39,7 @@ type Config struct {
 	Clientset              kubernetes.Interface
 	StatusReceiver         StatusReceiver
 	Rebooter               Rebooter
+	HostFilesPrefix        string
 }
 
 // StatusReceiver describe dependency of object providing status updates from update_engine.
@@ -57,13 +59,14 @@ type Klocksmith interface {
 
 // Klocksmith implements agent part of FLUO.
 type klocksmith struct {
-	nodeName    string
-	pg          corev1client.PodsGetter
-	nc          corev1client.NodeInterface
-	dsg         appsv1client.DaemonSetsGetter
-	ue          StatusReceiver
-	lc          Rebooter
-	reapTimeout time.Duration
+	nodeName        string
+	pg              corev1client.PodsGetter
+	nc              corev1client.NodeInterface
+	dsg             appsv1client.DaemonSetsGetter
+	ue              StatusReceiver
+	lc              Rebooter
+	reapTimeout     time.Duration
+	hostFilesPrefix string
 }
 
 const (
@@ -99,13 +102,14 @@ func New(config *Config) (Klocksmith, error) {
 	}
 
 	return &klocksmith{
-		nodeName:    config.NodeName,
-		pg:          config.Clientset.CoreV1(),
-		dsg:         config.Clientset.AppsV1(),
-		nc:          config.Clientset.CoreV1().Nodes(),
-		ue:          config.StatusReceiver,
-		lc:          config.Rebooter,
-		reapTimeout: config.PodDeletionGracePeriod,
+		nodeName:        config.NodeName,
+		pg:              config.Clientset.CoreV1(),
+		dsg:             config.Clientset.AppsV1(),
+		nc:              config.Clientset.CoreV1().Nodes(),
+		ue:              config.StatusReceiver,
+		lc:              config.Rebooter,
+		reapTimeout:     config.PodDeletionGracePeriod,
+		hostFilesPrefix: config.HostFilesPrefix,
 	}, nil
 }
 
@@ -343,15 +347,15 @@ func (k *klocksmith) updateStatusCallback(ctx context.Context, status updateengi
 
 // setInfoLabels labels our node with helpful info about Flatcar Container Linux.
 func (k *klocksmith) setInfoLabels(ctx context.Context) error {
-	vi, err := getVersionInfo()
+	versionInfo, err := getVersionInfo(k.hostFilesPrefix)
 	if err != nil {
 		return fmt.Errorf("getting version info: %w", err)
 	}
 
 	labels := map[string]string{
-		constants.LabelID:      vi.id,
-		constants.LabelGroup:   vi.group,
-		constants.LabelVersion: vi.version,
+		constants.LabelID:      versionInfo.id,
+		constants.LabelGroup:   versionInfo.group,
+		constants.LabelVersion: versionInfo.version,
 	}
 
 	if err := k8sutil.SetNodeLabels(ctx, k.nc, k.nodeName, labels); err != nil {
@@ -554,21 +558,25 @@ type versionInfo struct {
 	version string
 }
 
-func getUpdateMap() (map[string]string, error) {
+func getUpdateMap(filesPathPrefix string) (map[string]string, error) {
 	infomap := map[string]string{}
 
+	updateConfPathWithPrefix := filepath.Join(filesPathPrefix, updateConfPath)
+
 	// This file should always be present on Flatcar.
-	b, err := ioutil.ReadFile(updateConfPath)
+	b, err := ioutil.ReadFile(updateConfPathWithPrefix)
 	if err != nil {
-		return nil, fmt.Errorf("reading file %q: %w", updateConfPath, err)
+		return nil, fmt.Errorf("reading file %q: %w", updateConfPathWithPrefix, err)
 	}
 
 	splitNewlineEnv(infomap, string(b))
 
-	updateConfOverride, err := ioutil.ReadFile(updateConfOverridePath)
+	updateConfOverridePathWithPrefix := filepath.Join(filesPathPrefix, updateConfOverridePath)
+
+	updateConfOverride, err := ioutil.ReadFile(updateConfOverridePathWithPrefix)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			return nil, fmt.Errorf("reading file %q: %w", updateConfOverridePath, err)
+			return nil, fmt.Errorf("reading file %q: %w", updateConfOverridePathWithPrefix, err)
 		}
 
 		klog.Infof("Skipping missing update.conf: %v", err)
@@ -579,13 +587,15 @@ func getUpdateMap() (map[string]string, error) {
 	return infomap, nil
 }
 
-func getReleaseMap() (map[string]string, error) {
+func getReleaseMap(filesPathPrefix string) (map[string]string, error) {
 	infomap := map[string]string{}
 
+	osReleasePathWithPrefix := filepath.Join(filesPathPrefix, osReleasePath)
+
 	// This file should always be present on Flatcar.
-	b, err := ioutil.ReadFile(osReleasePath)
+	b, err := ioutil.ReadFile(osReleasePathWithPrefix)
 	if err != nil {
-		return nil, fmt.Errorf("reading file %q: %w", osReleasePath, err)
+		return nil, fmt.Errorf("reading file %q: %w", osReleasePathWithPrefix, err)
 	}
 
 	splitNewlineEnv(infomap, string(b))
@@ -596,13 +606,13 @@ func getReleaseMap() (map[string]string, error) {
 // GetVersionInfo returns VersionInfo from the current Flatcar system.
 //
 // Should probably live in a different package.
-func getVersionInfo() (*versionInfo, error) {
-	updateconf, err := getUpdateMap()
+func getVersionInfo(filesPathPrefix string) (*versionInfo, error) {
+	updateconf, err := getUpdateMap(filesPathPrefix)
 	if err != nil {
 		return nil, fmt.Errorf("getting update configuration: %w", err)
 	}
 
-	osrelease, err := getReleaseMap()
+	osrelease, err := getReleaseMap(filesPathPrefix)
 	if err != nil {
 		return nil, fmt.Errorf("getting OS release info: %w", err)
 	}

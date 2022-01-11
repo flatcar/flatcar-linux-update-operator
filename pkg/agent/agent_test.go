@@ -2,11 +2,12 @@ package agent_test
 
 import (
 	"context"
-	"errors"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/kubernetes/fake"
 
 	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/agent"
@@ -99,6 +100,7 @@ func Test_Creating_new_agent(t *testing.T) {
 	})
 }
 
+//nolint:funlen // Just many test cases.
 func Test_Running_agent(t *testing.T) {
 	t.Parallel()
 
@@ -108,14 +110,10 @@ func Test_Running_agent(t *testing.T) {
 		t.Run("Flatcar_update_configuration_file_does_not_exist", func(t *testing.T) {
 			t.Parallel()
 
-			updateConfigurationFilePath := "/usr/share/flatcar/update.conf"
+			configWithNoHostFiles := testConfig()
+			configWithNoHostFiles.HostFilesPrefix = t.TempDir()
 
-			// Temporary check in case someone runs tests actually on Flatcar.
-			if _, err := os.Stat(updateConfigurationFilePath); !errors.Is(err, os.ErrNotExist) {
-				t.Skipf("%q file found, running may give unreliable results", updateConfigurationFilePath)
-			}
-
-			client, err := agent.New(testConfig())
+			client, err := agent.New(configWithNoHostFiles)
 			if err != nil {
 				t.Fatalf("Unexpected error creating new agent: %v", err)
 			}
@@ -134,6 +132,45 @@ func Test_Running_agent(t *testing.T) {
 			case err := <-done:
 				if err == nil {
 					t.Fatalf("Expected agent to return an error")
+				}
+			}
+		})
+
+		t.Run("configured_Node_does_not_exist", func(t *testing.T) {
+			configWithTestFilesPrefix := testConfig()
+
+			configWithTestFilesPrefix.HostFilesPrefix = t.TempDir()
+
+			files := map[string]string{
+				"/usr/share/flatcar/update.conf": "GROUP=imageGroup",
+				"/etc/os-release":                "ID=testID\nVERSION=testVersion",
+			}
+
+			createTestFiles(t, files, configWithTestFilesPrefix.HostFilesPrefix)
+
+			client, err := agent.New(configWithTestFilesPrefix)
+			if err != nil {
+				t.Fatalf("Unexpected error creating new agent: %v", err)
+			}
+
+			ctx, cancel := context.WithTimeout(contextWithDeadline(t), 500*time.Millisecond)
+			defer cancel()
+
+			done := make(chan error)
+			go func() {
+				done <- client.Run(ctx.Done())
+			}()
+
+			select {
+			case <-ctx.Done():
+				t.Fatalf("Expected agent to exit before deadline")
+			case err := <-done:
+				if err == nil {
+					t.Fatalf("Expected agent to return an error")
+				}
+
+				if !apierrors.IsNotFound(err) {
+					t.Fatalf("Expected Node not found error when running agent, got: %v", err)
 				}
 			}
 		})
@@ -172,4 +209,21 @@ func contextWithDeadline(t *testing.T) context.Context {
 	t.Cleanup(cancel)
 
 	return ctx
+}
+
+func createTestFiles(t *testing.T, filesContentByPath map[string]string, prefix string) {
+	t.Helper()
+
+	for path, content := range filesContentByPath {
+		pathWithPrefix := filepath.Join(prefix, path)
+
+		dir := filepath.Dir(pathWithPrefix)
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			t.Fatalf("Failed creating directory %q: %v", dir, err)
+		}
+
+		if err := os.WriteFile(pathWithPrefix, []byte(content), 0o600); err != nil {
+			t.Fatalf("Failed creating file %q: %v", pathWithPrefix, err)
+		}
+	}
 }
