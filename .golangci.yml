@@ -26,27 +26,27 @@ issues:
       source: "http(s)://"
     # Allow use of fmt.Print* functions in cmd package and in tests.
     - linters:
-      - forbidigo
+        - forbidigo
       text: "use of `fmt.Printf` forbidden by pattern"
       path: cmd/
     - linters:
-      - forbidigo
+        - forbidigo
       text: "use of `fmt.Println` forbidden by pattern"
       path: cmd/
     - linters:
-      - forbidigo
+        - forbidigo
       text: "use of `fmt.Printf` forbidden by pattern"
       path: "_test.go"
     - linters:
-      - forbidigo
+        - forbidigo
       text: "use of `fmt.Println` forbidden by pattern"
       path: "_test.go"
     # Allow to return unwrapped errors from external packages, as we do not use typed errors yet.
     - linters:
-      - wrapcheck
+        - wrapcheck
       text: "error returned from external package is unwrapped"
     - linters:
-      - wrapcheck
+        - wrapcheck
       text: "error returned from interface method should be wrapped"
 
 linters-settings:
