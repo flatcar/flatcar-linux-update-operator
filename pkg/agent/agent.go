@@ -327,7 +327,7 @@ func (k *klocksmith) updateStatusCallback(ctx context.Context, status updateengi
 		labels[constants.LabelRebootNeeded] = constants.True
 	}
 
-	err := wait.PollUntil(defaultPollInterval, func() (bool, error) {
+	err := wait.PollImmediateUntil(defaultPollInterval, func() (bool, error) {
 		if err := k8sutil.SetNodeAnnotationsLabels(ctx, k.nc, k.nodeName, anno, labels); err != nil {
 			klog.Errorf("Failed to set annotation %q: %v", constants.AnnotationStatus, err)
 
