@@ -121,6 +121,10 @@ test-changelog: check-working-tree-clean ## Verifies that changelog is properly 
 	make format-changelog
 	@test -z "$$(git status --porcelain)" || (echo "Please run 'make format-changelog' and commit generated changes."; git diff; exit 1)
 
+.PHONY: build-kustomize
+build-kustomize: ## Renders manifests using kustomize.
+	kustomize build examples/deploy/
+
 .PHONY: help
 help: ## Prints help message.
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
