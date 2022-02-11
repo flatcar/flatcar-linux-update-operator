@@ -26,32 +26,52 @@ issues:
       source: "http(s)://"
     # Allow use of fmt.Print* functions in cmd package and in tests.
     - linters:
-      - forbidigo
+        - forbidigo
       text: "use of `fmt.Printf` forbidden by pattern"
       path: cmd/
     - linters:
-      - forbidigo
+        - forbidigo
       text: "use of `fmt.Println` forbidden by pattern"
       path: cmd/
     - linters:
-      - forbidigo
+        - forbidigo
       text: "use of `fmt.Printf` forbidden by pattern"
       path: "_test.go"
     - linters:
-      - forbidigo
+        - forbidigo
       text: "use of `fmt.Println` forbidden by pattern"
       path: "_test.go"
     # Allow to return unwrapped errors from external packages, as we do not use typed errors yet.
     - linters:
-      - wrapcheck
+        - wrapcheck
       text: "error returned from external package is unwrapped"
     - linters:
-      - wrapcheck
+        - wrapcheck
       text: "error returned from interface method should be wrapped"
 
 linters-settings:
-  exhaustive:
-    default-signifies-exhaustive: true
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+  gci:
+    local-prefixes: github.com/flatcar-linux/flatcar-linux-update-operator
+  godot:
+    capital: true
+  gofumpt:
+    extra-rules: true
+  govet:
+    enable-all: true
+    disable:
+      - fieldalignment
+      - shadow
+  makezero:
+    always: true
+  nolintlint:
+    allow-leading-space: false
+    require-explanation: true
+    require-specific: true
+  wsl:
+    force-err-cuddling: true
 
 # Update list of enabled linters using 'make update-linters'.
 linters:
@@ -81,14 +101,17 @@ linters:
     - asciicheck
     - bidichk
     - bodyclose
+    - containedctx
     - contextcheck
     - cyclop
     - deadcode
+    - decorder
     - depguard
     - dogsled
     - dupl
     - durationcheck
     - errcheck
+    - errchkjson
     - errname
     - errorlint
     - exhaustive
@@ -110,10 +133,12 @@ linters:
     - gomoddirectives
     - gomodguard
     - goprintffuncname
+    - grouper
     - ifshort
     - importas
     - ineffassign
     - lll
+    - maintidx
     - makezero
     - misspell
     - nakedret

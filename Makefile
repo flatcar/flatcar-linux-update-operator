@@ -28,7 +28,7 @@ build-test: ## Compiles unit tests.
 
 .PHONY: test
 test: ## Runs unit tests.
-	go test -mod=vendor ./...
+	CGO_ENABLED= go test -mod=vendor -race ./...
 
 .PHONY: generate
 generate: ## Updates generated source files.
