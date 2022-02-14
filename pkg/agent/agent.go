@@ -54,7 +54,7 @@ type Rebooter interface {
 
 // Klocksmith represents capabilities of agent.
 type Klocksmith interface {
-	Run(stop <-chan struct{}) error
+	Run(ctx context.Context) error
 }
 
 // Klocksmith implements agent part of FLUO.
@@ -115,13 +115,13 @@ func New(config *Config) (Klocksmith, error) {
 
 // Run starts the agent to listen for an update_engine reboot signal and react
 // by draining pods and rebooting. Runs until the stop channel is closed.
-func (k *klocksmith) Run(stop <-chan struct{}) error {
+func (k *klocksmith) Run(ctx context.Context) error {
 	klog.V(5).Info("Starting agent")
 
 	defer klog.V(5).Info("Stopping agent")
 
 	// Agent process should reboot the node, no need to loop.
-	if err := k.process(stop); err != nil {
+	if err := k.process(ctx); err != nil {
 		klog.Errorf("Error running agent process: %v", err)
 
 		return fmt.Errorf("processing: %w", err)
@@ -133,10 +133,8 @@ func (k *klocksmith) Run(stop <-chan struct{}) error {
 // process performs the agent reconciliation to reboot the node or stops when
 // the stop channel is closed.
 //
-//nolint:funlen,cyclop // This will be refactored once we have tests in place.
-func (k *klocksmith) process(stop <-chan struct{}) error {
-	ctx := context.TODO()
-
+//nolint:funlen,cyclop,gocognit // This will be refactored once we have tests in place.
+func (k *klocksmith) process(ctx context.Context) error {
 	klog.Info("Setting info labels")
 
 	if err := k.setInfoLabels(ctx); err != nil {
@@ -201,7 +199,7 @@ func (k *klocksmith) process(stop <-chan struct{}) error {
 	}
 
 	// Watch update engine for status updates.
-	go k.watchUpdateStatus(ctx, k.updateStatusCallback, stop)
+	go k.watchUpdateStatus(ctx, k.updateStatusCallback)
 
 	// Block until constants.AnnotationOkToReboot is set.
 	for {
@@ -305,7 +303,7 @@ func (k *klocksmith) process(stop <-chan struct{}) error {
 	k.lc.Reboot(false)
 
 	// Cross fingers.
-	sleepOrDone(24*7*time.Hour, stop)
+	sleepOrDone(24*7*time.Hour, ctx.Done())
 
 	return nil
 }
@@ -369,13 +367,13 @@ func (k *klocksmith) setInfoLabels(ctx context.Context) error {
 
 type statusUpdateF func(context.Context, updateengine.Status)
 
-func (k *klocksmith) watchUpdateStatus(ctx context.Context, update statusUpdateF, stop <-chan struct{}) {
+func (k *klocksmith) watchUpdateStatus(ctx context.Context, update statusUpdateF) {
 	klog.Info("Beginning to watch update_engine status")
 
 	oldOperation := ""
 	ch := make(chan updateengine.Status, 1)
 
-	go k.ue.ReceiveStatuses(ch, stop)
+	go k.ue.ReceiveStatuses(ch, ctx.Done())
 
 	for status := range ch {
 		if status.CurrentOperation != oldOperation && update != nil {

@@ -123,7 +123,7 @@ func Test_Running_agent(t *testing.T) {
 
 			done := make(chan error)
 			go func() {
-				done <- client.Run(ctx.Done())
+				done <- client.Run(ctx)
 			}()
 
 			select {
@@ -158,7 +158,7 @@ func Test_Running_agent(t *testing.T) {
 
 			done := make(chan error)
 			go func() {
-				done <- client.Run(ctx.Done())
+				done <- client.Run(ctx)
 			}()
 
 			select {
