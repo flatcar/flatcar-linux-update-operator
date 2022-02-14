@@ -153,7 +153,7 @@ func (k *klocksmith) process(stop <-chan struct{}) error {
 	// Only make a node schedulable if a reboot was in progress. This prevents a node from being made schedulable
 	// if it was made unschedulable by something other than the agent.
 	//
-	//nolint:lll
+	//nolint:lll // To be addressed.
 	madeUnschedulableAnnotation, madeUnschedulableAnnotationExists := node.Annotations[constants.AnnotationAgentMadeUnschedulable]
 	makeSchedulable := madeUnschedulableAnnotation == constants.True
 
@@ -279,6 +279,8 @@ func (k *klocksmith) process(stop <-chan struct{}) error {
 	}
 
 	// Wait for the pods to delete completely.
+	//
+	//nolint:varnamelen // Conventional name.
 	wg := sync.WaitGroup{}
 
 	for _, pod := range pods {
@@ -410,13 +412,13 @@ func (k *klocksmith) waitForOkToReboot(ctx context.Context) error {
 	// reboot and the controller telling us to do it.
 	ctx, _ = watchtools.ContextWithOptionalTimeout(ctx, maxOperatorResponseTime)
 
-	ev, err := watchtools.UntilWithoutRetry(ctx, watcher, k8sutil.NodeAnnotationCondition(shouldRebootSelector))
+	event, err := watchtools.UntilWithoutRetry(ctx, watcher, k8sutil.NodeAnnotationCondition(shouldRebootSelector))
 	if err != nil {
 		return fmt.Errorf("waiting for annotation %q failed: %w", constants.AnnotationOkToReboot, err)
 	}
 
 	// Sanity check.
-	no, ok := ev.Object.(*corev1.Node)
+	no, ok := event.Object.(*corev1.Node)
 	if !ok {
 		panic("event contains a non-*api.Node object")
 	}
@@ -457,26 +459,30 @@ func (k *klocksmith) waitForNotOkToReboot(ctx context.Context) error {
 	// of what the operator checks is the correct thing to do.
 	ctx, _ = watchtools.ContextWithOptionalTimeout(ctx, maxOperatorResponseTime)
 
-	ev, err := watchtools.UntilWithoutRetry(ctx, watcher, watchtools.ConditionFunc(func(event watch.Event) (bool, error) {
+	watchF := func(event watch.Event) (bool, error) {
+		//nolint:exhaustive // Handle for event type Bookmark will be added once we have tests in place.
 		switch event.Type {
 		case watch.Error:
 			return false, fmt.Errorf("watching node: %v", event.Object)
 		case watch.Deleted:
 			return false, fmt.Errorf("our node was deleted while we were waiting for ready")
 		case watch.Added, watch.Modified:
+			//nolint:forcetypeassert // Will be addressed once we have proper tests in place.
 			return event.Object.(*corev1.Node).Annotations[constants.AnnotationOkToReboot] != constants.True, nil
 		default:
 			return false, fmt.Errorf("unknown event type: %v", event.Type)
 		}
-	}))
+	}
+
+	event, err := watchtools.UntilWithoutRetry(ctx, watcher, watchF)
 	if err != nil {
 		return fmt.Errorf("waiting for annotation %q: %w", constants.AnnotationOkToReboot, err)
 	}
 
 	// Sanity check.
-	no, ok := ev.Object.(*corev1.Node)
+	no, ok := event.Object.(*corev1.Node)
 	if !ok {
-		return fmt.Errorf("object received in event is not Node, got: %#v", ev.Object)
+		return fmt.Errorf("object received in event is not Node, got: %#v", event.Object)
 	}
 
 	if no.Annotations[constants.AnnotationOkToReboot] == constants.True {
@@ -537,9 +543,10 @@ func sleepOrDone(d time.Duration, done <-chan struct{}) {
 }
 
 // splitNewlineEnv splits newline-delimited KEY=VAL pairs and puts values into given map.
-func splitNewlineEnv(m map[string]string, envs string) {
+func splitNewlineEnv(envVars map[string]string, envs string) {
 	sc := bufio.NewScanner(strings.NewReader(envs))
 	for sc.Scan() {
+		//nolint:gomnd // TODO.
 		spl := strings.SplitN(sc.Text(), "=", 2)
 
 		// Just skip empty lines or lines without a value.
@@ -547,7 +554,7 @@ func splitNewlineEnv(m map[string]string, envs string) {
 			continue
 		}
 
-		m[spl[0]] = spl[1]
+		envVars[spl[0]] = spl[1]
 	}
 }
 
@@ -617,11 +624,9 @@ func getVersionInfo(filesPathPrefix string) (*versionInfo, error) {
 		return nil, fmt.Errorf("getting OS release info: %w", err)
 	}
 
-	vi := &versionInfo{
+	return &versionInfo{
 		id:      osrelease["ID"],
 		group:   updateconf["GROUP"],
 		version: osrelease["VERSION"],
-	}
-
-	return vi, nil
+	}, nil
 }
