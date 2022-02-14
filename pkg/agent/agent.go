@@ -311,7 +311,18 @@ func (k *klocksmith) process(ctx context.Context) error {
 		}(pod)
 	}
 
-	wg.Wait()
+	allPodsTerminated := make(chan struct{})
+
+	go func() {
+		wg.Wait()
+		allPodsTerminated <- struct{}{}
+	}()
+
+	select {
+	case <-allPodsTerminated:
+	case <-ctx.Done():
+		return fmt.Errorf("waiting for all pods to terminate before the reboot interrupted")
+	}
 
 	klog.Info("Node drained, rebooting")
 
