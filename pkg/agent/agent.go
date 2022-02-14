@@ -210,16 +210,24 @@ func (k *klocksmith) process(ctx context.Context) error {
 	go k.watchUpdateStatus(ctx, k.updateStatusCallback)
 
 	// Block until constants.AnnotationOkToReboot is set.
-	for {
-		klog.Infof("Waiting for ok-to-reboot from controller...")
+	okToReboot := false
+	for !okToReboot {
+		select {
+		case <-ctx.Done():
+			klog.Infof("Got stop signal while waiting for ok-to-reboot from controller")
 
-		err := k.waitForOkToReboot(ctx)
-		if err == nil {
-			// Time to reboot.
-			break
+			return nil
+		default:
+			klog.Infof("Waiting for ok-to-reboot from controller...")
+
+			err := k.waitForOkToReboot(ctx)
+			if err == nil {
+				// Time to reboot.
+				okToReboot = true
+			}
+
+			klog.Warningf("Error waiting for an ok-to-reboot: %v", err)
 		}
-
-		klog.Warningf("Error waiting for an ok-to-reboot: %v", err)
 	}
 
 	klog.Info("Checking if node is already unschedulable")
