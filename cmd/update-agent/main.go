@@ -82,5 +82,8 @@ func main() {
 	// Run agent until the stop channel is closed
 	stop := make(chan struct{})
 	defer close(stop)
-	agent.Run(stop)
+
+	if err := agent.Run(stop); err != nil {
+		klog.Fatalf("Error running agent: %v", err)
+	}
 }
