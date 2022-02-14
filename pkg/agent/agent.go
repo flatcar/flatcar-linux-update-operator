@@ -40,6 +40,7 @@ type Config struct {
 	StatusReceiver         StatusReceiver
 	Rebooter               Rebooter
 	HostFilesPrefix        string
+	PollInterval           time.Duration
 }
 
 // StatusReceiver describe dependency of object providing status updates from update_engine.
@@ -67,6 +68,7 @@ type klocksmith struct {
 	lc              Rebooter
 	reapTimeout     time.Duration
 	hostFilesPrefix string
+	pollInterval    time.Duration
 }
 
 const (
@@ -101,6 +103,11 @@ func New(config *Config) (Klocksmith, error) {
 		return nil, fmt.Errorf("node name can't be empty")
 	}
 
+	pollInterval := config.PollInterval
+	if pollInterval == 0 {
+		pollInterval = defaultPollInterval
+	}
+
 	return &klocksmith{
 		nodeName:        config.NodeName,
 		pg:              config.Clientset.CoreV1(),
@@ -110,6 +117,7 @@ func New(config *Config) (Klocksmith, error) {
 		lc:              config.Rebooter,
 		reapTimeout:     config.PodDeletionGracePeriod,
 		hostFilesPrefix: config.HostFilesPrefix,
+		pollInterval:    pollInterval,
 	}, nil
 }
 
@@ -331,7 +339,7 @@ func (k *klocksmith) updateStatusCallback(ctx context.Context, status updateengi
 		labels[constants.LabelRebootNeeded] = constants.True
 	}
 
-	err := wait.PollImmediateUntil(defaultPollInterval, func() (bool, error) {
+	err := wait.PollImmediateUntil(k.pollInterval, func() (bool, error) {
 		if err := k8sutil.SetNodeAnnotationsLabels(ctx, k.nc, k.nodeName, anno, labels); err != nil {
 			klog.Errorf("Failed to set annotation %q: %v", constants.AnnotationStatus, err)
 
@@ -509,7 +517,7 @@ func (k *klocksmith) getPodsForDeletion(ctx context.Context) ([]corev1.Pod, erro
 
 // waitForPodDeletion waits for a pod to be deleted.
 func (k *klocksmith) waitForPodDeletion(ctx context.Context, pod corev1.Pod) error {
-	return wait.PollImmediate(defaultPollInterval, k.reapTimeout, func() (bool, error) {
+	return wait.PollImmediate(k.pollInterval, k.reapTimeout, func() (bool, error) {
 		p, err := k.pg.Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 		if errors.IsNotFound(err) || (p != nil && p.ObjectMeta.UID != pod.ObjectMeta.UID) {
 			klog.Infof("Deleted pod %q", pod.Name)
