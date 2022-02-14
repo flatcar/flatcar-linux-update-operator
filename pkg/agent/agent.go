@@ -347,7 +347,7 @@ func (k *klocksmith) updateStatusCallback(ctx context.Context, status updateengi
 		}
 
 		return true, nil
-	}, wait.NeverStop)
+	}, ctx.Done())
 	if err != nil {
 		klog.Errorf("Failed updating node annotations and labels: %v", err)
 	}
