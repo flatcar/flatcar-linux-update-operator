@@ -34,13 +34,14 @@ import (
 
 // Config represents configurable options for agent.
 type Config struct {
-	NodeName               string
-	PodDeletionGracePeriod time.Duration
-	Clientset              kubernetes.Interface
-	StatusReceiver         StatusReceiver
-	Rebooter               Rebooter
-	HostFilesPrefix        string
-	PollInterval           time.Duration
+	NodeName                string
+	PodDeletionGracePeriod  time.Duration
+	Clientset               kubernetes.Interface
+	StatusReceiver          StatusReceiver
+	Rebooter                Rebooter
+	HostFilesPrefix         string
+	PollInterval            time.Duration
+	MaxOperatorResponseTime time.Duration
 }
 
 // StatusReceiver describe dependency of object providing status updates from update_engine.
@@ -60,20 +61,21 @@ type Klocksmith interface {
 
 // Klocksmith implements agent part of FLUO.
 type klocksmith struct {
-	nodeName        string
-	pg              corev1client.PodsGetter
-	nc              corev1client.NodeInterface
-	dsg             appsv1client.DaemonSetsGetter
-	ue              StatusReceiver
-	lc              Rebooter
-	reapTimeout     time.Duration
-	hostFilesPrefix string
-	pollInterval    time.Duration
+	nodeName                string
+	pg                      corev1client.PodsGetter
+	nc                      corev1client.NodeInterface
+	dsg                     appsv1client.DaemonSetsGetter
+	ue                      StatusReceiver
+	lc                      Rebooter
+	reapTimeout             time.Duration
+	hostFilesPrefix         string
+	pollInterval            time.Duration
+	maxOperatorResponseTime time.Duration
 }
 
 const (
-	defaultPollInterval     = 10 * time.Second
-	maxOperatorResponseTime = 24 * time.Hour
+	defaultPollInterval            = 10 * time.Second
+	defaultMaxOperatorResponseTime = 24 * time.Hour
 
 	updateConfPath         = "/usr/share/flatcar/update.conf"
 	updateConfOverridePath = "/etc/flatcar/update.conf"
@@ -108,16 +110,22 @@ func New(config *Config) (Klocksmith, error) {
 		pollInterval = defaultPollInterval
 	}
 
+	maxOperatorResponseTime := config.MaxOperatorResponseTime
+	if maxOperatorResponseTime == 0 {
+		maxOperatorResponseTime = defaultMaxOperatorResponseTime
+	}
+
 	return &klocksmith{
-		nodeName:        config.NodeName,
-		pg:              config.Clientset.CoreV1(),
-		dsg:             config.Clientset.AppsV1(),
-		nc:              config.Clientset.CoreV1().Nodes(),
-		ue:              config.StatusReceiver,
-		lc:              config.Rebooter,
-		reapTimeout:     config.PodDeletionGracePeriod,
-		hostFilesPrefix: config.HostFilesPrefix,
-		pollInterval:    pollInterval,
+		nodeName:                config.NodeName,
+		pg:                      config.Clientset.CoreV1(),
+		dsg:                     config.Clientset.AppsV1(),
+		nc:                      config.Clientset.CoreV1().Nodes(),
+		ue:                      config.StatusReceiver,
+		lc:                      config.Rebooter,
+		reapTimeout:             config.PodDeletionGracePeriod,
+		hostFilesPrefix:         config.HostFilesPrefix,
+		pollInterval:            pollInterval,
+		maxOperatorResponseTime: maxOperatorResponseTime,
 	}, nil
 }
 
@@ -435,7 +443,7 @@ func (k *klocksmith) waitForOkToReboot(ctx context.Context) error {
 
 	// Hopefully 24 hours is enough time between indicating we need a
 	// reboot and the controller telling us to do it.
-	ctx, _ = watchtools.ContextWithOptionalTimeout(ctx, maxOperatorResponseTime)
+	ctx, _ = watchtools.ContextWithOptionalTimeout(ctx, k.maxOperatorResponseTime)
 
 	event, err := watchtools.UntilWithoutRetry(ctx, watcher, k8sutil.NodeAnnotationCondition(shouldRebootSelector))
 	if err != nil {
@@ -482,7 +490,7 @@ func (k *klocksmith) waitForNotOkToReboot(ctx context.Context) error {
 	// true' vs '== False'; due to the operator matching on '== True', and not
 	// going out of its way to convert '' => 'False', checking the exact inverse
 	// of what the operator checks is the correct thing to do.
-	ctx, _ = watchtools.ContextWithOptionalTimeout(ctx, maxOperatorResponseTime)
+	ctx, _ = watchtools.ContextWithOptionalTimeout(ctx, k.maxOperatorResponseTime)
 
 	watchF := func(event watch.Event) (bool, error) {
 		//nolint:exhaustive // Handle for event type Bookmark will be added once we have tests in place.
