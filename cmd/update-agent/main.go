@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -79,11 +80,8 @@ func main() {
 
 	klog.Infof("%s running", os.Args[0])
 
-	// Run agent until the stop channel is closed
-	stop := make(chan struct{})
-	defer close(stop)
-
-	if err := agent.Run(stop); err != nil {
+	// Run agent until the context is cancelled.
+	if err := agent.Run(context.Background()); err != nil {
 		klog.Fatalf("Error running agent: %v", err)
 	}
 }

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -33,11 +34,14 @@ import (
 
 // Config represents configurable options for agent.
 type Config struct {
-	NodeName               string
-	PodDeletionGracePeriod time.Duration
-	Clientset              kubernetes.Interface
-	StatusReceiver         StatusReceiver
-	Rebooter               Rebooter
+	NodeName                string
+	PodDeletionGracePeriod  time.Duration
+	Clientset               kubernetes.Interface
+	StatusReceiver          StatusReceiver
+	Rebooter                Rebooter
+	HostFilesPrefix         string
+	PollInterval            time.Duration
+	MaxOperatorResponseTime time.Duration
 }
 
 // StatusReceiver describe dependency of object providing status updates from update_engine.
@@ -52,23 +56,26 @@ type Rebooter interface {
 
 // Klocksmith represents capabilities of agent.
 type Klocksmith interface {
-	Run(stop <-chan struct{}) error
+	Run(ctx context.Context) error
 }
 
 // Klocksmith implements agent part of FLUO.
 type klocksmith struct {
-	nodeName    string
-	pg          corev1client.PodsGetter
-	nc          corev1client.NodeInterface
-	dsg         appsv1client.DaemonSetsGetter
-	ue          StatusReceiver
-	lc          Rebooter
-	reapTimeout time.Duration
+	nodeName                string
+	pg                      corev1client.PodsGetter
+	nc                      corev1client.NodeInterface
+	dsg                     appsv1client.DaemonSetsGetter
+	ue                      StatusReceiver
+	lc                      Rebooter
+	reapTimeout             time.Duration
+	hostFilesPrefix         string
+	pollInterval            time.Duration
+	maxOperatorResponseTime time.Duration
 }
 
 const (
-	defaultPollInterval     = 10 * time.Second
-	maxOperatorResponseTime = 24 * time.Hour
+	defaultPollInterval            = 10 * time.Second
+	defaultMaxOperatorResponseTime = 24 * time.Hour
 
 	updateConfPath         = "/usr/share/flatcar/update.conf"
 	updateConfOverridePath = "/etc/flatcar/update.conf"
@@ -98,26 +105,39 @@ func New(config *Config) (Klocksmith, error) {
 		return nil, fmt.Errorf("node name can't be empty")
 	}
 
+	pollInterval := config.PollInterval
+	if pollInterval == 0 {
+		pollInterval = defaultPollInterval
+	}
+
+	maxOperatorResponseTime := config.MaxOperatorResponseTime
+	if maxOperatorResponseTime == 0 {
+		maxOperatorResponseTime = defaultMaxOperatorResponseTime
+	}
+
 	return &klocksmith{
-		nodeName:    config.NodeName,
-		pg:          config.Clientset.CoreV1(),
-		dsg:         config.Clientset.AppsV1(),
-		nc:          config.Clientset.CoreV1().Nodes(),
-		ue:          config.StatusReceiver,
-		lc:          config.Rebooter,
-		reapTimeout: config.PodDeletionGracePeriod,
+		nodeName:                config.NodeName,
+		pg:                      config.Clientset.CoreV1(),
+		dsg:                     config.Clientset.AppsV1(),
+		nc:                      config.Clientset.CoreV1().Nodes(),
+		ue:                      config.StatusReceiver,
+		lc:                      config.Rebooter,
+		reapTimeout:             config.PodDeletionGracePeriod,
+		hostFilesPrefix:         config.HostFilesPrefix,
+		pollInterval:            pollInterval,
+		maxOperatorResponseTime: maxOperatorResponseTime,
 	}, nil
 }
 
 // Run starts the agent to listen for an update_engine reboot signal and react
 // by draining pods and rebooting. Runs until the stop channel is closed.
-func (k *klocksmith) Run(stop <-chan struct{}) error {
+func (k *klocksmith) Run(ctx context.Context) error {
 	klog.V(5).Info("Starting agent")
 
 	defer klog.V(5).Info("Stopping agent")
 
 	// Agent process should reboot the node, no need to loop.
-	if err := k.process(stop); err != nil {
+	if err := k.process(ctx); err != nil {
 		klog.Errorf("Error running agent process: %v", err)
 
 		return fmt.Errorf("processing: %w", err)
@@ -129,10 +149,8 @@ func (k *klocksmith) Run(stop <-chan struct{}) error {
 // process performs the agent reconciliation to reboot the node or stops when
 // the stop channel is closed.
 //
-//nolint:funlen,cyclop // This will be refactored once we have tests in place.
-func (k *klocksmith) process(stop <-chan struct{}) error {
-	ctx := context.TODO()
-
+//nolint:funlen,cyclop,gocognit // This will be refactored once we have tests in place.
+func (k *klocksmith) process(ctx context.Context) error {
 	klog.Info("Setting info labels")
 
 	if err := k.setInfoLabels(ctx); err != nil {
@@ -149,7 +167,7 @@ func (k *klocksmith) process(stop <-chan struct{}) error {
 	// Only make a node schedulable if a reboot was in progress. This prevents a node from being made schedulable
 	// if it was made unschedulable by something other than the agent.
 	//
-	//nolint:lll
+	//nolint:lll // To be addressed.
 	madeUnschedulableAnnotation, madeUnschedulableAnnotationExists := node.Annotations[constants.AnnotationAgentMadeUnschedulable]
 	makeSchedulable := madeUnschedulableAnnotation == constants.True
 
@@ -197,19 +215,27 @@ func (k *klocksmith) process(stop <-chan struct{}) error {
 	}
 
 	// Watch update engine for status updates.
-	go k.watchUpdateStatus(ctx, k.updateStatusCallback, stop)
+	go k.watchUpdateStatus(ctx, k.updateStatusCallback)
 
 	// Block until constants.AnnotationOkToReboot is set.
-	for {
-		klog.Infof("Waiting for ok-to-reboot from controller...")
+	okToReboot := false
+	for !okToReboot {
+		select {
+		case <-ctx.Done():
+			klog.Infof("Got stop signal while waiting for ok-to-reboot from controller")
 
-		err := k.waitForOkToReboot(ctx)
-		if err == nil {
-			// Time to reboot.
-			break
+			return nil
+		default:
+			klog.Infof("Waiting for ok-to-reboot from controller...")
+
+			err := k.waitForOkToReboot(ctx)
+			if err == nil {
+				// Time to reboot.
+				okToReboot = true
+			}
+
+			klog.Warningf("Error waiting for an ok-to-reboot: %v", err)
 		}
-
-		klog.Warningf("Error waiting for an ok-to-reboot: %v", err)
 	}
 
 	klog.Info("Checking if node is already unschedulable")
@@ -275,6 +301,8 @@ func (k *klocksmith) process(stop <-chan struct{}) error {
 	}
 
 	// Wait for the pods to delete completely.
+	//
+	//nolint:varnamelen // Conventional name.
 	wg := sync.WaitGroup{}
 
 	for _, pod := range pods {
@@ -291,7 +319,18 @@ func (k *klocksmith) process(stop <-chan struct{}) error {
 		}(pod)
 	}
 
-	wg.Wait()
+	allPodsTerminated := make(chan struct{})
+
+	go func() {
+		wg.Wait()
+		allPodsTerminated <- struct{}{}
+	}()
+
+	select {
+	case <-allPodsTerminated:
+	case <-ctx.Done():
+		return fmt.Errorf("waiting for all pods to terminate before the reboot interrupted")
+	}
 
 	klog.Info("Node drained, rebooting")
 
@@ -299,7 +338,7 @@ func (k *klocksmith) process(stop <-chan struct{}) error {
 	k.lc.Reboot(false)
 
 	// Cross fingers.
-	sleepOrDone(24*7*time.Hour, stop)
+	sleepOrDone(24*7*time.Hour, ctx.Done())
 
 	return nil
 }
@@ -327,7 +366,7 @@ func (k *klocksmith) updateStatusCallback(ctx context.Context, status updateengi
 		labels[constants.LabelRebootNeeded] = constants.True
 	}
 
-	err := wait.PollImmediateUntil(defaultPollInterval, func() (bool, error) {
+	err := wait.PollImmediateUntil(k.pollInterval, func() (bool, error) {
 		if err := k8sutil.SetNodeAnnotationsLabels(ctx, k.nc, k.nodeName, anno, labels); err != nil {
 			klog.Errorf("Failed to set annotation %q: %v", constants.AnnotationStatus, err)
 
@@ -335,7 +374,7 @@ func (k *klocksmith) updateStatusCallback(ctx context.Context, status updateengi
 		}
 
 		return true, nil
-	}, wait.NeverStop)
+	}, ctx.Done())
 	if err != nil {
 		klog.Errorf("Failed updating node annotations and labels: %v", err)
 	}
@@ -343,15 +382,15 @@ func (k *klocksmith) updateStatusCallback(ctx context.Context, status updateengi
 
 // setInfoLabels labels our node with helpful info about Flatcar Container Linux.
 func (k *klocksmith) setInfoLabels(ctx context.Context) error {
-	vi, err := getVersionInfo()
+	versionInfo, err := getVersionInfo(k.hostFilesPrefix)
 	if err != nil {
 		return fmt.Errorf("getting version info: %w", err)
 	}
 
 	labels := map[string]string{
-		constants.LabelID:      vi.id,
-		constants.LabelGroup:   vi.group,
-		constants.LabelVersion: vi.version,
+		constants.LabelID:      versionInfo.id,
+		constants.LabelGroup:   versionInfo.group,
+		constants.LabelVersion: versionInfo.version,
 	}
 
 	if err := k8sutil.SetNodeLabels(ctx, k.nc, k.nodeName, labels); err != nil {
@@ -363,13 +402,13 @@ func (k *klocksmith) setInfoLabels(ctx context.Context) error {
 
 type statusUpdateF func(context.Context, updateengine.Status)
 
-func (k *klocksmith) watchUpdateStatus(ctx context.Context, update statusUpdateF, stop <-chan struct{}) {
+func (k *klocksmith) watchUpdateStatus(ctx context.Context, update statusUpdateF) {
 	klog.Info("Beginning to watch update_engine status")
 
 	oldOperation := ""
 	ch := make(chan updateengine.Status, 1)
 
-	go k.ue.ReceiveStatuses(ch, stop)
+	go k.ue.ReceiveStatuses(ch, ctx.Done())
 
 	for status := range ch {
 		if status.CurrentOperation != oldOperation && update != nil {
@@ -404,15 +443,15 @@ func (k *klocksmith) waitForOkToReboot(ctx context.Context) error {
 
 	// Hopefully 24 hours is enough time between indicating we need a
 	// reboot and the controller telling us to do it.
-	ctx, _ = watchtools.ContextWithOptionalTimeout(ctx, maxOperatorResponseTime)
+	ctx, _ = watchtools.ContextWithOptionalTimeout(ctx, k.maxOperatorResponseTime)
 
-	ev, err := watchtools.UntilWithoutRetry(ctx, watcher, k8sutil.NodeAnnotationCondition(shouldRebootSelector))
+	event, err := watchtools.UntilWithoutRetry(ctx, watcher, k8sutil.NodeAnnotationCondition(shouldRebootSelector))
 	if err != nil {
 		return fmt.Errorf("waiting for annotation %q failed: %w", constants.AnnotationOkToReboot, err)
 	}
 
 	// Sanity check.
-	no, ok := ev.Object.(*corev1.Node)
+	no, ok := event.Object.(*corev1.Node)
 	if !ok {
 		panic("event contains a non-*api.Node object")
 	}
@@ -451,28 +490,32 @@ func (k *klocksmith) waitForNotOkToReboot(ctx context.Context) error {
 	// true' vs '== False'; due to the operator matching on '== True', and not
 	// going out of its way to convert '' => 'False', checking the exact inverse
 	// of what the operator checks is the correct thing to do.
-	ctx, _ = watchtools.ContextWithOptionalTimeout(ctx, maxOperatorResponseTime)
+	ctx, _ = watchtools.ContextWithOptionalTimeout(ctx, k.maxOperatorResponseTime)
 
-	ev, err := watchtools.UntilWithoutRetry(ctx, watcher, watchtools.ConditionFunc(func(event watch.Event) (bool, error) {
+	watchF := func(event watch.Event) (bool, error) {
+		//nolint:exhaustive // Handle for event type Bookmark will be added once we have tests in place.
 		switch event.Type {
 		case watch.Error:
 			return false, fmt.Errorf("watching node: %v", event.Object)
 		case watch.Deleted:
 			return false, fmt.Errorf("our node was deleted while we were waiting for ready")
 		case watch.Added, watch.Modified:
+			//nolint:forcetypeassert // Will be addressed once we have proper tests in place.
 			return event.Object.(*corev1.Node).Annotations[constants.AnnotationOkToReboot] != constants.True, nil
 		default:
 			return false, fmt.Errorf("unknown event type: %v", event.Type)
 		}
-	}))
+	}
+
+	event, err := watchtools.UntilWithoutRetry(ctx, watcher, watchF)
 	if err != nil {
 		return fmt.Errorf("waiting for annotation %q: %w", constants.AnnotationOkToReboot, err)
 	}
 
 	// Sanity check.
-	no, ok := ev.Object.(*corev1.Node)
+	no, ok := event.Object.(*corev1.Node)
 	if !ok {
-		return fmt.Errorf("object received in event is not Node, got: %#v", ev.Object)
+		return fmt.Errorf("object received in event is not Node, got: %#v", event.Object)
 	}
 
 	if no.Annotations[constants.AnnotationOkToReboot] == constants.True {
@@ -501,7 +544,7 @@ func (k *klocksmith) getPodsForDeletion(ctx context.Context) ([]corev1.Pod, erro
 
 // waitForPodDeletion waits for a pod to be deleted.
 func (k *klocksmith) waitForPodDeletion(ctx context.Context, pod corev1.Pod) error {
-	return wait.PollImmediate(defaultPollInterval, k.reapTimeout, func() (bool, error) {
+	return wait.PollImmediate(k.pollInterval, k.reapTimeout, func() (bool, error) {
 		p, err := k.pg.Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 		if errors.IsNotFound(err) || (p != nil && p.ObjectMeta.UID != pod.ObjectMeta.UID) {
 			klog.Infof("Deleted pod %q", pod.Name)
@@ -533,9 +576,10 @@ func sleepOrDone(d time.Duration, done <-chan struct{}) {
 }
 
 // splitNewlineEnv splits newline-delimited KEY=VAL pairs and puts values into given map.
-func splitNewlineEnv(m map[string]string, envs string) {
+func splitNewlineEnv(envVars map[string]string, envs string) {
 	sc := bufio.NewScanner(strings.NewReader(envs))
 	for sc.Scan() {
+		//nolint:gomnd // TODO.
 		spl := strings.SplitN(sc.Text(), "=", 2)
 
 		// Just skip empty lines or lines without a value.
@@ -543,7 +587,7 @@ func splitNewlineEnv(m map[string]string, envs string) {
 			continue
 		}
 
-		m[spl[0]] = spl[1]
+		envVars[spl[0]] = spl[1]
 	}
 }
 
@@ -554,21 +598,25 @@ type versionInfo struct {
 	version string
 }
 
-func getUpdateMap() (map[string]string, error) {
+func getUpdateMap(filesPathPrefix string) (map[string]string, error) {
 	infomap := map[string]string{}
 
+	updateConfPathWithPrefix := filepath.Join(filesPathPrefix, updateConfPath)
+
 	// This file should always be present on Flatcar.
-	b, err := ioutil.ReadFile(updateConfPath)
+	b, err := ioutil.ReadFile(updateConfPathWithPrefix)
 	if err != nil {
-		return nil, fmt.Errorf("reading file %q: %w", updateConfPath, err)
+		return nil, fmt.Errorf("reading file %q: %w", updateConfPathWithPrefix, err)
 	}
 
 	splitNewlineEnv(infomap, string(b))
 
-	updateConfOverride, err := ioutil.ReadFile(updateConfOverridePath)
+	updateConfOverridePathWithPrefix := filepath.Join(filesPathPrefix, updateConfOverridePath)
+
+	updateConfOverride, err := ioutil.ReadFile(updateConfOverridePathWithPrefix)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			return nil, fmt.Errorf("reading file %q: %w", updateConfOverridePath, err)
+			return nil, fmt.Errorf("reading file %q: %w", updateConfOverridePathWithPrefix, err)
 		}
 
 		klog.Infof("Skipping missing update.conf: %v", err)
@@ -579,13 +627,15 @@ func getUpdateMap() (map[string]string, error) {
 	return infomap, nil
 }
 
-func getReleaseMap() (map[string]string, error) {
+func getReleaseMap(filesPathPrefix string) (map[string]string, error) {
 	infomap := map[string]string{}
 
+	osReleasePathWithPrefix := filepath.Join(filesPathPrefix, osReleasePath)
+
 	// This file should always be present on Flatcar.
-	b, err := ioutil.ReadFile(osReleasePath)
+	b, err := ioutil.ReadFile(osReleasePathWithPrefix)
 	if err != nil {
-		return nil, fmt.Errorf("reading file %q: %w", osReleasePath, err)
+		return nil, fmt.Errorf("reading file %q: %w", osReleasePathWithPrefix, err)
 	}
 
 	splitNewlineEnv(infomap, string(b))
@@ -596,22 +646,20 @@ func getReleaseMap() (map[string]string, error) {
 // GetVersionInfo returns VersionInfo from the current Flatcar system.
 //
 // Should probably live in a different package.
-func getVersionInfo() (*versionInfo, error) {
-	updateconf, err := getUpdateMap()
+func getVersionInfo(filesPathPrefix string) (*versionInfo, error) {
+	updateconf, err := getUpdateMap(filesPathPrefix)
 	if err != nil {
 		return nil, fmt.Errorf("getting update configuration: %w", err)
 	}
 
-	osrelease, err := getReleaseMap()
+	osrelease, err := getReleaseMap(filesPathPrefix)
 	if err != nil {
 		return nil, fmt.Errorf("getting OS release info: %w", err)
 	}
 
-	vi := &versionInfo{
+	return &versionInfo{
 		id:      osrelease["ID"],
 		group:   updateconf["GROUP"],
 		version: osrelease["VERSION"],
-	}
-
-	return vi, nil
+	}, nil
 }
