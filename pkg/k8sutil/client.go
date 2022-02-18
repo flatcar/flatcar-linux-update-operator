@@ -13,7 +13,7 @@ import (
 func GetClient(path string) (*kubernetes.Clientset, error) {
 	conf, err := getClientConfig(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get Kubernetes client config: %w", err)
+		return nil, fmt.Errorf("getting Kubernetes client config: %w", err)
 	}
 
 	return kubernetes.NewForConfig(conf)
@@ -22,9 +22,10 @@ func GetClient(path string) (*kubernetes.Clientset, error) {
 // getClientConfig returns a Kubernetes client Config.
 func getClientConfig(path string) (*rest.Config, error) {
 	if path != "" {
-		// build Config from a kubeconfig filepath
+		// Build Config from a kubeconfig filepath.
 		return clientcmd.BuildConfigFromFlags("", path)
 	}
-	// uses pod's service account to get a Config
+
+	// Uses pod's service account to get a Config.
 	return rest.InClusterConfig()
 }
