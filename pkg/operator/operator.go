@@ -96,9 +96,6 @@ type Kontroller struct {
 	// It will be set to the namespace the operator is running in automatically.
 	namespace string
 
-	// Auto-label Flatcar Container Linux nodes for migration compatibility.
-	autoLabelContainerLinux bool
-
 	// Reboot window.
 	rebootWindow *timeutil.Periodic
 
@@ -175,7 +172,6 @@ func New(config Config) (*Kontroller, error) {
 		afterRebootAnnotations:      config.AfterRebootAnnotations,
 		leaderElectionEventRecorder: leaderElectionEventRecorder,
 		namespace:                   config.Namespace,
-		autoLabelContainerLinux:     config.AutoLabelContainerLinux,
 		rebootWindow:                rebootWindow,
 		maxRebootingNodes:           maxRebootingNodes,
 		reconciliationPeriod:        defaultReconciliationPeriod,
@@ -192,11 +188,6 @@ func (k *Kontroller) Run(stop <-chan struct{}) error {
 	// Leader election is responsible for shutting down the controller, so when leader election
 	// is lost, controller is immediately stopped, as shared context will be cancelled.
 	ctx := k.withLeaderElection(stop, err)
-
-	// Start Flatcar Container Linux node auto-labeler.
-	if k.autoLabelContainerLinux {
-		go wait.Until(func() { k.legacyLabeler(ctx) }, k.reconciliationPeriod, ctx.Done())
-	}
 
 	klog.V(5).Info("starting controller")
 

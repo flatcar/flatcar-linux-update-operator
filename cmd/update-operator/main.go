@@ -17,7 +17,6 @@ type flags struct {
 	beforeRebootAnnotations flagutil.StringSliceFlag
 	afterRebootAnnotations  flagutil.StringSliceFlag
 	kubeconfig              *string
-	autoLabelContainerLinux *bool
 	rebootWindowStart       *string
 	rebootWindowLength      *string
 	printVersion            *bool
@@ -27,9 +26,6 @@ func handleFlags() *flags {
 	f := &flags{
 		kubeconfig: flag.String("kubeconfig", "",
 			"Path to a kubeconfig file. Default to the in-cluster config if not provided."),
-
-		autoLabelContainerLinux: flag.Bool("auto-label-flatcar-linux", false,
-			"Auto-label Flatcar Container Linux nodes with agent=true (convenience)"),
 
 		rebootWindowStart: flag.String("reboot-window-start", "",
 			"Day of week ('Sun', 'Mon', ...; optional) and time of day at which the reboot window starts. "+
@@ -97,7 +93,6 @@ func main() {
 	// Construct update-operator.
 	o, err := operator.New(operator.Config{
 		Client:                  client,
-		AutoLabelContainerLinux: *f.autoLabelContainerLinux,
 		BeforeRebootAnnotations: f.beforeRebootAnnotations,
 		AfterRebootAnnotations:  f.afterRebootAnnotations,
 		RebootWindowStart:       *f.rebootWindowStart,

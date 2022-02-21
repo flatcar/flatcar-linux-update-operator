@@ -80,10 +80,6 @@ const (
 	// LabelVersion is a key set by the update-agent to the value of "VERSION" in /etc/os-release.
 	LabelVersion = Prefix + "version"
 
-	// LabelUpdateAgentEnabled is a key set to "true" on nodes where update-agent pods should be scheduled.
-	// This applies only when update-operator is run with the flag "auto-label-flatcar-linux=true".
-	LabelUpdateAgentEnabled = Prefix + "agent"
-
 	// AgentVersion is the key used to indicate the
 	// flatcar-linux-update-operator's agent's version.
 	// The value is a semver-parseable string. It should be present on each agent
