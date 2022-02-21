@@ -81,6 +81,22 @@ var (
 	notBeforeRebootReq = k8sutil.NewRequirementOrDie(constants.LabelBeforeReboot, selection.NotIn, []string{constants.True})
 )
 
+// Config configures a Kontroller.
+type Config struct {
+	// Kubernetes client.
+	Client kubernetes.Interface
+	// Migration compatibility.
+	AutoLabelContainerLinux bool
+	// Annotations to look for before and after reboots.
+	BeforeRebootAnnotations []string
+	AfterRebootAnnotations  []string
+	// Reboot window.
+	RebootWindowStart  string
+	RebootWindowLength string
+	Namespace          string
+	LockID             string
+}
+
 // Kontroller implement operator part of FLUO.
 type Kontroller struct {
 	kc kubernetes.Interface
@@ -106,22 +122,6 @@ type Kontroller struct {
 	leaderElectionLease time.Duration
 
 	lockID string
-}
-
-// Config configures a Kontroller.
-type Config struct {
-	// Kubernetes client.
-	Client kubernetes.Interface
-	// Migration compatibility.
-	AutoLabelContainerLinux bool
-	// Annotations to look for before and after reboots.
-	BeforeRebootAnnotations []string
-	AfterRebootAnnotations  []string
-	// Reboot window.
-	RebootWindowStart  string
-	RebootWindowLength string
-	Namespace          string
-	LockID             string
 }
 
 // New initializes a new Kontroller.
