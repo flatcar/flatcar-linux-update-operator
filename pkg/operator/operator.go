@@ -172,12 +172,12 @@ func (k *Kontroller) Run(stop <-chan struct{}) error {
 	// is lost, controller is immediately stopped, as shared context will be cancelled.
 	ctx := k.withLeaderElection(stop, err)
 
-	klog.V(5).Info("starting controller")
+	klog.V(5).Info("Starting controller")
 
 	// Call the process loop each period, until stop is closed.
 	wait.Until(func() { k.process(ctx) }, k.reconciliationPeriod, ctx.Done())
 
-	klog.V(5).Info("stopping controller")
+	klog.V(5).Info("Stopping controller")
 
 	return <-err
 }
@@ -233,7 +233,7 @@ func (k *Kontroller) withLeaderElection(stop <-chan struct{}, err chan<- error) 
 			RetryPeriod: k.leaderElectionLease / 3,
 			Callbacks: leaderelection.LeaderCallbacks{
 				OnStartedLeading: func(ctx context.Context) { // was: func(stop <-chan struct{
-					klog.V(5).Info("started leading")
+					klog.V(5).Info("Started leading")
 					waitLeading <- struct{}{}
 				},
 				OnStoppedLeading: func() {
