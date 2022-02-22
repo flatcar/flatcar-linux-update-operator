@@ -155,7 +155,7 @@ func New(config Config) (*Kontroller, error) {
 	// Create event emitter.
 	leaderElectionBroadcaster := record.NewBroadcaster()
 	leaderElectionBroadcaster.StartRecordingToSink(&corev1client.EventSinkImpl{
-		Interface: corev1client.New(config.Client.CoreV1().RESTClient()).Events(""),
+		Interface: config.Client.CoreV1().Events(config.Namespace),
 	})
 
 	leaderElectionEventRecorder := leaderElectionBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{

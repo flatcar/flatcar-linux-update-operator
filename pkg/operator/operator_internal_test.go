@@ -22,6 +22,7 @@ const (
 	testAnotherBeforeRebootAnnotation = "test-another-after-annotation"
 	testAfterRebootAnnotation         = "test-after-annotation"
 	testAnotherAfterRebootAnnotation  = "test-another-after-annotation"
+	testNamespace                     = "default"
 )
 
 func Test_Operator_exits_gracefully_when_user_requests_shutdown(t *testing.T) {
@@ -124,6 +125,35 @@ func Test_Operator_shuts_down_leader_election_process_when_user_requests_shutdow
 	}
 }
 
+func Test_Operator_emits_events_about_leader_election_to_configured_namespace(t *testing.T) {
+	t.Parallel()
+
+	testController := kontrollerWithObjects()
+	testController.reconciliationPeriod = time.Second
+
+	stop := make(chan struct{})
+
+	go func() {
+		time.Sleep(testController.reconciliationPeriod)
+		close(stop)
+	}()
+
+	if err := testController.Run(stop); err != nil {
+		t.Fatalf("Unexpected run error: %v", err)
+	}
+
+	ns := testController.namespace
+
+	events, err := testController.kc.CoreV1().Events(ns).List(contextWithDeadline(t), metav1.ListOptions{})
+	if err != nil {
+		t.Fatalf("Failed listing events: %v", err)
+	}
+
+	if len(events.Items) == 0 {
+		t.Fatalf("Expected at least one event to be published")
+	}
+}
+
 //nolint:funlen
 func Test_Operator_returns_error_when_leadership_is_lost(t *testing.T) {
 	t.Parallel()
@@ -161,7 +191,7 @@ func Test_Operator_returns_error_when_leadership_is_lost(t *testing.T) {
 	// Force-steal leader election.
 	ctx := contextWithDeadline(t)
 
-	configMapClient := k.kc.CoreV1().ConfigMaps("")
+	configMapClient := k.kc.CoreV1().ConfigMaps(testNamespace)
 
 	lock, err := configMapClient.Get(ctx, leaderElectionResourceName, metav1.GetOptions{})
 	if err != nil {
@@ -1081,6 +1111,7 @@ func kontrollerWithObjects(objects ...runtime.Object) *Kontroller {
 		reconciliationPeriod: defaultReconciliationPeriod,
 		leaderElectionLease:  defaultLeaderElectionLease,
 		lockID:               "foo",
+		namespace:            testNamespace,
 	}
 }
 
