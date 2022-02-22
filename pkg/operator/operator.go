@@ -104,7 +104,6 @@ type Kontroller struct {
 	beforeRebootAnnotations []string
 	afterRebootAnnotations  []string
 
-	leaderElectionEventRecorder record.EventRecorder
 	// Namespace is the kubernetes namespace any resources (e.g. locks,
 	// configmaps, agents) should be created and read under.
 	// It will be set to the namespace the operator is running in automatically.
@@ -150,28 +149,17 @@ func New(config Config) (*Kontroller, error) {
 
 	kc := config.Client
 
-	// Create event emitter.
-	leaderElectionBroadcaster := record.NewBroadcaster()
-	leaderElectionBroadcaster.StartRecordingToSink(&corev1client.EventSinkImpl{
-		Interface: config.Client.CoreV1().Events(config.Namespace),
-	})
-
-	leaderElectionEventRecorder := leaderElectionBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{
-		Component: leaderElectionEventSourceComponent,
-	})
-
 	return &Kontroller{
-		kc:                          kc,
-		nc:                          kc.CoreV1().Nodes(),
-		beforeRebootAnnotations:     config.BeforeRebootAnnotations,
-		afterRebootAnnotations:      config.AfterRebootAnnotations,
-		leaderElectionEventRecorder: leaderElectionEventRecorder,
-		namespace:                   config.Namespace,
-		rebootWindow:                rebootWindow,
-		maxRebootingNodes:           maxRebootingNodes,
-		reconciliationPeriod:        defaultReconciliationPeriod,
-		leaderElectionLease:         defaultLeaderElectionLease,
-		lockID:                      config.LockID,
+		kc:                      kc,
+		nc:                      kc.CoreV1().Nodes(),
+		beforeRebootAnnotations: config.BeforeRebootAnnotations,
+		afterRebootAnnotations:  config.AfterRebootAnnotations,
+		namespace:               config.Namespace,
+		rebootWindow:            rebootWindow,
+		maxRebootingNodes:       maxRebootingNodes,
+		reconciliationPeriod:    defaultReconciliationPeriod,
+		leaderElectionLease:     defaultLeaderElectionLease,
+		lockID:                  config.LockID,
 	}, nil
 }
 
@@ -197,6 +185,11 @@ func (k *Kontroller) Run(stop <-chan struct{}) error {
 // withLeaderElection creates a new context which is cancelled when this
 // operator does not hold a lock to operate on the cluster.
 func (k *Kontroller) withLeaderElection(stop <-chan struct{}, err chan<- error) context.Context {
+	leaderElectionBroadcaster := record.NewBroadcaster()
+	leaderElectionBroadcaster.StartRecordingToSink(&corev1client.EventSinkImpl{
+		Interface: k.kc.CoreV1().Events(k.namespace),
+	})
+
 	resLock := &resourcelock.ConfigMapLock{
 		ConfigMapMeta: metav1.ObjectMeta{
 			Namespace: k.namespace,
@@ -204,8 +197,10 @@ func (k *Kontroller) withLeaderElection(stop <-chan struct{}, err chan<- error) 
 		},
 		Client: k.kc.CoreV1(),
 		LockConfig: resourcelock.ResourceLockConfig{
-			Identity:      k.lockID,
-			EventRecorder: k.leaderElectionEventRecorder,
+			Identity: k.lockID,
+			EventRecorder: leaderElectionBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{
+				Component: leaderElectionEventSourceComponent,
+			}),
 		},
 	}
 
