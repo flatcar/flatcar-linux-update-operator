@@ -27,7 +27,7 @@ import (
 
 const (
 	leaderElectionEventSourceComponent = "update-operator-leader-election"
-	maxRebootingNodes                  = 1
+	defaultMaxRebootingNodes           = 1
 
 	leaderElectionResourceName = "flatcar-linux-update-operator-lock"
 
@@ -89,10 +89,13 @@ type Config struct {
 	BeforeRebootAnnotations []string
 	AfterRebootAnnotations  []string
 	// Reboot window.
-	RebootWindowStart  string
-	RebootWindowLength string
-	Namespace          string
-	LockID             string
+	RebootWindowStart    string
+	RebootWindowLength   string
+	Namespace            string
+	LockID               string
+	ReconciliationPeriod time.Duration
+	LeaderElectionLease  time.Duration
+	MaxRebootingNodes    int
 }
 
 // Kontroller implement operator part of FLUO.
@@ -149,6 +152,21 @@ func New(config Config) (*Kontroller, error) {
 
 	kc := config.Client
 
+	reconciliationPeriod := config.ReconciliationPeriod
+	if reconciliationPeriod == 0 {
+		reconciliationPeriod = defaultLeaderElectionLease
+	}
+
+	leaderElectionLeaseDuration := config.LeaderElectionLease
+	if leaderElectionLeaseDuration == 0 {
+		leaderElectionLeaseDuration = defaultLeaderElectionLease
+	}
+
+	maxRebootingNodes := config.MaxRebootingNodes
+	if maxRebootingNodes == 0 {
+		maxRebootingNodes = defaultMaxRebootingNodes
+	}
+
 	return &Kontroller{
 		kc:                      kc,
 		nc:                      kc.CoreV1().Nodes(),
@@ -157,8 +175,8 @@ func New(config Config) (*Kontroller, error) {
 		namespace:               config.Namespace,
 		rebootWindow:            rebootWindow,
 		maxRebootingNodes:       maxRebootingNodes,
-		reconciliationPeriod:    defaultReconciliationPeriod,
-		leaderElectionLease:     defaultLeaderElectionLease,
+		reconciliationPeriod:    reconciliationPeriod,
+		leaderElectionLease:     leaderElectionLeaseDuration,
 		lockID:                  config.LockID,
 	}, nil
 }
@@ -461,14 +479,14 @@ func (k *Kontroller) remainingRebootingCapacity(nodelist *corev1.NodeList) int {
 
 	rebootingNodes = append(append(rebootingNodes, beforeRebootNodes...), afterRebootNodes...)
 
-	remainingCapacity := maxRebootingNodes - len(rebootingNodes)
+	remainingCapacity := k.maxRebootingNodes - len(rebootingNodes)
 
 	if remainingCapacity == 0 {
 		for _, n := range rebootingNodes {
 			klog.Infof("Found node %q still rebooting, waiting", n.Name)
 		}
 
-		klog.Infof("Found %d (of max %d) rebooting nodes; waiting for completion", len(rebootingNodes), maxRebootingNodes)
+		klog.Infof("Found %d (of max %d) rebooting nodes; waiting for completion", len(rebootingNodes), k.maxRebootingNodes)
 	}
 
 	return remainingCapacity

@@ -33,20 +33,11 @@ func Test_Operator_exits_gracefully_when_user_requests_shutdown(t *testing.T) {
 
 	rebootCancelledNode := rebootCancelledNode()
 
-	config, _ := testConfig(rebootCancelledNode)
-	testKontroller := kontrollerWithObjects(t, config)
-	testKontroller.reconciliationPeriod = 1 * time.Second
+	config, fakeClient := testConfig(rebootCancelledNode)
 
-	stop := make(chan struct{})
+	ctx := contextWithDeadline(t)
 
-	go func() {
-		time.Sleep(testKontroller.reconciliationPeriod)
-		close(stop)
-	}()
-
-	if err := testKontroller.Run(stop); err != nil {
-		t.Fatalf("Unexpected run error: %v", err)
-	}
+	<-process(ctx, t, config, fakeClient)
 
 	updatedNode := node(contextWithDeadline(t), t, config.Client.CoreV1().Nodes(), rebootCancelledNode.Name)
 
@@ -63,9 +54,9 @@ func Test_Operator_shuts_down_leader_election_process_when_user_requests_shutdow
 
 	config, _ := testConfig(rebootCancelledNode)
 	config.BeforeRebootAnnotations = []string{testBeforeRebootAnnotation}
+	config.ReconciliationPeriod = 1 * time.Second
+	config.LeaderElectionLease = 2 * time.Second
 	testKontroller := kontrollerWithObjects(t, config)
-	testKontroller.reconciliationPeriod = 1 * time.Second
-	testKontroller.leaderElectionLease = 2 * time.Second
 
 	stop := make(chan struct{})
 	stopped := make(chan struct{})
@@ -79,7 +70,7 @@ func Test_Operator_shuts_down_leader_election_process_when_user_requests_shutdow
 	}()
 
 	// Wait for one reconciliation cycle to run.
-	time.Sleep(testKontroller.reconciliationPeriod)
+	time.Sleep(config.ReconciliationPeriod)
 
 	ctx := contextWithDeadline(t)
 	updatedNode := node(ctx, t, config.Client.CoreV1().Nodes(), rebootCancelledNode.Name)
@@ -103,8 +94,6 @@ func Test_Operator_shuts_down_leader_election_process_when_user_requests_shutdow
 	config.LockID = "bar"
 
 	parallelKontroller := kontrollerWithObjects(t, config)
-	parallelKontroller.reconciliationPeriod = testKontroller.reconciliationPeriod
-	parallelKontroller.leaderElectionLease = testKontroller.leaderElectionLease
 
 	stop = make(chan struct{})
 
@@ -119,7 +108,7 @@ func Test_Operator_shuts_down_leader_election_process_when_user_requests_shutdow
 		}
 	}()
 
-	time.Sleep(testKontroller.leaderElectionLease * 2)
+	time.Sleep(config.LeaderElectionLease * 2)
 
 	updatedNode = node(ctx, t, config.Client.CoreV1().Nodes(), rebootCancelledNode.Name)
 
@@ -154,9 +143,9 @@ func Test_Operator_returns_error_when_leadership_is_lost(t *testing.T) {
 
 	config, _ := testConfig(rebootCancelledNode)
 	config.BeforeRebootAnnotations = []string{testBeforeRebootAnnotation}
+	config.ReconciliationPeriod = 1 * time.Second
+	config.LeaderElectionLease = 2 * time.Second
 	testKontroller := kontrollerWithObjects(t, config)
-	testKontroller.reconciliationPeriod = 1 * time.Second
-	testKontroller.leaderElectionLease = 2 * time.Second
 
 	stop := make(chan struct{})
 
@@ -171,7 +160,7 @@ func Test_Operator_returns_error_when_leadership_is_lost(t *testing.T) {
 	}()
 
 	// Wait for one reconciliation cycle to run.
-	time.Sleep(testKontroller.reconciliationPeriod)
+	time.Sleep(config.ReconciliationPeriod)
 
 	ctx := contextWithDeadline(t)
 
@@ -224,7 +213,7 @@ func Test_Operator_returns_error_when_leadership_is_lost(t *testing.T) {
 	}
 
 	// Wait lease time to ensure operator lost it.
-	time.Sleep(testKontroller.leaderElectionLease)
+	time.Sleep(config.LeaderElectionLease)
 
 	// Patch node object again to verify if operator is functional.
 	updatedNode.Labels[constants.LabelBeforeReboot] = constants.True
@@ -234,7 +223,7 @@ func Test_Operator_returns_error_when_leadership_is_lost(t *testing.T) {
 		t.Fatalf("Updating Node object: %v", err)
 	}
 
-	time.Sleep(testKontroller.reconciliationPeriod)
+	time.Sleep(config.ReconciliationPeriod)
 
 	updatedNode = node(ctx, t, config.Client.CoreV1().Nodes(), rebootCancelledNode.Name)
 
@@ -255,8 +244,8 @@ func Test_Operator_waits_for_leader_election_before_reconciliation(t *testing.T)
 
 	config, _ := testConfig(rebootCancelledNode)
 	config.BeforeRebootAnnotations = []string{testBeforeRebootAnnotation}
+	config.ReconciliationPeriod = 1 * time.Second
 	testKontroller := kontrollerWithObjects(t, config)
-	testKontroller.reconciliationPeriod = 1 * time.Second
 
 	stop := make(chan struct{})
 	stopped := make(chan struct{})
@@ -269,7 +258,7 @@ func Test_Operator_waits_for_leader_election_before_reconciliation(t *testing.T)
 		stopped <- struct{}{}
 	}()
 
-	time.Sleep(testKontroller.reconciliationPeriod)
+	time.Sleep(config.ReconciliationPeriod)
 
 	close(stop)
 
@@ -292,7 +281,6 @@ func Test_Operator_waits_for_leader_election_before_reconciliation(t *testing.T)
 
 	config.LockID = "bar"
 	parallelKontroller := kontrollerWithObjects(t, config)
-	parallelKontroller.reconciliationPeriod = testKontroller.reconciliationPeriod
 
 	stop = make(chan struct{})
 
@@ -302,7 +290,7 @@ func Test_Operator_waits_for_leader_election_before_reconciliation(t *testing.T)
 
 	runOperator(ctx, t, parallelKontroller, stop)
 
-	time.Sleep(parallelKontroller.reconciliationPeriod)
+	time.Sleep(config.ReconciliationPeriod)
 
 	updatedNode = node(ctx, t, config.Client.CoreV1().Nodes(), rebootCancelledNode.Name)
 
@@ -318,8 +306,8 @@ func Test_Operator_stops_reconciliation_loop_when_control_channel_is_closed(t *t
 
 	config, fakeClient := testConfig(rebootCancelledNode)
 	config.BeforeRebootAnnotations = []string{testBeforeRebootAnnotation}
+	config.ReconciliationPeriod = 1 * time.Second
 	testKontroller := kontrollerWithObjects(t, config)
-	testKontroller.reconciliationPeriod = 1 * time.Second
 
 	nodeUpdated := nodeUpdatedNTimes(fakeClient, 1)
 
@@ -340,7 +328,7 @@ func Test_Operator_stops_reconciliation_loop_when_control_channel_is_closed(t *t
 
 	close(stop)
 
-	time.Sleep(testKontroller.reconciliationPeriod * 2)
+	time.Sleep(config.ReconciliationPeriod * 2)
 
 	updatedNode.Labels[constants.LabelBeforeReboot] = constants.True
 	updatedNode.Annotations[testBeforeRebootAnnotation] = constants.True
@@ -349,7 +337,7 @@ func Test_Operator_stops_reconciliation_loop_when_control_channel_is_closed(t *t
 		t.Fatalf("Updating Node object: %v", err)
 	}
 
-	time.Sleep(testKontroller.reconciliationPeriod * 2)
+	time.Sleep(config.ReconciliationPeriod * 2)
 
 	updatedNode = node(ctx, t, config.Client.CoreV1().Nodes(), rebootCancelledNode.Name)
 
@@ -365,8 +353,8 @@ func Test_Operator_reconciles_objects_every_configured_period(t *testing.T) {
 
 	config, _ := testConfig(rebootCancelledNode)
 	config.BeforeRebootAnnotations = []string{testBeforeRebootAnnotation}
+	config.ReconciliationPeriod = 1 * time.Second
 	testKontroller := kontrollerWithObjects(t, config)
-	testKontroller.reconciliationPeriod = 1 * time.Second
 
 	stop := make(chan struct{})
 
@@ -378,7 +366,7 @@ func Test_Operator_reconciles_objects_every_configured_period(t *testing.T) {
 
 	runOperator(ctx, t, testKontroller, stop)
 
-	time.Sleep(testKontroller.reconciliationPeriod)
+	time.Sleep(config.ReconciliationPeriod)
 
 	updatedNode := node(ctx, t, config.Client.CoreV1().Nodes(), rebootCancelledNode.Name)
 
@@ -394,7 +382,7 @@ func Test_Operator_reconciles_objects_every_configured_period(t *testing.T) {
 		t.Fatalf("Updating Node object: %v", err)
 	}
 
-	time.Sleep(testKontroller.reconciliationPeriod * 2)
+	time.Sleep(config.ReconciliationPeriod * 2)
 
 	updatedNode = node(ctx, t, config.Client.CoreV1().Nodes(), rebootCancelledNode.Name)
 
@@ -594,11 +582,9 @@ func Test_Operator_does_not_count_nodes_as_rebootable_which(t *testing.T) {
 			c(rebootableNode)
 
 			config, fakeClient := testConfig(rebootableNode)
-			testKontroller := kontrollerWithObjects(t, config)
-
+			config.BeforeRebootAnnotations = []string{testBeforeRebootAnnotation, testAnotherBeforeRebootAnnotation}
 			// To test filter on before-reboot label.
-			testKontroller.maxRebootingNodes = 2
-			testKontroller.beforeRebootAnnotations = []string{testBeforeRebootAnnotation, testAnotherBeforeRebootAnnotation}
+			config.MaxRebootingNodes = 2
 
 			<-process(ctx, t, config, fakeClient)
 
@@ -1152,10 +1138,6 @@ func kontrollerWithObjects(t *testing.T, config Config) *Kontroller {
 	if err != nil {
 		t.Fatalf("Failed creating controller instance: %v", err)
 	}
-
-	kontroller.reconciliationPeriod = defaultReconciliationPeriod
-	kontroller.leaderElectionLease = defaultLeaderElectionLease
-	kontroller.maxRebootingNodes = 1
 
 	return kontroller
 }
