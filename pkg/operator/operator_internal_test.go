@@ -9,12 +9,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/flatcar-linux/locksmith/pkg/timeutil"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/klog/v2"
 
 	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/constants"
@@ -33,7 +33,7 @@ func Test_Operator_exits_gracefully_when_user_requests_shutdown(t *testing.T) {
 
 	rebootCancelledNode := rebootCancelledNode()
 
-	config := testConfig(rebootCancelledNode)
+	config, _ := testConfig(rebootCancelledNode)
 	testKontroller := kontrollerWithObjects(t, config)
 	testKontroller.reconciliationPeriod = 1 * time.Second
 
@@ -61,7 +61,7 @@ func Test_Operator_shuts_down_leader_election_process_when_user_requests_shutdow
 
 	rebootCancelledNode := rebootCancelledNode()
 
-	config := testConfig(rebootCancelledNode)
+	config, _ := testConfig(rebootCancelledNode)
 	config.BeforeRebootAnnotations = []string{testBeforeRebootAnnotation}
 	testKontroller := kontrollerWithObjects(t, config)
 	testKontroller.reconciliationPeriod = 1 * time.Second
@@ -132,21 +132,9 @@ func Test_Operator_shuts_down_leader_election_process_when_user_requests_shutdow
 func Test_Operator_emits_events_about_leader_election_to_configured_namespace(t *testing.T) {
 	t.Parallel()
 
-	config := testConfig()
+	config, fakeClient := testConfig()
 
-	testController := kontrollerWithObjects(t, config)
-	testController.reconciliationPeriod = time.Second
-
-	stop := make(chan struct{})
-
-	go func() {
-		time.Sleep(testController.reconciliationPeriod)
-		close(stop)
-	}()
-
-	if err := testController.Run(stop); err != nil {
-		t.Fatalf("Unexpected run error: %v", err)
-	}
+	<-process(contextWithDeadline(t), t, config, fakeClient)
 
 	events, err := config.Client.CoreV1().Events(config.Namespace).List(contextWithDeadline(t), metav1.ListOptions{})
 	if err != nil {
@@ -164,7 +152,7 @@ func Test_Operator_returns_error_when_leadership_is_lost(t *testing.T) {
 
 	rebootCancelledNode := rebootCancelledNode()
 
-	config := testConfig(rebootCancelledNode)
+	config, _ := testConfig(rebootCancelledNode)
 	config.BeforeRebootAnnotations = []string{testBeforeRebootAnnotation}
 	testKontroller := kontrollerWithObjects(t, config)
 	testKontroller.reconciliationPeriod = 1 * time.Second
@@ -265,7 +253,7 @@ func Test_Operator_waits_for_leader_election_before_reconciliation(t *testing.T)
 
 	rebootCancelledNode := rebootCancelledNode()
 
-	config := testConfig(rebootCancelledNode)
+	config, _ := testConfig(rebootCancelledNode)
 	config.BeforeRebootAnnotations = []string{testBeforeRebootAnnotation}
 	testKontroller := kontrollerWithObjects(t, config)
 	testKontroller.reconciliationPeriod = 1 * time.Second
@@ -312,7 +300,7 @@ func Test_Operator_waits_for_leader_election_before_reconciliation(t *testing.T)
 		close(stop)
 	})
 
-	runOperator(t, parallelKontroller, stop)
+	runOperator(ctx, t, parallelKontroller, stop)
 
 	time.Sleep(parallelKontroller.reconciliationPeriod)
 
@@ -328,18 +316,21 @@ func Test_Operator_stops_reconciliation_loop_when_control_channel_is_closed(t *t
 
 	rebootCancelledNode := rebootCancelledNode()
 
-	config := testConfig(rebootCancelledNode)
+	config, fakeClient := testConfig(rebootCancelledNode)
 	config.BeforeRebootAnnotations = []string{testBeforeRebootAnnotation}
 	testKontroller := kontrollerWithObjects(t, config)
 	testKontroller.reconciliationPeriod = 1 * time.Second
 
+	nodeUpdated := nodeUpdatedNTimes(fakeClient, 1)
+
 	stop := make(chan struct{})
 
-	runOperator(t, testKontroller, stop)
-
-	time.Sleep(testKontroller.reconciliationPeriod)
-
 	ctx := contextWithDeadline(t)
+
+	runOperator(ctx, t, testKontroller, stop)
+
+	<-nodeUpdated
+
 	updatedNode := node(ctx, t, config.Client.CoreV1().Nodes(), rebootCancelledNode.Name)
 
 	if _, ok := updatedNode.Labels[constants.LabelBeforeReboot]; ok {
@@ -372,7 +363,7 @@ func Test_Operator_reconciles_objects_every_configured_period(t *testing.T) {
 
 	rebootCancelledNode := rebootCancelledNode()
 
-	config := testConfig(rebootCancelledNode)
+	config, _ := testConfig(rebootCancelledNode)
 	config.BeforeRebootAnnotations = []string{testBeforeRebootAnnotation}
 	testKontroller := kontrollerWithObjects(t, config)
 	testKontroller.reconciliationPeriod = 1 * time.Second
@@ -383,11 +374,12 @@ func Test_Operator_reconciles_objects_every_configured_period(t *testing.T) {
 		close(stop)
 	})
 
-	runOperator(t, testKontroller, stop)
+	ctx := contextWithDeadline(t)
+
+	runOperator(ctx, t, testKontroller, stop)
 
 	time.Sleep(testKontroller.reconciliationPeriod)
 
-	ctx := contextWithDeadline(t)
 	updatedNode := node(ctx, t, config.Client.CoreV1().Nodes(), rebootCancelledNode.Name)
 
 	if _, ok := updatedNode.Labels[constants.LabelBeforeReboot]; ok {
@@ -430,12 +422,12 @@ func Test_Operator_cleans_up_nodes_which_cannot_be_rebooted(t *testing.T) {
 		},
 	}
 
-	config := testConfig(rebootCancelledNode, toBeRebootedNode)
+	config, fakeClient := testConfig(rebootCancelledNode, toBeRebootedNode)
 	config.BeforeRebootAnnotations = []string{testBeforeRebootAnnotation}
-	testKontroller := kontrollerWithObjects(t, config)
 
 	ctx := contextWithDeadline(t)
-	testKontroller.process(ctx)
+
+	<-process(ctx, t, config, fakeClient)
 
 	updatedNode := node(ctx, t, config.Client.CoreV1().Nodes(), rebootCancelledNode.Name)
 
@@ -481,25 +473,33 @@ func Test_Operator_does_not_count_nodes_as_rebooting_which(t *testing.T) {
 
 	ctx := contextWithDeadline(t)
 
-	cases := map[string]*corev1.Node{
-		"has_finished_rebooting": finishedRebootingNode(),
-		"are_idle":               idleNode(),
+	cases := map[string]struct {
+		expectedNodeUpdates int
+		extraNode           *corev1.Node
+	}{
+		"has_finished_rebooting": {
+			expectedNodeUpdates: 3,
+			extraNode:           finishedRebootingNode(),
+		},
+		"are_idle": {
+			expectedNodeUpdates: 2,
+			extraNode:           idleNode(),
+		},
 	}
 
-	for name, c := range cases { //nolint:paralleltest
-		c := c
+	for name, testCase := range cases { //nolint:paralleltest // False positive.
+		testCase := testCase
 
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
 			rebootableNode := rebootableNode()
 
-			extraNode := c
+			config, fakeClient := testConfig(testCase.extraNode, rebootableNode)
 
-			config := testConfig(extraNode, rebootableNode)
-			testKontroller := kontrollerWithObjects(t, config)
-
-			testKontroller.process(ctx)
+			nodeUpdated := nodeUpdatedNTimes(fakeClient, testCase.expectedNodeUpdates)
+			<-process(ctx, t, config, fakeClient)
+			<-nodeUpdated
 
 			updatedNode := node(ctx, t, config.Client.CoreV1().Nodes(), rebootableNode.Name)
 
@@ -541,15 +541,13 @@ func Test_Operator_counts_nodes_as_rebooting_which(t *testing.T) {
 
 			extraNode := c
 
-			config := testConfig(extraNode, rebootableNode)
+			config, fakeClient := testConfig(extraNode, rebootableNode)
 
 			// Required to test selecting rebooting nodes only with before-reboot label, otherwise
 			// it gets removed before we schedule nodes for rebooting.
 			config.BeforeRebootAnnotations = []string{testBeforeRebootAnnotation}
 
-			testKontroller := kontrollerWithObjects(t, config)
-
-			testKontroller.process(ctx)
+			<-process(ctx, t, config, fakeClient)
 
 			updatedNode := node(ctx, t, config.Client.CoreV1().Nodes(), rebootableNode.Name)
 
@@ -595,14 +593,14 @@ func Test_Operator_does_not_count_nodes_as_rebootable_which(t *testing.T) {
 
 			c(rebootableNode)
 
-			config := testConfig(rebootableNode)
+			config, fakeClient := testConfig(rebootableNode)
 			testKontroller := kontrollerWithObjects(t, config)
 
 			// To test filter on before-reboot label.
 			testKontroller.maxRebootingNodes = 2
 			testKontroller.beforeRebootAnnotations = []string{testBeforeRebootAnnotation, testAnotherBeforeRebootAnnotation}
 
-			testKontroller.process(ctx)
+			<-process(ctx, t, config, fakeClient)
 
 			updatedNode := node(ctx, t, config.Client.CoreV1().Nodes(), rebootableNode.Name)
 
@@ -618,13 +616,15 @@ func Test_Operator_counts_nodes_as_rebootable_which_needs_reboot_and_has_all_oth
 
 	rebootableNode := rebootableNode()
 
-	config := testConfig(rebootableNode)
-	testKontroller := kontrollerWithObjects(t, config)
+	config, fakeClient := testConfig(rebootableNode)
 
 	ctx := contextWithDeadline(t)
-	testKontroller.process(ctx)
 
-	updatedNode := node(ctx, t, config.Client.CoreV1().Nodes(), rebootableNode.Name)
+	nodeUpdated := nodeUpdatedNTimes(fakeClient, 1)
+	<-process(ctx, t, config, fakeClient)
+	<-nodeUpdated
+
+	updatedNode := node(contextWithDeadline(t), t, config.Client.CoreV1().Nodes(), rebootableNode.Name)
 
 	v, ok := updatedNode.Labels[constants.LabelBeforeReboot]
 	if !ok || v != constants.True {
@@ -637,15 +637,13 @@ func Test_Operator_does_not_schedules_reboot_process_outside_reboot_window(t *te
 
 	rebootableNode := rebootableNode()
 
-	config := testConfig(rebootableNode)
+	config, fakeClient := testConfig(rebootableNode)
 	config.RebootWindowStart = "Mon 14:00"
 	config.RebootWindowLength = "0s"
 
-	testKontroller := kontrollerWithObjects(t, config)
-
 	ctx := contextWithDeadline(t)
 
-	testKontroller.process(ctx)
+	<-process(ctx, t, config, fakeClient)
 
 	updatedNode := node(ctx, t, config.Client.CoreV1().Nodes(), rebootableNode.Name)
 	if v, ok := updatedNode.Labels[constants.LabelBeforeReboot]; ok && v == constants.True {
@@ -666,17 +664,13 @@ func Test_Operator_schedules_reboot_process(t *testing.T) {
 
 		rebootableNode := rebootableNode()
 
-		config := testConfig(rebootableNode)
-		testKontroller := kontrollerWithObjects(t, config)
+		config, fakeClient := testConfig(rebootableNode)
+		config.RebootWindowStart = "Mon 00:00"
+		config.RebootWindowLength = fmt.Sprintf("%ds", (7*24*60*60)-1)
 
-		rw, err := timeutil.ParsePeriodic("Mon 00:00", fmt.Sprintf("%ds", (7*24*60*60)-1))
-		if err != nil {
-			t.Fatalf("Parsing reboot window: %v", err)
-		}
-
-		testKontroller.rebootWindow = rw
-
-		testKontroller.process(ctx)
+		nodeUpdated := nodeUpdatedNTimes(fakeClient, 1)
+		<-process(ctx, t, config, fakeClient)
+		<-nodeUpdated
 
 		updatedNode := node(ctx, t, config.Client.CoreV1().Nodes(), rebootableNode.Name)
 		if _, ok := updatedNode.Labels[constants.LabelBeforeReboot]; !ok {
@@ -689,11 +683,9 @@ func Test_Operator_schedules_reboot_process(t *testing.T) {
 
 		rebootableNode := rebootableNode()
 
-		config := testConfig(rebootableNode, rebootNotConfirmedNode())
+		config, fakeClient := testConfig(rebootableNode, rebootNotConfirmedNode())
 
-		testKontroller := kontrollerWithObjects(t, config)
-
-		testKontroller.process(ctx)
+		<-process(ctx, t, config, fakeClient)
 
 		updatedNode := node(ctx, t, config.Client.CoreV1().Nodes(), rebootableNode.Name)
 		if v, ok := updatedNode.Labels[constants.LabelBeforeReboot]; ok && v == constants.True {
@@ -706,11 +698,9 @@ func Test_Operator_schedules_reboot_process(t *testing.T) {
 
 		scheduledForRebootNode := scheduledForRebootNode()
 
-		config := testConfig(scheduledForRebootNode)
+		config, fakeClient := testConfig(scheduledForRebootNode)
 
-		testKontroller := kontrollerWithObjects(t, config)
-
-		testKontroller.process(ctx)
+		<-process(ctx, t, config, fakeClient)
 
 		updatedNode := node(ctx, t, config.Client.CoreV1().Nodes(), scheduledForRebootNode.Name)
 
@@ -725,11 +715,12 @@ func Test_Operator_schedules_reboot_process(t *testing.T) {
 		rebootableNode := rebootableNode()
 		rebootableNode.Annotations[testBeforeRebootAnnotation] = constants.True
 
-		config := testConfig(rebootableNode)
+		config, fakeClient := testConfig(rebootableNode)
 		config.BeforeRebootAnnotations = []string{testBeforeRebootAnnotation}
-		testKontroller := kontrollerWithObjects(t, config)
 
-		testKontroller.process(ctx)
+		nodeUpdated := nodeUpdatedNTimes(fakeClient, 1)
+		<-process(ctx, t, config, fakeClient)
+		<-nodeUpdated
 
 		updatedNode := node(ctx, t, config.Client.CoreV1().Nodes(), rebootableNode.Name)
 
@@ -794,13 +785,13 @@ func Test_Operator_approves_reboot_process_for_nodes_which_have(t *testing.T) {
 				c.mutateF(readyToRebootNode)
 			}
 
-			config := testConfig(readyToRebootNode)
-			testKontroller := kontrollerWithObjects(t, config)
+			config, fakeClient := testConfig(readyToRebootNode)
+
 			// Use beforeRebootAnnotations to be able to test moment when node has before-reboot
 			// label, but it cannot be removed yet.
-			testKontroller.beforeRebootAnnotations = []string{testBeforeRebootAnnotation}
+			config.BeforeRebootAnnotations = []string{testBeforeRebootAnnotation}
 
-			testKontroller.process(ctx)
+			<-process(ctx, t, config, fakeClient)
 
 			updatedNode := node(ctx, t, config.Client.CoreV1().Nodes(), readyToRebootNode.Name)
 
@@ -822,13 +813,12 @@ func Test_Operator_approves_reboot_process_by(t *testing.T) {
 
 	readyToRebootNode := readyToRebootNode()
 
-	config := testConfig(readyToRebootNode)
+	config, fakeClient := testConfig(readyToRebootNode)
 	config.BeforeRebootAnnotations = []string{testBeforeRebootAnnotation}
-	testKontroller := kontrollerWithObjects(t, config)
 
 	ctx := contextWithDeadline(t)
 
-	testKontroller.process(ctx)
+	<-process(ctx, t, config, fakeClient)
 
 	updatedNode := node(ctx, t, config.Client.CoreV1().Nodes(), readyToRebootNode.Name)
 
@@ -919,12 +909,10 @@ func Test_Operator_counts_nodes_as_just_rebooted_which(t *testing.T) {
 				c.mutateF(justRebootedNode)
 			}
 
-			config := testConfig(justRebootedNode)
+			config, fakeClient := testConfig(justRebootedNode)
 			config.AfterRebootAnnotations = []string{testAfterRebootAnnotation, testAnotherAfterRebootAnnotation}
 
-			testKontroller := kontrollerWithObjects(t, config)
-
-			testKontroller.process(ctx)
+			<-process(ctx, t, config, fakeClient)
 
 			updatedNode := node(ctx, t, config.Client.CoreV1().Nodes(), justRebootedNode.Name)
 
@@ -961,13 +949,12 @@ func Test_Operator_confirms_reboot_process_by(t *testing.T) {
 	justRebootedNode.Annotations[testAfterRebootAnnotation] = constants.True
 	justRebootedNode.Annotations[testAnotherAfterRebootAnnotation] = constants.True
 
-	config := testConfig(justRebootedNode)
+	config, fakeClient := testConfig(justRebootedNode)
 	config.AfterRebootAnnotations = []string{testAfterRebootAnnotation, testAnotherAfterRebootAnnotation}
-	testKontroller := kontrollerWithObjects(t, config)
 
 	ctx := contextWithDeadline(t)
 
-	testKontroller.process(ctx)
+	<-process(ctx, t, config, fakeClient)
 
 	updatedNode := node(ctx, t, config.Client.CoreV1().Nodes(), justRebootedNode.Name)
 
@@ -1037,11 +1024,10 @@ func Test_Operator_counts_nodes_as_which_finished_rebooting_which_has(t *testing
 				c.mutateF(finishedRebootingNode)
 			}
 
-			config := testConfig(finishedRebootingNode)
+			config, fakeClient := testConfig(finishedRebootingNode)
 			config.AfterRebootAnnotations = []string{testAfterRebootAnnotation, testAnotherAfterRebootAnnotation}
-			testKontroller := kontrollerWithObjects(t, config)
 
-			testKontroller.process(ctx)
+			<-process(ctx, t, config, fakeClient)
 
 			updatedNode := node(ctx, t, config.Client.CoreV1().Nodes(), finishedRebootingNode.Name)
 
@@ -1063,13 +1049,13 @@ func Test_Operator_finishes_reboot_process_by(t *testing.T) {
 
 	finishedRebootingNode := finishedRebootingNode()
 
-	config := testConfig(finishedRebootingNode)
-	testKontroller := kontrollerWithObjects(t, config)
-	testKontroller.afterRebootAnnotations = []string{testAfterRebootAnnotation, testAnotherAfterRebootAnnotation}
+	config, fakeClient := testConfig(finishedRebootingNode)
+	config.AfterRebootAnnotations = []string{testAfterRebootAnnotation, testAnotherAfterRebootAnnotation}
 
-	testKontroller.process(contextWithDeadline(t))
+	ctx := contextWithDeadline(t)
+	<-process(ctx, t, config, fakeClient)
 
-	updatedNode := node(contextWithDeadline(t), t, config.Client.CoreV1().Nodes(), finishedRebootingNode.Name)
+	updatedNode := node(ctx, t, config.Client.CoreV1().Nodes(), finishedRebootingNode.Name)
 
 	// To de-schedule hook pods.
 	t.Run("removing_after_reboot_label", func(t *testing.T) {
@@ -1138,7 +1124,7 @@ func contextWithDeadline(t *testing.T) context.Context {
 	return ctx
 }
 
-func runOperator(t *testing.T, k *Kontroller, stopCh <-chan struct{}) {
+func runOperator(_ context.Context, t *testing.T, k *Kontroller, stopCh <-chan struct{}) {
 	t.Helper()
 
 	go func() {
@@ -1149,12 +1135,14 @@ func runOperator(t *testing.T, k *Kontroller, stopCh <-chan struct{}) {
 	}()
 }
 
-func testConfig(objects ...runtime.Object) Config {
+func testConfig(objects ...runtime.Object) (Config, *k8stesting.Fake) {
+	client := fake.NewSimpleClientset(objects...)
+
 	return Config{
-		Client:    fake.NewSimpleClientset(objects...),
+		Client:    client,
 		LockID:    "foo",
 		Namespace: testNamespace,
-	}
+	}, &client.Fake
 }
 
 func kontrollerWithObjects(t *testing.T, config Config) *Kontroller {
@@ -1331,4 +1319,58 @@ func node(ctx context.Context, t *testing.T, nodeClient corev1client.NodeInterfa
 	}
 
 	return node
+}
+
+func process(ctx context.Context, t *testing.T, config Config, fakeClient *k8stesting.Fake) chan struct{} {
+	t.Helper()
+
+	reconcileCycleCh := make(chan struct{})
+
+	listCallsCount := 0
+
+	fakeClient.PrependReactor("list", "nodes", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		operatorListOperations := 4
+
+		if listCallsCount == operatorListOperations {
+			reconcileCycleCh <- struct{}{}
+			listCallsCount = 0
+
+			return false, nil, nil
+		}
+
+		listCallsCount++
+
+		return false, nil, nil
+	})
+
+	stop := make(chan struct{})
+
+	t.Cleanup(func() {
+		close(stop)
+	})
+
+	runOperator(ctx, t, kontrollerWithObjects(t, config), stop)
+
+	return reconcileCycleCh
+}
+
+func nodeUpdatedNTimes(fakeClient *k8stesting.Fake, expectedUpdateCalls int) chan struct{} {
+	updateCallsCount := 0
+	nodeUpdatedCh := make(chan struct{}, 1)
+
+	fakeClient.PrependReactor("update", "nodes", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		if updateCallsCount == expectedUpdateCalls {
+			nodeUpdatedCh <- struct{}{}
+
+			updateCallsCount = 0
+
+			return false, nil, nil
+		}
+
+		updateCallsCount++
+
+		return false, nil, nil
+	})
+
+	return nodeUpdatedCh
 }
