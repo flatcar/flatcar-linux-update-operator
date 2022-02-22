@@ -3,7 +3,9 @@ package operator
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
@@ -13,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/klog/v2"
 
 	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/constants"
 )
@@ -1071,6 +1074,19 @@ func Test_Operator_finishes_reboot_process_by(t *testing.T) {
 			t.Fatalf("Expected annotation %q value %q, got %q", constants.AnnotationOkToReboot, constants.False, v)
 		}
 	})
+}
+
+// Expose klog flags to be able to increase verbosity for operator logs.
+func TestMain(m *testing.M) {
+	testFlags := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
+	klog.InitFlags(testFlags)
+
+	if err := testFlags.Parse([]string{"-v=10"}); err != nil {
+		fmt.Printf("Failed parsing flags: %v\n", err)
+		os.Exit(1)
+	}
+
+	os.Exit(m.Run())
 }
 
 func contextWithDeadline(t *testing.T) context.Context {
