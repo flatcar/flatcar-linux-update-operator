@@ -85,8 +85,6 @@ var (
 type Config struct {
 	// Kubernetes client.
 	Client kubernetes.Interface
-	// Migration compatibility.
-	AutoLabelContainerLinux bool
 	// Annotations to look for before and after reboots.
 	BeforeRebootAnnotations []string
 	AfterRebootAnnotations  []string
