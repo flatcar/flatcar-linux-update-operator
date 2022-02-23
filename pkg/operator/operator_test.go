@@ -123,17 +123,18 @@ func Test_Operator_exits_gracefully_when_user_requests_shutdown(t *testing.T) {
 	}
 }
 
-//nolint:funlen
+//nolint:funlen // Should likely be refactored.
 func Test_Operator_shuts_down_leader_election_process_when_user_requests_shutdown(t *testing.T) {
 	t.Parallel()
 
 	rebootCancelledNode := rebootCancelledNode()
 
-	config, _ := testConfig(rebootCancelledNode)
+	config, fakeClient := testConfig(rebootCancelledNode)
 	config.BeforeRebootAnnotations = []string{testBeforeRebootAnnotation}
 	config.ReconciliationPeriod = 1 * time.Second
 	config.LeaderElectionLease = 2 * time.Second
 	testKontroller := kontrollerWithObjects(t, config)
+	nodeUpdated := nodeUpdatedNTimes(fakeClient, 1)
 
 	stop := make(chan struct{})
 	stopped := make(chan struct{})
@@ -147,7 +148,7 @@ func Test_Operator_shuts_down_leader_election_process_when_user_requests_shutdow
 	}()
 
 	// Wait for one reconciliation cycle to run.
-	time.Sleep(config.ReconciliationPeriod)
+	<-nodeUpdated
 
 	ctx := contextWithDeadline(t)
 	updatedNode := node(ctx, t, config.Client.CoreV1().Nodes(), rebootCancelledNode.Name)
@@ -212,17 +213,17 @@ func Test_Operator_emits_events_about_leader_election_to_configured_namespace(t 
 	}
 }
 
-//nolint:funlen
 func Test_Operator_returns_error_when_leadership_is_lost(t *testing.T) {
 	t.Parallel()
 
 	rebootCancelledNode := rebootCancelledNode()
 
-	config, _ := testConfig(rebootCancelledNode)
+	config, fakeClient := testConfig(rebootCancelledNode)
 	config.BeforeRebootAnnotations = []string{testBeforeRebootAnnotation}
 	config.ReconciliationPeriod = 1 * time.Second
 	config.LeaderElectionLease = 2 * time.Second
 	testKontroller := kontrollerWithObjects(t, config)
+	nodeUpdated := nodeUpdatedNTimes(fakeClient, 1)
 
 	stop := make(chan struct{})
 
@@ -237,7 +238,7 @@ func Test_Operator_returns_error_when_leadership_is_lost(t *testing.T) {
 	}()
 
 	// Wait for one reconciliation cycle to run.
-	time.Sleep(config.ReconciliationPeriod)
+	<-nodeUpdated
 
 	ctx := contextWithDeadline(t)
 
@@ -249,7 +250,35 @@ func Test_Operator_returns_error_when_leadership_is_lost(t *testing.T) {
 			constants.LabelBeforeReboot)
 	}
 
-	// Force-steal leader election.
+	stealLeaderElection(ctx, t, config)
+
+	// Wait lease time to ensure operator lost it.
+	time.Sleep(config.LeaderElectionLease)
+
+	// Patch node object again to verify if operator is functional.
+	updatedNode.Labels[constants.LabelBeforeReboot] = constants.True
+	updatedNode.Annotations[testBeforeRebootAnnotation] = constants.True
+
+	if _, err := config.Client.CoreV1().Nodes().Update(ctx, updatedNode, metav1.UpdateOptions{}); err != nil {
+		t.Fatalf("Updating Node object: %v", err)
+	}
+
+	time.Sleep(config.ReconciliationPeriod)
+
+	updatedNode = node(ctx, t, config.Client.CoreV1().Nodes(), rebootCancelledNode.Name)
+
+	if _, ok := updatedNode.Labels[constants.LabelBeforeReboot]; !ok {
+		t.Fatalf("Expected label %q to remain on Node", constants.LabelBeforeReboot)
+	}
+
+	if err := <-errCh; err == nil {
+		t.Fatalf("Expected operator to return error when leader election is lost")
+	}
+}
+
+func stealLeaderElection(ctx context.Context, t *testing.T, config operator.Config) {
+	t.Helper()
+
 	configMapClient := config.Client.CoreV1().ConfigMaps(config.Namespace)
 
 	configMaps, err := configMapClient.List(ctx, metav1.ListOptions{})
@@ -294,32 +323,8 @@ func Test_Operator_returns_error_when_leadership_is_lost(t *testing.T) {
 	if _, err := configMapClient.Update(ctx, &lock, metav1.UpdateOptions{}); err != nil {
 		t.Fatalf("Updating lock ConfigMap: %v", err)
 	}
-
-	// Wait lease time to ensure operator lost it.
-	time.Sleep(config.LeaderElectionLease)
-
-	// Patch node object again to verify if operator is functional.
-	updatedNode.Labels[constants.LabelBeforeReboot] = constants.True
-	updatedNode.Annotations[testBeforeRebootAnnotation] = constants.True
-
-	if _, err := config.Client.CoreV1().Nodes().Update(ctx, updatedNode, metav1.UpdateOptions{}); err != nil {
-		t.Fatalf("Updating Node object: %v", err)
-	}
-
-	time.Sleep(config.ReconciliationPeriod)
-
-	updatedNode = node(ctx, t, config.Client.CoreV1().Nodes(), rebootCancelledNode.Name)
-
-	if _, ok := updatedNode.Labels[constants.LabelBeforeReboot]; !ok {
-		t.Fatalf("Expected label %q to remain on Node", constants.LabelBeforeReboot)
-	}
-
-	if err := <-errCh; err == nil {
-		t.Fatalf("Expected operator to return error when leader election is lost")
-	}
 }
 
-//nolint:funlen
 func Test_Operator_waits_for_leader_election_before_reconciliation(t *testing.T) {
 	t.Parallel()
 
@@ -477,8 +482,6 @@ func Test_Operator_reconciles_objects_every_configured_period(t *testing.T) {
 
 // before-reboot label is intended to be used as a selector for pre-reboot hooks, so it should only
 // be set for nodes, which are ready to start rebooting any minute.
-//
-//nolint:funlen
 func Test_Operator_cleans_up_nodes_which_cannot_be_rebooted(t *testing.T) {
 	t.Parallel()
 
@@ -602,15 +605,13 @@ func Test_Operator_counts_nodes_as_rebooting_which(t *testing.T) {
 		"just_rebooted":                    justRebootedNode(),
 	}
 
-	for name, c := range cases { //nolint:paralleltest
-		c := c
+	for name, extraNode := range cases { //nolint:paralleltest // False positive.
+		extraNode := extraNode
 
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
 			rebootableNode := rebootableNode()
-
-			extraNode := c
 
 			config, fakeClient := testConfig(extraNode, rebootableNode)
 
@@ -652,8 +653,8 @@ func Test_Operator_does_not_count_nodes_as_rebootable_which(t *testing.T) {
 		},
 	}
 
-	for name, c := range cases { //nolint:paralleltest
-		c := c
+	for name, mutateF := range cases { //nolint:paralleltest // False positive.
+		mutateF := mutateF
 
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
@@ -662,7 +663,7 @@ func Test_Operator_does_not_count_nodes_as_rebootable_which(t *testing.T) {
 			rebootableNode.Annotations[testBeforeRebootAnnotation] = constants.True
 			rebootableNode.Annotations[testAnotherBeforeRebootAnnotation] = constants.True
 
-			c(rebootableNode)
+			mutateF(rebootableNode)
 
 			config, fakeClient := testConfig(rebootableNode)
 			config.BeforeRebootAnnotations = []string{testBeforeRebootAnnotation, testAnotherBeforeRebootAnnotation}
@@ -722,7 +723,7 @@ func Test_Operator_does_not_schedules_reboot_process_outside_reboot_window(t *te
 
 // To schedule pre-reboot hooks.
 //
-//nolint:funlen
+//nolint:funlen // Just many test cases.
 func Test_Operator_schedules_reboot_process(t *testing.T) {
 	t.Parallel()
 
@@ -843,15 +844,15 @@ func Test_Operator_approves_reboot_process_for_nodes_which_have(t *testing.T) {
 		},
 	}
 
-	for name, c := range cases { //nolint:paralleltest
-		c := c
+	for name, testCase := range cases { //nolint:paralleltest // False positive.
+		testCase := testCase
 
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
 			readyToRebootNode := readyToRebootNode()
-			if c.mutateF != nil {
-				c.mutateF(readyToRebootNode)
+			if testCase.mutateF != nil {
+				testCase.mutateF(readyToRebootNode)
 			}
 
 			config, fakeClient := testConfig(readyToRebootNode)
@@ -865,11 +866,11 @@ func Test_Operator_approves_reboot_process_for_nodes_which_have(t *testing.T) {
 			updatedNode := node(ctx, t, config.Client.CoreV1().Nodes(), readyToRebootNode.Name)
 
 			v, ok := updatedNode.Annotations[constants.AnnotationOkToReboot]
-			if c.expectRebootOK && (!ok || v != constants.True) {
+			if testCase.expectRebootOK && (!ok || v != constants.True) {
 				t.Fatalf("Expected reboot-ok annotation, got %v", updatedNode.Annotations)
 			}
 
-			if !c.expectRebootOK && ok && v == constants.True {
+			if !testCase.expectRebootOK && ok && v == constants.True {
 				t.Fatalf("Unexpected reboot-ok annotation")
 			}
 		})
@@ -928,7 +929,7 @@ func Test_Operator_approves_reboot_process_by(t *testing.T) {
 
 // Test opposite conditions starting from base to make sure all cases are covered.
 //
-//nolint:funlen,cyclop
+//nolint:funlen,cyclop // Just many test cases.
 func Test_Operator_counts_nodes_as_just_rebooted_which(t *testing.T) {
 	t.Parallel()
 
@@ -967,15 +968,15 @@ func Test_Operator_counts_nodes_as_just_rebooted_which(t *testing.T) {
 		},
 	}
 
-	for name, c := range cases { //nolint:paralleltest
-		c := c
+	for name, testCase := range cases { //nolint:paralleltest // False positive.
+		testCase := testCase
 
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
 			justRebootedNode := justRebootedNode()
-			if c.mutateF != nil {
-				c.mutateF(justRebootedNode)
+			if testCase.mutateF != nil {
+				testCase.mutateF(justRebootedNode)
 			}
 
 			config, fakeClient := testConfig(justRebootedNode)
@@ -986,7 +987,7 @@ func Test_Operator_counts_nodes_as_just_rebooted_which(t *testing.T) {
 			updatedNode := node(ctx, t, config.Client.CoreV1().Nodes(), justRebootedNode.Name)
 
 			v, ok := updatedNode.Labels[constants.LabelAfterReboot]
-			if c.expectJustRebooted {
+			if testCase.expectJustRebooted {
 				if !ok || v != constants.True {
 					t.Errorf("Expected after reboot label, got %v", updatedNode.Labels)
 				}
@@ -1000,7 +1001,7 @@ func Test_Operator_counts_nodes_as_just_rebooted_which(t *testing.T) {
 				}
 			}
 
-			if !c.expectJustRebooted {
+			if !testCase.expectJustRebooted {
 				v, ok := updatedNode.Annotations[testAfterRebootAnnotation]
 				if !ok || v != constants.False {
 					t.Fatalf("Expected annotation %q to be left untouched", testAfterRebootAnnotation)
@@ -1082,15 +1083,15 @@ func Test_Operator_counts_nodes_as_which_finished_rebooting_which_has(t *testing
 		},
 	}
 
-	for name, c := range cases { //nolint:paralleltest
-		c := c
+	for name, testCase := range cases { //nolint:paralleltest // False positive.
+		testCase := testCase
 
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
 			finishedRebootingNode := finishedRebootingNode()
-			if c.mutateF != nil {
-				c.mutateF(finishedRebootingNode)
+			if testCase.mutateF != nil {
+				testCase.mutateF(finishedRebootingNode)
 			}
 
 			config, fakeClient := testConfig(finishedRebootingNode)
@@ -1101,11 +1102,11 @@ func Test_Operator_counts_nodes_as_which_finished_rebooting_which_has(t *testing
 			updatedNode := node(ctx, t, config.Client.CoreV1().Nodes(), finishedRebootingNode.Name)
 
 			v, ok := updatedNode.Annotations[constants.AnnotationOkToReboot]
-			if !c.expectFinishedRebooting && ok && v != constants.True {
+			if !testCase.expectFinishedRebooting && ok && v != constants.True {
 				t.Fatalf("Expected after reboot label, got %v", updatedNode.Labels)
 			}
 
-			if c.expectFinishedRebooting && ok && v == constants.True {
+			if testCase.expectFinishedRebooting && ok && v == constants.True {
 				t.Fatalf("Unexpected after reboot label")
 			}
 		})
