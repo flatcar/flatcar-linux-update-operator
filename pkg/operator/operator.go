@@ -27,7 +27,7 @@ import (
 
 const (
 	leaderElectionEventSourceComponent = "update-operator-leader-election"
-	maxRebootingNodes                  = 1
+	defaultMaxRebootingNodes           = 1
 
 	leaderElectionResourceName = "flatcar-linux-update-operator-lock"
 
@@ -81,6 +81,23 @@ var (
 	notBeforeRebootReq = k8sutil.NewRequirementOrDie(constants.LabelBeforeReboot, selection.NotIn, []string{constants.True})
 )
 
+// Config configures a Kontroller.
+type Config struct {
+	// Kubernetes client.
+	Client kubernetes.Interface
+	// Annotations to look for before and after reboots.
+	BeforeRebootAnnotations []string
+	AfterRebootAnnotations  []string
+	// Reboot window.
+	RebootWindowStart    string
+	RebootWindowLength   string
+	Namespace            string
+	LockID               string
+	ReconciliationPeriod time.Duration
+	LeaderElectionLease  time.Duration
+	MaxRebootingNodes    int
+}
+
 // Kontroller implement operator part of FLUO.
 type Kontroller struct {
 	kc kubernetes.Interface
@@ -90,7 +107,6 @@ type Kontroller struct {
 	beforeRebootAnnotations []string
 	afterRebootAnnotations  []string
 
-	leaderElectionEventRecorder record.EventRecorder
 	// Namespace is the kubernetes namespace any resources (e.g. locks,
 	// configmaps, agents) should be created and read under.
 	// It will be set to the namespace the operator is running in automatically.
@@ -106,22 +122,6 @@ type Kontroller struct {
 	leaderElectionLease time.Duration
 
 	lockID string
-}
-
-// Config configures a Kontroller.
-type Config struct {
-	// Kubernetes client.
-	Client kubernetes.Interface
-	// Migration compatibility.
-	AutoLabelContainerLinux bool
-	// Annotations to look for before and after reboots.
-	BeforeRebootAnnotations []string
-	AfterRebootAnnotations  []string
-	// Reboot window.
-	RebootWindowStart  string
-	RebootWindowLength string
-	Namespace          string
-	LockID             string
 }
 
 // New initializes a new Kontroller.
@@ -152,31 +152,32 @@ func New(config Config) (*Kontroller, error) {
 
 	kc := config.Client
 
-	// Create event emitter.
-	broadcaster := record.NewBroadcaster()
-	broadcaster.StartRecordingToSink(&corev1client.EventSinkImpl{Interface: kc.CoreV1().Events("")})
+	reconciliationPeriod := config.ReconciliationPeriod
+	if reconciliationPeriod == 0 {
+		reconciliationPeriod = defaultLeaderElectionLease
+	}
 
-	leaderElectionBroadcaster := record.NewBroadcaster()
-	leaderElectionBroadcaster.StartRecordingToSink(&corev1client.EventSinkImpl{
-		Interface: corev1client.New(config.Client.CoreV1().RESTClient()).Events(""),
-	})
+	leaderElectionLeaseDuration := config.LeaderElectionLease
+	if leaderElectionLeaseDuration == 0 {
+		leaderElectionLeaseDuration = defaultLeaderElectionLease
+	}
 
-	leaderElectionEventRecorder := leaderElectionBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{
-		Component: leaderElectionEventSourceComponent,
-	})
+	maxRebootingNodes := config.MaxRebootingNodes
+	if maxRebootingNodes == 0 {
+		maxRebootingNodes = defaultMaxRebootingNodes
+	}
 
 	return &Kontroller{
-		kc:                          kc,
-		nc:                          kc.CoreV1().Nodes(),
-		beforeRebootAnnotations:     config.BeforeRebootAnnotations,
-		afterRebootAnnotations:      config.AfterRebootAnnotations,
-		leaderElectionEventRecorder: leaderElectionEventRecorder,
-		namespace:                   config.Namespace,
-		rebootWindow:                rebootWindow,
-		maxRebootingNodes:           maxRebootingNodes,
-		reconciliationPeriod:        defaultReconciliationPeriod,
-		leaderElectionLease:         defaultLeaderElectionLease,
-		lockID:                      config.LockID,
+		kc:                      kc,
+		nc:                      kc.CoreV1().Nodes(),
+		beforeRebootAnnotations: config.BeforeRebootAnnotations,
+		afterRebootAnnotations:  config.AfterRebootAnnotations,
+		namespace:               config.Namespace,
+		rebootWindow:            rebootWindow,
+		maxRebootingNodes:       maxRebootingNodes,
+		reconciliationPeriod:    reconciliationPeriod,
+		leaderElectionLease:     leaderElectionLeaseDuration,
+		lockID:                  config.LockID,
 	}, nil
 }
 
@@ -189,12 +190,12 @@ func (k *Kontroller) Run(stop <-chan struct{}) error {
 	// is lost, controller is immediately stopped, as shared context will be cancelled.
 	ctx := k.withLeaderElection(stop, err)
 
-	klog.V(5).Info("starting controller")
+	klog.V(5).Info("Starting controller")
 
 	// Call the process loop each period, until stop is closed.
 	wait.Until(func() { k.process(ctx) }, k.reconciliationPeriod, ctx.Done())
 
-	klog.V(5).Info("stopping controller")
+	klog.V(5).Info("Stopping controller")
 
 	return <-err
 }
@@ -202,6 +203,11 @@ func (k *Kontroller) Run(stop <-chan struct{}) error {
 // withLeaderElection creates a new context which is cancelled when this
 // operator does not hold a lock to operate on the cluster.
 func (k *Kontroller) withLeaderElection(stop <-chan struct{}, err chan<- error) context.Context {
+	leaderElectionBroadcaster := record.NewBroadcaster()
+	leaderElectionBroadcaster.StartRecordingToSink(&corev1client.EventSinkImpl{
+		Interface: k.kc.CoreV1().Events(k.namespace),
+	})
+
 	resLock := &resourcelock.ConfigMapLock{
 		ConfigMapMeta: metav1.ObjectMeta{
 			Namespace: k.namespace,
@@ -209,8 +215,10 @@ func (k *Kontroller) withLeaderElection(stop <-chan struct{}, err chan<- error) 
 		},
 		Client: k.kc.CoreV1(),
 		LockConfig: resourcelock.ResourceLockConfig{
-			Identity:      k.lockID,
-			EventRecorder: k.leaderElectionEventRecorder,
+			Identity: k.lockID,
+			EventRecorder: leaderElectionBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{
+				Component: leaderElectionEventSourceComponent,
+			}),
 		},
 	}
 
@@ -243,7 +251,7 @@ func (k *Kontroller) withLeaderElection(stop <-chan struct{}, err chan<- error) 
 			RetryPeriod: k.leaderElectionLease / 3,
 			Callbacks: leaderelection.LeaderCallbacks{
 				OnStartedLeading: func(ctx context.Context) { // was: func(stop <-chan struct{
-					klog.V(5).Info("started leading")
+					klog.V(5).Info("Started leading")
 					waitLeading <- struct{}{}
 				},
 				OnStoppedLeading: func() {
@@ -471,14 +479,14 @@ func (k *Kontroller) remainingRebootingCapacity(nodelist *corev1.NodeList) int {
 
 	rebootingNodes = append(append(rebootingNodes, beforeRebootNodes...), afterRebootNodes...)
 
-	remainingCapacity := maxRebootingNodes - len(rebootingNodes)
+	remainingCapacity := k.maxRebootingNodes - len(rebootingNodes)
 
 	if remainingCapacity == 0 {
 		for _, n := range rebootingNodes {
 			klog.Infof("Found node %q still rebooting, waiting", n.Name)
 		}
 
-		klog.Infof("Found %d (of max %d) rebooting nodes; waiting for completion", len(rebootingNodes), maxRebootingNodes)
+		klog.Infof("Found %d (of max %d) rebooting nodes; waiting for completion", len(rebootingNodes), k.maxRebootingNodes)
 	}
 
 	return remainingCapacity
