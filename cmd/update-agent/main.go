@@ -11,6 +11,8 @@ import (
 	"github.com/coreos/pkg/flagutil"
 	"k8s.io/klog/v2"
 
+	"k8s.io/kubectl/pkg/drain"
+
 	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/agent"
 	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/dbus"
 	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/k8sutil"
@@ -65,12 +67,24 @@ func main() {
 		klog.Fatalf("Failed establishing connection to logind dbus: %v", err)
 	}
 
+	dh := drain.Helper{
+		Ctx:                 nil,
+		Client:              clientset,
+		Force:               false,
+		GracePeriodSeconds:  -1,
+		IgnoreAllDaemonSets: true,
+		DeleteEmptyDirData:  true,
+		Out:                 os.Stdout,
+		ErrOut:              os.Stderr,
+	}
+
 	config := &agent.Config{
 		NodeName:               *node,
 		PodDeletionGracePeriod: time.Duration(*reapTimeout) * time.Second,
 		Clientset:              clientset,
 		StatusReceiver:         updateEngineClient,
 		Rebooter:               rebooter,
+		DrainHelper:            &dh,
 	}
 
 	agent, err := agent.New(config)

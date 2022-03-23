@@ -9,10 +9,10 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"k8s.io/kubectl/pkg/drain"
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -42,6 +42,7 @@ type Config struct {
 	HostFilesPrefix         string
 	PollInterval            time.Duration
 	MaxOperatorResponseTime time.Duration
+	DrainHelper             *drain.Helper
 }
 
 // StatusReceiver describe dependency of object providing status updates from update_engine.
@@ -71,6 +72,7 @@ type klocksmith struct {
 	hostFilesPrefix         string
 	pollInterval            time.Duration
 	maxOperatorResponseTime time.Duration
+	dh                      *drain.Helper
 }
 
 const (
@@ -126,6 +128,7 @@ func New(config *Config) (Klocksmith, error) {
 		hostFilesPrefix:         config.HostFilesPrefix,
 		pollInterval:            pollInterval,
 		maxOperatorResponseTime: maxOperatorResponseTime,
+		dh:                      config.DrainHelper,
 	}, nil
 }
 
@@ -291,46 +294,52 @@ func (k *klocksmith) process(ctx context.Context) error {
 	// Mirror pod or daemonset anyway..
 	klog.Infof("Deleting %d pods", len(pods))
 
-	for _, pod := range pods {
-		klog.Infof("Terminating pod %q...", pod.Name)
-
-		if err := k.pg.Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{}); err != nil {
-			// Continue anyways, the reboot should terminate it.
-			klog.Errorf("Failed terminating pod %q: %v", pod.Name, err)
-		}
+	err = k.dh.DeleteOrEvictPods(pods)
+	if err != nil {
+		klog.Errorf("error deleting/evicting pods: %v", err)
+		return err
 	}
 
-	// Wait for the pods to delete completely.
+	//for _, pod := range pods {
+	//	klog.Infof("Terminating pod %q...", pod.Name)
 	//
-	//nolint:varnamelen // Conventional name.
-	wg := sync.WaitGroup{}
-
-	for _, pod := range pods {
-		wg.Add(1)
-
-		go func(pod corev1.Pod) {
-			klog.Infof("Waiting for pod %q to terminate", pod.Name)
-
-			if err := k.waitForPodDeletion(ctx, pod); err != nil {
-				klog.Errorf("Skipping wait on pod %q: %v", pod.Name, err)
-			}
-
-			wg.Done()
-		}(pod)
-	}
-
-	allPodsTerminated := make(chan struct{})
-
-	go func() {
-		wg.Wait()
-		allPodsTerminated <- struct{}{}
-	}()
-
-	select {
-	case <-allPodsTerminated:
-	case <-ctx.Done():
-		return fmt.Errorf("waiting for all pods to terminate before the reboot interrupted")
-	}
+	//	if err := k.pg.Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{}); err != nil {
+	//		// Continue anyways, the reboot should terminate it.
+	//		klog.Errorf("Failed terminating pod %q: %v", pod.Name, err)
+	//	}
+	//}
+	//
+	//// Wait for the pods to delete completely.
+	////
+	////nolint:varnamelen // Conventional name.
+	//wg := sync.WaitGroup{}
+	//
+	//for _, pod := range pods {
+	//	wg.Add(1)
+	//
+	//	go func(pod corev1.Pod) {
+	//		klog.Infof("Waiting for pod %q to terminate", pod.Name)
+	//
+	//		if err := k.waitForPodDeletion(ctx, pod); err != nil {
+	//			klog.Errorf("Skipping wait on pod %q: %v", pod.Name, err)
+	//		}
+	//
+	//		wg.Done()
+	//	}(pod)
+	//}
+	//
+	//allPodsTerminated := make(chan struct{})
+	//
+	//go func() {
+	//	wg.Wait()
+	//	allPodsTerminated <- struct{}{}
+	//}()
+	//
+	//select {
+	//case <-allPodsTerminated:
+	//case <-ctx.Done():
+	//	return fmt.Errorf("waiting for all pods to terminate before the reboot interrupted")
+	//}
 
 	klog.Info("Node drained, rebooting")
 
