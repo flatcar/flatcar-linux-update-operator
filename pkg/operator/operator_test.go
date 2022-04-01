@@ -1113,6 +1113,114 @@ func Test_Operator_counts_nodes_as_which_finished_rebooting_which_has(t *testing
 	}
 }
 
+//nolint:funlen // Just many sub-tests.
+func Test_Operator_stops_current_reconciliation_when(t *testing.T) {
+	t.Parallel()
+
+	for name, testCase := range map[string]struct {
+		node                  *corev1.Node
+		failingListCall       int
+		failingUpdateCall     int
+		expectedNodeCondition func(*corev1.Node) bool
+	}{
+		"cleaning_up_node_state_fails_because": {
+			node:              rebootCancelledNode(),
+			failingListCall:   0,
+			failingUpdateCall: 0,
+			expectedNodeCondition: func(node *corev1.Node) bool {
+				_, ok := node.Labels[constants.LabelBeforeReboot]
+
+				return ok
+			},
+		},
+		"evaluating_nodes_which_finished_rebooting_fails_because": {
+			node:              finishedRebootingNode(),
+			failingListCall:   1,
+			failingUpdateCall: 0,
+			expectedNodeCondition: func(node *corev1.Node) bool {
+				_, ok := node.Labels[constants.LabelAfterReboot]
+
+				return ok
+			},
+		},
+		"evaluating_nodes_which_just_rebooted_fails_because": {
+			node:              justRebootedNode(),
+			failingListCall:   2,
+			failingUpdateCall: 1,
+			expectedNodeCondition: func(node *corev1.Node) bool {
+				_, ok := node.Labels[constants.LabelAfterReboot]
+
+				return !ok
+			},
+		},
+		"evaluating_nodes_which_are_ready_to_reboot_fails_because": {
+			node:              readyToRebootNode(),
+			failingListCall:   3,
+			failingUpdateCall: 1,
+			expectedNodeCondition: func(node *corev1.Node) bool {
+				v, ok := node.Labels[constants.LabelBeforeReboot]
+
+				return ok || v != constants.True
+			},
+		},
+		"evaluating_nodes_which_needs_to_reboot_fails_because": {
+			node:              rebootableNode(),
+			failingListCall:   4,
+			failingUpdateCall: 1,
+			expectedNodeCondition: func(node *corev1.Node) bool {
+				v, ok := node.Labels[constants.LabelBeforeReboot]
+
+				return ok || v != constants.True
+			},
+		},
+	} {
+		testCase := testCase
+
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			for subName, subTestCase := range map[string]struct {
+				failingCall int
+				verb        string
+			}{
+				"listing_node_objects_fails": {
+					failingCall: testCase.failingListCall,
+					verb:        "list",
+				},
+				"updating_node_fails": {
+					failingCall: testCase.failingUpdateCall,
+					verb:        "update",
+				},
+			} {
+				subTestCase := subTestCase
+
+				t.Run(subName, func(t *testing.T) {
+					t.Parallel()
+
+					config, fakeClient := testConfig(testCase.node)
+					requestFailed, failRequest := failOnNthCall(subTestCase.failingCall, fmt.Errorf(t.Name()))
+					fakeClient.PrependReactor(subTestCase.verb, "nodes", failRequest)
+
+					ctx, cancel := context.WithTimeout(contextWithDeadline(t), 5*time.Second)
+					t.Cleanup(cancel)
+
+					process(ctx, t, config, fakeClient)
+
+					select {
+					case <-requestFailed:
+					case <-ctx.Done():
+						t.Fatalf("Timed out waiting for request to fail")
+					}
+
+					if !testCase.expectedNodeCondition(node(ctx, t, config.Client.CoreV1().Nodes(), testCase.node.Name)) {
+						t.Fatalf("Expected condition not met")
+					}
+				})
+			}
+		})
+	}
+}
+
 // To de-schedule post-reboot hooks.
 func Test_Operator_finishes_reboot_process_by(t *testing.T) {
 	t.Parallel()
@@ -1398,7 +1506,7 @@ func node(ctx context.Context, t *testing.T, nodeClient corev1client.NodeInterfa
 func process(ctx context.Context, t *testing.T, config operator.Config, fakeClient *k8stesting.Fake) chan struct{} {
 	t.Helper()
 
-	reconcileCycleCh := make(chan struct{})
+	reconcileCycleCh := make(chan struct{}, 1)
 
 	listCallsCount := 0
 
@@ -1447,4 +1555,25 @@ func nodeUpdatedNTimes(fakeClient *k8stesting.Fake, expectedUpdateCalls int) cha
 	})
 
 	return nodeUpdatedCh
+}
+
+func failOnNthCall(failingCall int, err error) (chan struct{}, k8stesting.ReactionFunc) {
+	callCounter := 0
+
+	errorReached := make(chan struct{}, 1)
+
+	return errorReached, func(action k8stesting.Action) (bool, runtime.Object, error) {
+		// TODO: Make implementation smarter.
+		if callCounter != failingCall {
+			callCounter++
+
+			return false, nil, nil
+		}
+
+		if len(errorReached) == 0 {
+			errorReached <- struct{}{}
+		}
+
+		return true, nil, err
+	}
 }
