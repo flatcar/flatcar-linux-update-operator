@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func Test_slitNewlineEnv(t *testing.T) {
+func Test_splitNewlineEnv(t *testing.T) {
 	t.Parallel()
 
 	t.Run("retain_map_values_when_given_empty_input", func(t *testing.T) {
