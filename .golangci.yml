@@ -16,10 +16,6 @@ issues:
     - linters:
         - gomnd
       source: "klog.V\\("
-    # Ignore long generate commands.
-    - linters:
-        - lll
-      source: "^\\/\\/go:generate"
     # Ignore URLs in comments.
     - linters:
         - lll
