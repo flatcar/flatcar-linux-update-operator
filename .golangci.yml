@@ -48,6 +48,10 @@ issues:
     - linters:
         - wrapcheck
       text: "error returned from interface method should be wrapped"
+    # False positive: https://github.com/kunwardeep/paralleltest/issues/8.
+    - linters:
+        - paralleltest
+      text: "does not use range value in test Run"
 
 linters-settings:
   errcheck:
