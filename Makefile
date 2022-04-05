@@ -30,10 +30,6 @@ build-test: ## Compiles unit tests.
 test: ## Runs unit tests.
 	CGO_ENABLED= go test -mod=vendor -race ./...
 
-.PHONY: generate
-generate: ## Updates generated source files.
-	go generate -mod=vendor -tags generate -v -x ./...
-
 .PHONY: image
 image: ## Builds FLUO Docker image.
 	@$(DOCKER_CMD) build --rm=true -t $(IMAGE_REPO):$(VERSION) .
@@ -51,15 +47,11 @@ clean: ## Cleans build artifacts.
 	rm -rf bin
 
 .PHONY: ci
-ci: check-generate check-vendor check-tidy build test test-integration ## Runs checks performed by CI without external dependencies required (e.g. golangci-lint).
+ci: check-vendor check-tidy build test test-integration ## Runs checks performed by CI without external dependencies required (e.g. golangci-lint).
 
 .PHONY: check-working-tree-clean
 check-working-tree-clean: ## Checks if working directory is clean.
 	@test -z "$$(git status --porcelain)" || (echo "Commit all changes before running this target"; exit 1)
-
-.PHONY: check-generate
-check-generate: check-working-tree-clean generate ## Checks if generated source files are up to date.
-	@test -z "$$(git status --porcelain)" || (echo "Please run 'make generate' and commit generated changes."; git --no-pager diff; exit 1)
 
 .PHONY: check-vendor
 check-vendor: check-working-tree-clean vendor ## Checks if vendor directory is up to date.
