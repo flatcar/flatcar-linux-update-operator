@@ -26,6 +26,7 @@ var (
 
 	reapTimeout = flag.Int("grace-period", 600,
 		"Period of time in seconds given to a pod to terminate when rebooting for an update")
+	useKubectlDrain = flag.Bool("use-kubectl-drain", false, "Use kubectl drain implementation to drain nodes")
 )
 
 func main() {
@@ -74,8 +75,8 @@ func main() {
 		GracePeriodSeconds:  -1,
 		IgnoreAllDaemonSets: true,
 		DeleteEmptyDirData:  true,
-		Out:                 os.Stdout,
-		ErrOut:              os.Stderr,
+		Out:                 KlogOutWriter{},
+		ErrOut:              KlogErrWriter{},
 	}
 
 	config := &agent.Config{
@@ -98,4 +99,18 @@ func main() {
 	if err := agent.Run(context.Background()); err != nil {
 		klog.Fatalf("Error running agent: %v", err)
 	}
+}
+
+type KlogOutWriter struct{}
+
+func (r KlogOutWriter) Write(data []byte) (n int, err error) {
+	klog.Info(string(data))
+	return 0, err
+}
+
+type KlogErrWriter struct{}
+
+func (r KlogErrWriter) Write(data []byte) (n int, err error) {
+	klog.Error(string(data))
+	return 0, err
 }
