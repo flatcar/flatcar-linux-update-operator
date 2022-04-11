@@ -89,10 +89,12 @@ rules:
       - ""
     resources:
       - pods
+      - pods/eviction
     verbs:
       - get
       - list
       - delete
+      - create
   - apiGroups:
       - "apps"
     resources:
