@@ -104,14 +104,14 @@ func main() {
 
 type KlogOutWriter struct{}
 
-func (r KlogOutWriter) Write(data []byte) (n int, err error) {
+func (r KlogOutWriter) Write(data []byte) (int, error) {
 	klog.Info(string(data))
-	return 0, err
+	return len(data), nil
 }
 
 type KlogErrWriter struct{}
 
-func (r KlogErrWriter) Write(data []byte) (n int, err error) {
+func (r KlogErrWriter) Write(data []byte) (int, error) {
 	klog.Error(string(data))
-	return 0, err
+	return len(data), nil
 }
