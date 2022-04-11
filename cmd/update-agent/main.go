@@ -86,6 +86,7 @@ func main() {
 		StatusReceiver:         updateEngineClient,
 		Rebooter:               rebooter,
 		DrainHelper:            &dh,
+		UseKubectlDrain:        *useKubectlDrain,
 	}
 
 	agent, err := agent.New(config)

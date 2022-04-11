@@ -289,6 +289,7 @@ func (k *klocksmith) process(ctx context.Context) error {
 	klog.Info("Getting pod list for deletion")
 
 	if k.useKubectlDrain {
+		klog.Info("draining node using kubectl drain implementation")
 		deletion, errs := k.dh.GetPodsForDeletion(k.nodeName)
 		if err != nil {
 			return fmt.Errorf("error getting pods for deletion: %v", errs)
@@ -318,6 +319,8 @@ func (k *klocksmith) process(ctx context.Context) error {
 }
 
 func (k *klocksmith) findAndDeletePods(ctx context.Context) error {
+	klog.Info("Getting pod list for deletion")
+
 	pods, err := k.getPodsForDeletion(ctx)
 	if err != nil {
 		return fmt.Errorf("getting list of pods for deletion: %w", err)
