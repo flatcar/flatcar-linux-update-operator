@@ -16,10 +16,6 @@ issues:
     - linters:
         - gomnd
       source: "klog.V\\("
-    # Ignore long generate commands.
-    - linters:
-        - lll
-      source: "^\\/\\/go:generate"
     # Ignore URLs in comments.
     - linters:
         - lll
@@ -48,6 +44,10 @@ issues:
     - linters:
         - wrapcheck
       text: "error returned from interface method should be wrapped"
+    # False positive: https://github.com/kunwardeep/paralleltest/issues/8.
+    - linters:
+        - paralleltest
+      text: "does not use range value in test Run"
 
 linters-settings:
   errcheck:
