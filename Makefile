@@ -13,7 +13,7 @@ IMAGE_REPO?=ghcr.io/flatcar-linux/flatcar-linux-update-operator
 GOLANGCI_LINT_CONFIG_FILE ?= .golangci.yml
 
 .PHONY: all
-all: build test lint ## Compiles binaries, runs unit tests and runs linter.
+all: build test lint semgrep ## Compiles binaries, runs unit tests and runs linter.
 
 bin/%: ## Builds individual binaries.
 	go build -o $@ -ldflags $(LD_FLAGS) -mod=vendor ./cmd/$*
@@ -116,6 +116,11 @@ test-changelog: check-working-tree-clean ## Verifies that changelog is properly 
 .PHONY: build-kustomize
 build-kustomize: ## Renders manifests using kustomize.
 	kustomize build examples/deploy/
+
+.PHONY: semgrep
+semgrep: SEMGREP_BIN=semgrep
+semgrep: ## Runs semgrep linter.
+	@if ! which $(SEMGREP_BIN) >/dev/null 2>&1; then echo "$(SEMGREP_BIN) binary not found, skipping extra linting"; else $(SEMGREP_BIN); fi
 
 .PHONY: help
 help: ## Prints help message.

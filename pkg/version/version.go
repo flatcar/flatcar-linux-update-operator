@@ -25,7 +25,7 @@ var Semver semver.Version
 func init() {
 	parsedSemVer, err := semver.Parse(Version)
 	if err != nil {
-		klog.Fatalf("invalid build of update operator; version.Version must be set at compile "+
+		klog.Fatalf("Invalid build of update operator; version.Version must be set at compile "+
 			"time to a valid semver value. %v could not parse: %v", Version, err)
 	}
 

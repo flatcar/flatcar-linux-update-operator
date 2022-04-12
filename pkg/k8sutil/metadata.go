@@ -37,7 +37,7 @@ func GetNodeRetry(ctx context.Context, nc corev1client.NodeInterface, node strin
 	err := retry.OnError(retry.DefaultBackoff, func(error) bool { return true }, func() error {
 		n, getErr := nc.Get(ctx, node, metav1.GetOptions{})
 		if getErr != nil {
-			return fmt.Errorf("failed to get node %q: %w", node, getErr)
+			return fmt.Errorf("getting node %q: %w", node, getErr)
 		}
 
 		apiNode = n
@@ -60,7 +60,7 @@ func UpdateNodeRetry(ctx context.Context, nc corev1client.NodeInterface, node st
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		n, getErr := nc.Get(ctx, node, metav1.GetOptions{})
 		if getErr != nil {
-			return fmt.Errorf("failed to get node %q: %w", node, getErr)
+			return fmt.Errorf("getting node %q: %w", node, getErr)
 		}
 
 		f(n)
@@ -71,7 +71,7 @@ func UpdateNodeRetry(ctx context.Context, nc corev1client.NodeInterface, node st
 	})
 	if err != nil {
 		// May be conflict if max retries were hit.
-		return fmt.Errorf("unable to update node %q: %w", node, err)
+		return fmt.Errorf("updating node %q: %w", node, err)
 	}
 
 	return nil
