@@ -94,3 +94,13 @@ jobs:
 
       - name: Test rendering manifests using kustomize
         run: make build-kustomize
+
+  semgrep:
+    name: Semgrep
+    runs-on: ubuntu-latest
+    steps:
+
+      - uses: actions/checkout@v2
+
+      # Use dedicated action for nice integration with GitHub.
+      - uses: returntocorp/semgrep-action@v1

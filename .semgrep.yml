@@ -1,0 +1,25 @@
+rules:
+  - id: bad-error-wrap-wording
+    patterns:
+      - pattern-regex: fmt\.Errorf\(".?([Ff]ailed|[]Uu]nable|[Cc]ould|([Ee]rror))
+    message: Word "fail", "failed", "unable", "could not" should not be used when wrapping errors. Use verb in continuous form instead!
+    languages: [go]
+    severity: ERROR
+  - id: printed-messages-must-be-captialized
+    patterns:
+      - pattern-regex: (fmt.Print(ln|f)|\bt\.(Error|Fatal|Log)(|f)|klog\.(V\([0-9]\)\.|)(Info|Error|Fatal|Warning)(f|))\("[a-z]
+    message: Printed messages must be capitalized.
+    languages: [go]
+    severity: ERROR
+  - id: strings-must-be-quoted-using-q
+    patterns:
+      - pattern-regex: "'%s'"
+    message: When formatting, strings must be quoted using %q instead of e.g. '%s'.
+    languages: [go]
+    severity: ERROR
+  - id: error-wrapping-must-be-preceded-by-space
+    patterns:
+      - pattern-regex: '[^ ]%w'
+    message: When wrapping errors, %w must be preceded by space.
+    languages: [go]
+    severity: ERROR
