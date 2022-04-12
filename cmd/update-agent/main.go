@@ -24,7 +24,6 @@ var (
 
 	reapTimeout = flag.Int("grace-period", 600,
 		"Period of time in seconds given to a pod to terminate when rebooting for an update")
-	useKubectlDrain = flag.Bool("use-kubectl-drain", false, "Use kubectl drain implementation to drain nodes")
 )
 
 func main() {
@@ -72,7 +71,6 @@ func main() {
 		Clientset:              clientset,
 		StatusReceiver:         updateEngineClient,
 		Rebooter:               rebooter,
-		UseKubectlDrain:        *useKubectlDrain,
 	}
 
 	agent, err := agent.New(config)
