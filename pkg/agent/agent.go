@@ -9,11 +9,12 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
-	"k8s.io/kubectl/pkg/drain"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"k8s.io/kubectl/pkg/drain"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -72,7 +73,6 @@ type klocksmith struct {
 	hostFilesPrefix         string
 	pollInterval            time.Duration
 	maxOperatorResponseTime time.Duration
-	dh                      *drain.Helper
 	clientset               kubernetes.Interface
 }
 
@@ -276,7 +276,7 @@ func (k *klocksmith) process(ctx context.Context) error {
 		klog.Info("Node already marked as unschedulable")
 	}
 
-	dh := drain.Helper{
+	drainHelper := drain.Helper{
 		Ctx:                 ctx,
 		Client:              k.clientset,
 		Force:               false,
@@ -288,8 +288,9 @@ func (k *klocksmith) process(ctx context.Context) error {
 	}
 
 	klog.Info("Getting pod list for deletion")
-	pods, errs := dh.GetPodsForDeletion(k.nodeName)
-	if err != nil {
+
+	pods, errs := drainHelper.GetPodsForDeletion(k.nodeName)
+	if len(errs) != 0 {
 		return fmt.Errorf("error getting pods for deletion: %v", errs)
 	}
 
@@ -298,7 +299,8 @@ func (k *klocksmith) process(ctx context.Context) error {
 	})
 
 	klog.Infof("Deleting/Evicting %d pods", len(toDelete))
-	err = dh.DeleteOrEvictPods(toDelete)
+
+	err = drainHelper.DeleteOrEvictPods(toDelete)
 	if err != nil {
 		return fmt.Errorf("error deleting/evicting pods: %w", err)
 	}
@@ -603,6 +605,7 @@ type klogOutWriter struct{}
 
 func (r klogOutWriter) Write(data []byte) (int, error) {
 	klog.Info(string(data))
+
 	return len(data), nil
 }
 
@@ -610,5 +613,6 @@ type klogErrWriter struct{}
 
 func (r klogErrWriter) Write(data []byte) (int, error) {
 	klog.Error(string(data))
+
 	return len(data), nil
 }
