@@ -63,7 +63,7 @@ func getOwnerDaemonset(ctx context.Context, dsg appsv1client.DaemonSetsGetter, p
 			}
 
 			if !errors.IsNotFound(err) {
-				return nil, fmt.Errorf("failed to get controller of pod %q: %w", pod.Name, err)
+				return nil, fmt.Errorf("getting controller of pod %q: %w", pod.Name, err)
 			}
 		}
 	}
