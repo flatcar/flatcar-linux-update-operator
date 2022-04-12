@@ -76,6 +76,7 @@ type klocksmith struct {
 	maxOperatorResponseTime time.Duration
 	dh                      *drain.Helper
 	useKubectlDrain         bool
+	clientset               kubernetes.Interface
 }
 
 const (
@@ -131,8 +132,8 @@ func New(config *Config) (Klocksmith, error) {
 		hostFilesPrefix:         config.HostFilesPrefix,
 		pollInterval:            pollInterval,
 		maxOperatorResponseTime: maxOperatorResponseTime,
-		dh:                      config.DrainHelper,
 		useKubectlDrain:         config.UseKubectlDrain,
+		clientset:               config.Clientset,
 	}, nil
 }
 
@@ -286,16 +287,25 @@ func (k *klocksmith) process(ctx context.Context) error {
 		klog.Info("Node already marked as unschedulable")
 	}
 
-	klog.Info("Getting pod list for deletion")
-
 	if k.useKubectlDrain {
+		dh := drain.Helper{
+			Ctx:                 ctx,
+			Client:              k.clientset,
+			Force:               false,
+			GracePeriodSeconds:  -1,
+			IgnoreAllDaemonSets: true,
+			DeleteEmptyDirData:  true,
+			Out:                 klogOutWriter{},
+			ErrOut:              klogErrWriter{},
+		}
+
 		klog.Info("draining node using kubectl drain implementation")
-		deletion, errs := k.dh.GetPodsForDeletion(k.nodeName)
+		deletion, errs := dh.GetPodsForDeletion(k.nodeName)
 		if err != nil {
 			return fmt.Errorf("error getting pods for deletion: %v", errs)
 		}
 
-		err := k.dh.DeleteOrEvictPods(deletion.Pods())
+		err := dh.DeleteOrEvictPods(deletion.Pods())
 		if err != nil {
 			return fmt.Errorf("error deleting/evicting pods: %w", err)
 		}
@@ -693,4 +703,18 @@ func getVersionInfo(filesPathPrefix string) (*versionInfo, error) {
 		group:   updateconf["GROUP"],
 		version: osrelease["VERSION"],
 	}, nil
+}
+
+type klogOutWriter struct{}
+
+func (r klogOutWriter) Write(data []byte) (int, error) {
+	klog.Info(string(data))
+	return len(data), nil
+}
+
+type klogErrWriter struct{}
+
+func (r klogErrWriter) Write(data []byte) (int, error) {
+	klog.Error(string(data))
+	return len(data), nil
 }

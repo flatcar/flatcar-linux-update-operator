@@ -11,8 +11,6 @@ import (
 	"github.com/coreos/pkg/flagutil"
 	"k8s.io/klog/v2"
 
-	"k8s.io/kubectl/pkg/drain"
-
 	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/agent"
 	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/dbus"
 	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/k8sutil"
@@ -68,24 +66,12 @@ func main() {
 		klog.Fatalf("Failed establishing connection to logind dbus: %v", err)
 	}
 
-	dh := drain.Helper{
-		Ctx:                 nil,
-		Client:              clientset,
-		Force:               false,
-		GracePeriodSeconds:  -1,
-		IgnoreAllDaemonSets: true,
-		DeleteEmptyDirData:  true,
-		Out:                 KlogOutWriter{},
-		ErrOut:              KlogErrWriter{},
-	}
-
 	config := &agent.Config{
 		NodeName:               *node,
 		PodDeletionGracePeriod: time.Duration(*reapTimeout) * time.Second,
 		Clientset:              clientset,
 		StatusReceiver:         updateEngineClient,
 		Rebooter:               rebooter,
-		DrainHelper:            &dh,
 		UseKubectlDrain:        *useKubectlDrain,
 	}
 
@@ -100,18 +86,4 @@ func main() {
 	if err := agent.Run(context.Background()); err != nil {
 		klog.Fatalf("Error running agent: %v", err)
 	}
-}
-
-type KlogOutWriter struct{}
-
-func (r KlogOutWriter) Write(data []byte) (int, error) {
-	klog.Info(string(data))
-	return len(data), nil
-}
-
-type KlogErrWriter struct{}
-
-func (r KlogErrWriter) Write(data []byte) (int, error) {
-	klog.Error(string(data))
-	return len(data), nil
 }
