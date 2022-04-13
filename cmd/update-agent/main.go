@@ -4,10 +4,11 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"os"
+
 	"github.com/coreos/go-systemd/v22/login1"
 	"github.com/coreos/pkg/flagutil"
 	"k8s.io/klog/v2"
-	"os"
 
 	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/agent"
 	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/dbus"
