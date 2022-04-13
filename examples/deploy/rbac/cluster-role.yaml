@@ -2,7 +2,6 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: flatcar-linux-update-operator
-  namespace: reboot-coordinator
 rules:
   - apiGroups:
       - ""
@@ -57,7 +56,6 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: flatcar-linux-update-agent
-  namespace: reboot-coordinator
 rules:
   - apiGroups:
       - ""
