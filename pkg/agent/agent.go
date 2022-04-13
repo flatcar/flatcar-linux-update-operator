@@ -34,7 +34,7 @@ import (
 // Config represents configurable options for agent.
 type Config struct {
 	NodeName                string
-	PodDeletionGracePeriod  time.Duration
+	PodDeletionGracePeriod  int
 	Clientset               kubernetes.Interface
 	StatusReceiver          StatusReceiver
 	Rebooter                Rebooter
@@ -64,11 +64,43 @@ type klocksmith struct {
 	nc                      corev1client.NodeInterface
 	ue                      StatusReceiver
 	lc                      Rebooter
-	reapTimeout             time.Duration
+	reapTimeout             int
 	hostFilesPrefix         string
 	pollInterval            time.Duration
 	maxOperatorResponseTime time.Duration
 	clientset               kubernetes.Interface
+}
+
+type drainer interface {
+	GetPodsForDeletion(nodeName string) (*drain.PodDeleteList, []error)
+	DeleteOrEvictPods([]corev1.Pod) error
+}
+
+func newDrainer(ctx context.Context, cs kubernetes.Interface, gps int) drainer {
+	return &drain.Helper{
+		Ctx:                 ctx,
+		Client:              cs,
+		Force:               false,
+		GracePeriodSeconds:  gps,
+		IgnoreAllDaemonSets: true,
+		DeleteEmptyDirData:  true,
+		Out:                 &klogWriter{klog.Info},
+		ErrOut:              &klogWriter{klog.Error},
+		AdditionalFilters: []drain.PodFilter{
+			skipKubeSystemPods,
+		},
+	}
+}
+
+func skipKubeSystemPods(pod corev1.Pod) drain.PodDeleteStatus {
+	if pod.Namespace == "kube-system" {
+		return drain.PodDeleteStatus{
+			Delete: false,
+		}
+	}
+	return drain.PodDeleteStatus{
+		Delete: true,
+	}
 }
 
 const (
@@ -269,29 +301,18 @@ func (k *klocksmith) process(ctx context.Context) error {
 		klog.Info("Node already marked as unschedulable")
 	}
 
-	var drainHelper = drain.Helper{
-		Ctx:                 ctx,
-		Client:              k.clientset,
-		Force:               false,
-		GracePeriodSeconds:  -1,
-		IgnoreAllDaemonSets: true,
-		DeleteEmptyDirData:  true,
-		Out:                 &klogWriter{klog.Info},
-		ErrOut:              &klogWriter{klog.Error},
-		AdditionalFilters: []drain.PodFilter{
-			skipKubeSystemPods,
-		},
-	}
+	drainer := newDrainer(ctx, k.clientset, k.reapTimeout)
+
 	klog.Info("Getting pod list for deletion")
 
-	pods, errs := drainHelper.GetPodsForDeletion(k.nodeName)
+	pods, errs := drainer.GetPodsForDeletion(k.nodeName)
 	if len(errs) != 0 {
 		return fmt.Errorf("error getting pods for deletion: %v", errs)
 	}
 
 	klog.Infof("Deleting/Evicting %d pods", len(pods.Pods()))
 
-	if err := drainHelper.DeleteOrEvictPods(pods.Pods()); err != nil {
+	if err := drainer.DeleteOrEvictPods(pods.Pods()); err != nil {
 		return fmt.Errorf("error deleting/evicting pods: %w", err)
 	}
 
@@ -599,15 +620,4 @@ func (r klogWriter) Write(data []byte) (int, error) {
 	r.wf(string(data))
 
 	return len(data), nil
-}
-
-func skipKubeSystemPods(pod corev1.Pod) drain.PodDeleteStatus {
-	if pod.Namespace == "kube-system" {
-		return drain.PodDeleteStatus{
-			Delete: false,
-		}
-	}
-	return drain.PodDeleteStatus{
-		Delete: true,
-	}
 }

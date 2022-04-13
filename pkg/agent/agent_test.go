@@ -740,7 +740,7 @@ func Test_Running_agent(t *testing.T) {
 
 			testConfig, node, _ := validTestConfig(t, testNode())
 			testConfig.Clientset = fakeClient
-			testConfig.PodDeletionGracePeriod = time.Hour
+			testConfig.PodDeletionGracePeriod = 3600
 
 			expectedPodRemovedMutex := &sync.Mutex{}
 			expectedPodRemoved := len(expectedPodsRemovedNames)
@@ -1526,7 +1526,7 @@ func Test_Running_agent(t *testing.T) {
 
 			testConfig, node, _ := validTestConfig(t, testNode())
 			testConfig.Clientset = fakeClient
-			testConfig.PodDeletionGracePeriod = 30 * time.Second
+			testConfig.PodDeletionGracePeriod = 30
 			testConfig.Rebooter = &mockRebooter{
 				rebootF: func(auth bool) {
 					rebootTriggerred <- auth
@@ -1607,7 +1607,7 @@ func validTestConfig(t *testing.T, node *corev1.Node) (*agent.Config, *corev1.No
 		NodeName:               node.Name,
 		HostFilesPrefix:        hostFilesPrefix,
 		PollInterval:           200 * time.Millisecond,
-		PodDeletionGracePeriod: time.Second,
+		PodDeletionGracePeriod: 1,
 	}, node, &fakeClient.Fake
 }
 

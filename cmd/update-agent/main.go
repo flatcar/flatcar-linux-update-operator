@@ -4,12 +4,10 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"os"
-	"time"
-
 	"github.com/coreos/go-systemd/v22/login1"
 	"github.com/coreos/pkg/flagutil"
 	"k8s.io/klog/v2"
+	"os"
 
 	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/agent"
 	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/dbus"
@@ -68,7 +66,7 @@ func main() {
 
 	config := &agent.Config{
 		NodeName:               *node,
-		PodDeletionGracePeriod: time.Duration(*reapTimeout) * time.Second,
+		PodDeletionGracePeriod: *reapTimeout,
 		Clientset:              clientset,
 		StatusReceiver:         updateEngineClient,
 		Rebooter:               rebooter,
