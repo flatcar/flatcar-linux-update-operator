@@ -22,8 +22,9 @@ var (
 	node         = flag.String("node", "", "Kubernetes node name")
 	printVersion = flag.Bool("version", false, "Print version and exit")
 
-	reapTimeout = flag.Int("grace-period", 600,
-		"Period of time in seconds given to a pod to terminate when rebooting for an update")
+	reapTimeout = flag.Int("grace-period", -1,
+		"Period of time in seconds given to a pod to terminate when rebooting for an update, "+
+			"Set to a negative value to use the pod's terminationGracePeriodSeconds")
 )
 
 func main() {

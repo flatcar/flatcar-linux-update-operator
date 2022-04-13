@@ -22,7 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
-	appsv1client "k8s.io/client-go/kubernetes/typed/apps/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/klog/v2"
@@ -42,8 +41,6 @@ type Config struct {
 	HostFilesPrefix         string
 	PollInterval            time.Duration
 	MaxOperatorResponseTime time.Duration
-	DrainHelper             *drain.Helper
-	UseKubectlDrain         bool
 }
 
 // StatusReceiver describe dependency of object providing status updates from update_engine.
@@ -64,9 +61,7 @@ type Klocksmith interface {
 // Klocksmith implements agent part of FLUO.
 type klocksmith struct {
 	nodeName                string
-	pg                      corev1client.PodsGetter
 	nc                      corev1client.NodeInterface
-	dsg                     appsv1client.DaemonSetsGetter
 	ue                      StatusReceiver
 	lc                      Rebooter
 	reapTimeout             time.Duration
@@ -120,8 +115,6 @@ func New(config *Config) (Klocksmith, error) {
 
 	return &klocksmith{
 		nodeName:                config.NodeName,
-		pg:                      config.Clientset.CoreV1(),
-		dsg:                     config.Clientset.AppsV1(),
 		nc:                      config.Clientset.CoreV1().Nodes(),
 		ue:                      config.StatusReceiver,
 		lc:                      config.Rebooter,
@@ -276,17 +269,19 @@ func (k *klocksmith) process(ctx context.Context) error {
 		klog.Info("Node already marked as unschedulable")
 	}
 
-	drainHelper := drain.Helper{
+	var drainHelper = drain.Helper{
 		Ctx:                 ctx,
 		Client:              k.clientset,
 		Force:               false,
 		GracePeriodSeconds:  -1,
 		IgnoreAllDaemonSets: true,
 		DeleteEmptyDirData:  true,
-		Out:                 klogOutWriter{},
-		ErrOut:              klogErrWriter{},
+		Out:                 &klogWriter{klog.Info},
+		ErrOut:              &klogWriter{klog.Error},
+		AdditionalFilters: []drain.PodFilter{
+			skipKubeSystemPods,
+		},
 	}
-
 	klog.Info("Getting pod list for deletion")
 
 	pods, errs := drainHelper.GetPodsForDeletion(k.nodeName)
@@ -294,14 +289,9 @@ func (k *klocksmith) process(ctx context.Context) error {
 		return fmt.Errorf("error getting pods for deletion: %v", errs)
 	}
 
-	toDelete := k8sutil.FilterPods(pods.Pods(), func(p *corev1.Pod) bool {
-		return p.Namespace != "kube-system"
-	})
+	klog.Infof("Deleting/Evicting %d pods", len(pods.Pods()))
 
-	klog.Infof("Deleting/Evicting %d pods", len(toDelete))
-
-	err = drainHelper.DeleteOrEvictPods(toDelete)
-	if err != nil {
+	if err := drainHelper.DeleteOrEvictPods(pods.Pods()); err != nil {
 		return fmt.Errorf("error deleting/evicting pods: %w", err)
 	}
 
@@ -601,18 +591,23 @@ func getVersionInfo(filesPathPrefix string) (*versionInfo, error) {
 	}, nil
 }
 
-type klogOutWriter struct{}
+type klogWriter struct {
+	wf func(args ...interface{})
+}
 
-func (r klogOutWriter) Write(data []byte) (int, error) {
-	klog.Info(string(data))
+func (r klogWriter) Write(data []byte) (int, error) {
+	r.wf(string(data))
 
 	return len(data), nil
 }
 
-type klogErrWriter struct{}
-
-func (r klogErrWriter) Write(data []byte) (int, error) {
-	klog.Error(string(data))
-
-	return len(data), nil
+func skipKubeSystemPods(pod corev1.Pod) drain.PodDeleteStatus {
+	if pod.Namespace == "kube-system" {
+		return drain.PodDeleteStatus{
+			Delete: false,
+		}
+	}
+	return drain.PodDeleteStatus{
+		Delete: true,
+	}
 }
