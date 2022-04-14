@@ -98,6 +98,7 @@ func skipKubeSystemPods(pod corev1.Pod) drain.PodDeleteStatus {
 			Delete: false,
 		}
 	}
+
 	return drain.PodDeleteStatus{
 		Delete: true,
 	}
