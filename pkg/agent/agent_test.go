@@ -5,7 +5,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,7 +12,11 @@ import (
 	"testing"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+
 	corev1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -699,19 +702,24 @@ func Test_Running_agent(t *testing.T) {
 	})
 
 	t.Run("after_marking_node_as_unschedulable", func(t *testing.T) {
-		t.Skip() // TODO: fix test
 		t.Parallel()
 
 		t.Run("without_exceeding_pod_deletion_grace_period", func(t *testing.T) {
 			t.Parallel()
 
 			expectedPodsRemovedNames := map[string]struct{}{"pod-to-be-removed": {}}
-
+			controllerTrue := true
 			podsToCreate := []*corev1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "pod-to-be-removed",
 						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								Name:       "fake-owner",
+								Controller: &controllerTrue,
+							},
+						},
 					},
 					Spec: corev1.PodSpec{
 						NodeName: testNode().Name,
@@ -721,6 +729,12 @@ func Test_Running_agent(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "pod-filtered-from-removal-because-of-namespace",
 						Namespace: "kube-system",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								Name:       "fake-owner",
+								Controller: &controllerTrue,
+							},
+						},
 					},
 					Spec: corev1.PodSpec{
 						NodeName: testNode().Name,
@@ -730,6 +744,12 @@ func Test_Running_agent(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "pod-on-another-node",
 						Namespace: "another",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								Name:       "fake-owner",
+								Controller: &controllerTrue,
+							},
+						},
 					},
 					Spec: corev1.PodSpec{
 						NodeName: "baz",
@@ -738,10 +758,11 @@ func Test_Running_agent(t *testing.T) {
 			}
 
 			fakeClient := fake.NewSimpleClientset(podsToCreate[0], podsToCreate[1], podsToCreate[2], testNode())
+			addEvictionSupport(t, fakeClient, "v1")
 
 			testConfig, node, _ := validTestConfig(t, testNode())
 			testConfig.Clientset = fakeClient
-			testConfig.PodDeletionGracePeriod = 3600
+			testConfig.PodDeletionGracePeriod = time.Hour
 
 			expectedPodRemovedMutex := &sync.Mutex{}
 			expectedPodRemoved := len(expectedPodsRemovedNames)
@@ -787,6 +808,38 @@ func Test_Running_agent(t *testing.T) {
 				// After removal attempt of all pods which are expected to be removed, allow real removal by test code.
 				return expectedPodRemoved >= 0, nil, nil
 			})
+
+			fakeClient.PrependReactor(
+				"create",
+				"pods/eviction",
+				func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+					createAction, ok := action.(k8stesting.CreateActionImpl)
+					if !ok {
+						del := k8stesting.CreateActionImpl{}
+
+						return true, nil, fmt.Errorf("unexpected action, expected %T, got %T", del, action)
+					}
+
+					if eviction, ok := createAction.Object.(*policyv1.Eviction); !ok {
+						if _, ok := expectedPodsRemovedNames[eviction.GetObjectMeta().GetName()]; !ok {
+							t.Fatalf("Unexpected eviction for %q created", createAction.Name)
+						}
+					}
+
+					expectedPodRemovedMutex.Lock()
+					defer expectedPodRemovedMutex.Unlock()
+					expectedPodRemoved--
+
+					defer func(i int) {
+						if i == 0 {
+							allExpectedPodsScheduledForRemoval <- struct{}{}
+							allExpectedPodsScheduledForRemoval <- struct{}{}
+						}
+					}(expectedPodRemoved)
+
+					// After removal attempt of all pods which are expected to be removed, allow real removal by test code.
+					return expectedPodRemoved >= 0, nil, nil
+				})
 
 			expectedGetPodCalls := 1
 			podGetRequest := make(chan struct{}, expectedGetPodCalls)
@@ -862,11 +915,18 @@ func Test_Running_agent(t *testing.T) {
 
 			rebootTriggerred := make(chan bool)
 
+			controllerTrue := true
 			podsToCreate := []*corev1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "foo",
 						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								Name:       "fake-owner",
+								Controller: &controllerTrue,
+							},
+						},
 					},
 					Spec: corev1.PodSpec{
 						NodeName: testNode().Name,
@@ -875,6 +935,7 @@ func Test_Running_agent(t *testing.T) {
 			}
 
 			fakeClient := fake.NewSimpleClientset(podsToCreate[0], testNode())
+			addEvictionSupport(t, fakeClient, "v1")
 
 			testConfig, node, _ := validTestConfig(t, testNode())
 			testConfig.Clientset = fakeClient
@@ -884,8 +945,8 @@ func Test_Running_agent(t *testing.T) {
 				},
 			}
 
-			fakeClient.PrependReactor("delete", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
-				return true, nil, fmt.Errorf(t.Name())
+			fakeClient.PrependReactor("create", "pods/eviction", func(action k8stesting.Action) (bool, runtime.Object, error) {
+				return true, nil, nil
 			})
 
 			ctx := contextWithTimeout(t, agentRunTimeLimit)
@@ -1501,24 +1562,31 @@ func Test_Running_agent(t *testing.T) {
 			_, f := failOnNthCall(0, expectedError)
 			fakeClient.PrependReactor("list", "pods", f)
 
-			expectedErrorWrapped := fmt.Errorf("processing: error getting pods for deletion: %v", []error{expectedError})
+			expectedErrorWrapped := fmt.Errorf("processing: getting pods for deletion: %v", []error{expectedError})
 			if err := getAgentRunningError(t, testConfig); err.Error() != expectedErrorWrapped.Error() {
 				t.Fatalf("Expected error %q, got %q", expectedErrorWrapped, err)
 			}
 		})
 
 		t.Run("agent_receives_termination_signal_while_waiting_for_all_pods_to_be_terminated", func(t *testing.T) {
-			t.Skip() // TODO: fix test
 			t.Parallel()
 
 			rebootTriggerred := make(chan bool, 1)
 
+			controllerTrue := true
 			podsToCreate := []*corev1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "foo",
 						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								Name:       "fake-owner",
+								Controller: &controllerTrue,
+							},
+						},
 					},
+
 					Spec: corev1.PodSpec{
 						NodeName: testNode().Name,
 					},
@@ -1526,17 +1594,18 @@ func Test_Running_agent(t *testing.T) {
 			}
 
 			fakeClient := fake.NewSimpleClientset(podsToCreate[0], testNode())
+			addEvictionSupport(t, fakeClient, "v1")
 
 			testConfig, node, _ := validTestConfig(t, testNode())
 			testConfig.Clientset = fakeClient
-			testConfig.PodDeletionGracePeriod = 30
+			testConfig.PodDeletionGracePeriod = 30 * time.Second
 			testConfig.Rebooter = &mockRebooter{
 				rebootF: func(auth bool) {
 					rebootTriggerred <- auth
 				},
 			}
 
-			expectedGetPodCalls := 2
+			expectedGetPodCalls := 1
 			getPodCalls := make(chan struct{}, expectedGetPodCalls)
 
 			fakeClient.PrependReactor("get", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
@@ -1561,7 +1630,6 @@ func Test_Running_agent(t *testing.T) {
 
 			<-getPodCalls
 			cancel()
-			<-getPodCalls
 
 			select {
 			case err := <-done:
@@ -1610,7 +1678,7 @@ func validTestConfig(t *testing.T, node *corev1.Node) (*agent.Config, *corev1.No
 		NodeName:               node.Name,
 		HostFilesPrefix:        hostFilesPrefix,
 		PollInterval:           200 * time.Millisecond,
-		PodDeletionGracePeriod: 1,
+		PodDeletionGracePeriod: time.Second,
 	}, node, &fakeClient.Fake
 }
 
@@ -1968,4 +2036,67 @@ func updateActionToNode(t *testing.T, action k8stesting.Action) *corev1.Node {
 	}
 
 	return node
+}
+
+// lifted from https://github.com/kubernetes/kubectl/blob/master/pkg/drain/drain_test.go.
+func addEvictionSupport(t *testing.T, clientset *fake.Clientset, version string) {
+	t.Helper()
+
+	podsEviction := metav1.APIResource{
+		Name:    "pods/eviction",
+		Kind:    "Eviction",
+		Group:   "policy",
+		Version: version,
+	}
+	coreResources := &metav1.APIResourceList{
+		GroupVersion: "v1",
+		APIResources: []metav1.APIResource{podsEviction},
+	}
+
+	policyResources := &metav1.APIResourceList{
+		GroupVersion: "policy/v1",
+	}
+	clientset.Resources = append(clientset.Resources, coreResources, policyResources)
+
+	// Delete pods when evict is called
+	clientset.PrependReactor("create", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		if action.GetSubresource() != "eviction" {
+			return false, nil, nil
+		}
+
+		namespace := ""
+		name := ""
+		switch version {
+		case "v1":
+			var eviction *policyv1.Eviction
+			if a, ok := action.(k8stesting.CreateAction); ok {
+				if p, ok := a.GetObject().(*policyv1.Eviction); ok {
+					eviction = p
+				}
+			}
+			namespace = eviction.Namespace
+			name = eviction.Name
+		case "v1beta1":
+			var eviction *policyv1beta1.Eviction
+			if a, ok := action.(k8stesting.CreateAction); ok {
+				if p, ok := a.GetObject().(*policyv1beta1.Eviction); ok {
+					eviction = p
+				}
+			}
+			namespace = eviction.Namespace
+			name = eviction.Name
+		default:
+			t.Errorf("unknown version %s", version)
+		}
+		// Avoid the lock
+		go func() {
+			err := clientset.CoreV1().Pods(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
+			if err != nil {
+				// Errorf because we can't call Fatalf from another goroutine
+				t.Errorf("failed to delete pod: %s/%s", namespace, name)
+			}
+		}()
+
+		return true, nil, nil
+	})
 }

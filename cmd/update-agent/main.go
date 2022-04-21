@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/coreos/go-systemd/v22/login1"
 	"github.com/coreos/pkg/flagutil"
@@ -21,9 +22,8 @@ var (
 	node         = flag.String("node", "", "Kubernetes node name")
 	printVersion = flag.Bool("version", false, "Print version and exit")
 
-	reapTimeout = flag.Int("grace-period", -1,
-		"Period of time in seconds given to a pod to terminate when rebooting for an update, "+
-			"Set to a negative value to use the pod's terminationGracePeriodSeconds")
+	reapTimeout = flag.Int("grace-period", 600,
+		"Period of time in seconds given to a pod to terminate when rebooting for an update")
 )
 
 func main() {
@@ -67,7 +67,7 @@ func main() {
 
 	config := &agent.Config{
 		NodeName:               *node,
-		PodDeletionGracePeriod: *reapTimeout,
+		PodDeletionGracePeriod: time.Duration(*reapTimeout) * time.Second,
 		Clientset:              clientset,
 		StatusReceiver:         updateEngineClient,
 		Rebooter:               rebooter,

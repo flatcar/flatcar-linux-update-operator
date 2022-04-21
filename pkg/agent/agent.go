@@ -34,7 +34,7 @@ import (
 // Config represents configurable options for agent.
 type Config struct {
 	NodeName                string
-	PodDeletionGracePeriod  int
+	PodDeletionGracePeriod  time.Duration
 	Clientset               kubernetes.Interface
 	StatusReceiver          StatusReceiver
 	Rebooter                Rebooter
@@ -64,7 +64,7 @@ type klocksmith struct {
 	nc                      corev1client.NodeInterface
 	ue                      StatusReceiver
 	lc                      Rebooter
-	reapTimeout             int
+	reapTimeout             time.Duration
 	hostFilesPrefix         string
 	pollInterval            time.Duration
 	maxOperatorResponseTime time.Duration
@@ -76,12 +76,13 @@ type drainer interface {
 	DeleteOrEvictPods([]corev1.Pod) error
 }
 
-func newDrainer(ctx context.Context, cs kubernetes.Interface, gps int) drainer {
+func newDrainer(ctx context.Context, cs kubernetes.Interface, timeout time.Duration) drainer {
 	return &drain.Helper{
 		Ctx:                 ctx,
 		Client:              cs,
 		Force:               false,
-		GracePeriodSeconds:  gps,
+		GracePeriodSeconds:  -1,
+		Timeout:             timeout,
 		IgnoreAllDaemonSets: true,
 		DeleteEmptyDirData:  true,
 		Out:                 &klogWriter{klog.Info},
@@ -308,13 +309,19 @@ func (k *klocksmith) process(ctx context.Context) error {
 
 	pods, errs := drainer.GetPodsForDeletion(k.nodeName)
 	if len(errs) != 0 {
-		return fmt.Errorf("error getting pods for deletion: %v", errs)
+		return fmt.Errorf("getting pods for deletion: %v", errs)
 	}
 
 	klog.Infof("Deleting/Evicting %d pods", len(pods.Pods()))
 
 	if err := drainer.DeleteOrEvictPods(pods.Pods()); err != nil {
-		return fmt.Errorf("error deleting/evicting pods: %w", err)
+		// Not ideal but its untyped and the only way this condition is propagated,
+		// When we're ready to hand over the reigns for timeouts we can drop this.
+		if strings.Contains(err.Error(), "global timeout reached") {
+			klog.Warningf("timed out draining node, continuing...")
+		} else {
+			return fmt.Errorf("deleting/evicting pods: %w", err)
+		}
 	}
 
 	klog.Info("Node drained, rebooting")
