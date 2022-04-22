@@ -318,7 +318,7 @@ func (k *klocksmith) process(ctx context.Context) error {
 		// Not ideal but its untyped and the only way this condition is propagated,
 		// When we're ready to hand over the reigns for timeouts we can drop this.
 		if strings.Contains(err.Error(), "global timeout reached") {
-			klog.Warningf("timed out draining node, continuing...")
+			klog.Warningf("Timed out draining node, continuing...")
 		} else {
 			return fmt.Errorf("deleting/evicting pods: %w", err)
 		}
