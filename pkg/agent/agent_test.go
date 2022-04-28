@@ -2090,8 +2090,7 @@ func addEvictionSupport(t *testing.T, clientset *fake.Clientset, version string)
 		}
 		// Avoid the lock.
 		go func() {
-			err := clientset.CoreV1().Pods(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
-			if err != nil {
+			if err := clientset.CoreV1().Pods(namespace).Delete(ctx, name, metav1.DeleteOptions{}); err != nil {
 				// Errorf because we can't call Fatalf from another goroutine.
 				t.Errorf("Failed to delete pod %s/%s: %v", namespace, name, err)
 			}
