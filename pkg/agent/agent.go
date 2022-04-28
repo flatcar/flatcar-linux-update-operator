@@ -94,14 +94,8 @@ func newDrainer(ctx context.Context, cs kubernetes.Interface, timeout time.Durat
 }
 
 func skipKubeSystemPods(pod corev1.Pod) drain.PodDeleteStatus {
-	if pod.Namespace == "kube-system" {
-		return drain.PodDeleteStatus{
-			Delete: false,
-		}
-	}
-
 	return drain.PodDeleteStatus{
-		Delete: true,
+		Delete: pod.Namespace != "kube-system",
 	}
 }
 
