@@ -2039,7 +2039,7 @@ func updateActionToNode(t *testing.T, action k8stesting.Action) *corev1.Node {
 }
 
 // Lifted from https://github.com/kubernetes/kubectl/blob/master/pkg/drain/drain_test.go.
-func addEvictionSupport(t *testing.T, clientset *fake.Clientset, version string) {
+func addEvictionSupport(ctx context.Context, t *testing.T, clientset *fake.Clientset) {
 	t.Helper()
 
 	podsEviction := metav1.APIResource{
