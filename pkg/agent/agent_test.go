@@ -2038,7 +2038,7 @@ func updateActionToNode(t *testing.T, action k8stesting.Action) *corev1.Node {
 	return node
 }
 
-// lifted from https://github.com/kubernetes/kubectl/blob/master/pkg/drain/drain_test.go.
+// Lifted from https://github.com/kubernetes/kubectl/blob/master/pkg/drain/drain_test.go.
 func addEvictionSupport(t *testing.T, clientset *fake.Clientset, version string) {
 	t.Helper()
 
