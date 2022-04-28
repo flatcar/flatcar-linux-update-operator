@@ -2088,7 +2088,7 @@ func addEvictionSupport(t *testing.T, clientset *fake.Clientset, version string)
 		default:
 			t.Errorf("unknown version %s", version)
 		}
-		// Avoid the lock
+		// Avoid the lock.
 		go func() {
 			err := clientset.CoreV1().Pods(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
 			if err != nil {
