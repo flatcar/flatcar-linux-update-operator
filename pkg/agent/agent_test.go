@@ -16,7 +16,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
-	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -25,6 +24,7 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/pointer"
 
 	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/agent"
 	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/constants"
@@ -708,18 +708,12 @@ func Test_Running_agent(t *testing.T) {
 			t.Parallel()
 
 			expectedPodsRemovedNames := map[string]struct{}{"pod-to-be-removed": {}}
-			controllerTrue := true
 			podsToCreate := []*corev1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "pod-to-be-removed",
-						Namespace: "default",
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Name:       "fake-owner",
-								Controller: &controllerTrue,
-							},
-						},
+						Name:            "pod-to-be-removed",
+						Namespace:       "default",
+						OwnerReferences: testPodControllerReference(),
 					},
 					Spec: corev1.PodSpec{
 						NodeName: testNode().Name,
@@ -727,14 +721,9 @@ func Test_Running_agent(t *testing.T) {
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "pod-filtered-from-removal-because-of-namespace",
-						Namespace: "kube-system",
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Name:       "fake-owner",
-								Controller: &controllerTrue,
-							},
-						},
+						Name:            "pod-filtered-from-removal-because-of-namespace",
+						Namespace:       "kube-system",
+						OwnerReferences: testPodControllerReference(),
 					},
 					Spec: corev1.PodSpec{
 						NodeName: testNode().Name,
@@ -742,14 +731,9 @@ func Test_Running_agent(t *testing.T) {
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "pod-on-another-node",
-						Namespace: "another",
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Name:       "fake-owner",
-								Controller: &controllerTrue,
-							},
-						},
+						Name:            "pod-on-another-node",
+						Namespace:       "another",
+						OwnerReferences: testPodControllerReference(),
 					},
 					Spec: corev1.PodSpec{
 						NodeName: "baz",
@@ -758,7 +742,7 @@ func Test_Running_agent(t *testing.T) {
 			}
 
 			fakeClient := fake.NewSimpleClientset(podsToCreate[0], podsToCreate[1], podsToCreate[2], testNode())
-			addEvictionSupport(t, fakeClient, "v1")
+			addEvictionSupport(t, fakeClient)
 
 			testConfig, node, _ := validTestConfig(t, testNode())
 			testConfig.Clientset = fakeClient
@@ -915,18 +899,12 @@ func Test_Running_agent(t *testing.T) {
 
 			rebootTriggerred := make(chan bool)
 
-			controllerTrue := true
 			podsToCreate := []*corev1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "foo",
-						Namespace: "default",
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Name:       "fake-owner",
-								Controller: &controllerTrue,
-							},
-						},
+						Name:            "foo",
+						Namespace:       "default",
+						OwnerReferences: testPodControllerReference(),
 					},
 					Spec: corev1.PodSpec{
 						NodeName: testNode().Name,
@@ -935,7 +913,7 @@ func Test_Running_agent(t *testing.T) {
 			}
 
 			fakeClient := fake.NewSimpleClientset(podsToCreate[0], testNode())
-			addEvictionSupport(t, fakeClient, "v1")
+			addEvictionSupport(t, fakeClient)
 
 			testConfig, node, _ := validTestConfig(t, testNode())
 			testConfig.Clientset = fakeClient
@@ -945,6 +923,8 @@ func Test_Running_agent(t *testing.T) {
 				},
 			}
 
+			// We only handle the creating of the eviction and not the delete which will block and cause the timeout
+			// condition we're looking for.
 			fakeClient.PrependReactor("create", "pods/eviction", func(action k8stesting.Action) (bool, runtime.Object, error) {
 				return true, nil, nil
 			})
@@ -1550,7 +1530,7 @@ func Test_Running_agent(t *testing.T) {
 			}
 		})
 
-		t.Run("getting_nodes_for_deletion_fails", func(t *testing.T) {
+		t.Run("getting_pods_for_deletion_fails", func(t *testing.T) {
 			t.Parallel()
 
 			testConfig, node, fakeClient := validTestConfig(t, testNode())
@@ -1573,18 +1553,12 @@ func Test_Running_agent(t *testing.T) {
 
 			rebootTriggerred := make(chan bool, 1)
 
-			controllerTrue := true
 			podsToCreate := []*corev1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "foo",
-						Namespace: "default",
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Name:       "fake-owner",
-								Controller: &controllerTrue,
-							},
-						},
+						Name:            "foo",
+						Namespace:       "default",
+						OwnerReferences: testPodControllerReference(),
 					},
 
 					Spec: corev1.PodSpec{
@@ -1594,7 +1568,7 @@ func Test_Running_agent(t *testing.T) {
 			}
 
 			fakeClient := fake.NewSimpleClientset(podsToCreate[0], testNode())
-			addEvictionSupport(t, fakeClient, "v1")
+			addEvictionSupport(t, fakeClient)
 
 			testConfig, node, _ := validTestConfig(t, testNode())
 			testConfig.Clientset = fakeClient
@@ -2039,7 +2013,7 @@ func updateActionToNode(t *testing.T, action k8stesting.Action) *corev1.Node {
 }
 
 // Lifted from https://github.com/kubernetes/kubectl/blob/master/pkg/drain/drain_test.go.
-func addEvictionSupport(ctx context.Context, t *testing.T, clientset *fake.Clientset) {
+func addEvictionSupport(t *testing.T, clientset *fake.Clientset) {
 	t.Helper()
 
 	podsEviction := metav1.APIResource{
@@ -2057,45 +2031,13 @@ func addEvictionSupport(ctx context.Context, t *testing.T, clientset *fake.Clien
 		GroupVersion: "policy/v1",
 	}
 	clientset.Resources = append(clientset.Resources, coreResources, policyResources)
+}
 
-	// Delete pods when evict is called.
-	clientset.PrependReactor("create", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
-		if action.GetSubresource() != "eviction" {
-			return false, nil, nil
-		}
-
-		namespace := ""
-		name := ""
-		switch version {
-		case "v1":
-			var eviction *policyv1.Eviction
-			if a, ok := action.(k8stesting.CreateAction); ok {
-				if p, ok := a.GetObject().(*policyv1.Eviction); ok {
-					eviction = p
-				}
-			}
-			namespace = eviction.Namespace
-			name = eviction.Name
-		case "v1beta1":
-			var eviction *policyv1beta1.Eviction
-			if a, ok := action.(k8stesting.CreateAction); ok {
-				if p, ok := a.GetObject().(*policyv1beta1.Eviction); ok {
-					eviction = p
-				}
-			}
-			namespace = eviction.Namespace
-			name = eviction.Name
-		default:
-			t.Errorf("unknown version %s", version)
-		}
-		// Avoid the lock.
-		go func() {
-			if err := clientset.CoreV1().Pods(namespace).Delete(ctx, name, metav1.DeleteOptions{}); err != nil {
-				// Errorf because we can't call Fatalf from another goroutine.
-				t.Errorf("Failed to delete pod %s/%s: %v", namespace, name, err)
-			}
-		}()
-
-		return true, nil, nil
-	})
+func testPodControllerReference() []metav1.OwnerReference {
+	return []metav1.OwnerReference{
+		{
+			Name:       "fake-owner",
+			Controller: pointer.BoolPtr(true),
+		},
+	}
 }

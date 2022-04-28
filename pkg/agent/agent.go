@@ -71,34 +71,6 @@ type klocksmith struct {
 	clientset               kubernetes.Interface
 }
 
-type drainer interface {
-	GetPodsForDeletion(nodeName string) (*drain.PodDeleteList, []error)
-	DeleteOrEvictPods([]corev1.Pod) error
-}
-
-func newDrainer(ctx context.Context, cs kubernetes.Interface, timeout time.Duration) drainer {
-	return &drain.Helper{
-		Ctx:                 ctx,
-		Client:              cs,
-		Force:               false,
-		GracePeriodSeconds:  -1,
-		Timeout:             timeout,
-		IgnoreAllDaemonSets: true,
-		DeleteEmptyDirData:  true,
-		Out:                 &klogWriter{klog.Info},
-		ErrOut:              &klogWriter{klog.Error},
-		AdditionalFilters: []drain.PodFilter{
-			skipKubeSystemPods,
-		},
-	}
-}
-
-func skipKubeSystemPods(pod corev1.Pod) drain.PodDeleteStatus {
-	return drain.PodDeleteStatus{
-		Delete: pod.Namespace != "kube-system",
-	}
-}
-
 const (
 	defaultPollInterval            = 10 * time.Second
 	defaultMaxOperatorResponseTime = 24 * time.Hour
@@ -312,6 +284,7 @@ func (k *klocksmith) process(ctx context.Context) error {
 		// Not ideal but its untyped and the only way this condition is propagated,
 		// When we're ready to hand over the reigns for timeouts we can drop this.
 		if strings.Contains(err.Error(), "global timeout reached") {
+			// Continue anyways, the reboot should terminate it.
 			klog.Warningf("Timed out draining node, continuing...")
 		} else {
 			return fmt.Errorf("deleting/evicting pods: %w", err)
@@ -509,6 +482,37 @@ func (k *klocksmith) waitForNotOkToReboot(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+type drainer interface {
+	GetPodsForDeletion(nodeName string) (*drain.PodDeleteList, []error)
+	DeleteOrEvictPods([]corev1.Pod) error
+}
+
+func newDrainer(ctx context.Context, cs kubernetes.Interface, timeout time.Duration) drainer {
+	return &drain.Helper{
+		Ctx:                ctx,
+		Client:             cs,
+		Force:              false,
+		GracePeriodSeconds: -1,
+		Timeout:            timeout,
+		// Explicitly don't terminate self? we'll probably just be a
+		// Mirror pod or daemonset anyway..
+		IgnoreAllDaemonSets: true,
+		DeleteEmptyDirData:  true,
+		Out:                 &klogWriter{klog.Info},
+		ErrOut:              &klogWriter{klog.Error},
+		AdditionalFilters: []drain.PodFilter{
+			// XXX: Ignoring kube-system is a simple way to avoid eviciting
+			// critical components such as kube-scheduler and
+			// kube-controller-manager.
+			func(pod corev1.Pod) drain.PodDeleteStatus {
+				return drain.PodDeleteStatus{
+					Delete: pod.Namespace != "kube-system",
+				}
+			},
+		},
+	}
 }
 
 // sleepOrDone blocks until the done channel receives
