@@ -2092,7 +2092,7 @@ func addEvictionSupport(t *testing.T, clientset *fake.Clientset, version string)
 		go func() {
 			err := clientset.CoreV1().Pods(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
 			if err != nil {
-				// Errorf because we can't call Fatalf from another goroutine
+				// Errorf because we can't call Fatalf from another goroutine.
 				t.Errorf("failed to delete pod: %s/%s", namespace, name)
 			}
 		}()
