@@ -2058,7 +2058,7 @@ func addEvictionSupport(t *testing.T, clientset *fake.Clientset, version string)
 	}
 	clientset.Resources = append(clientset.Resources, coreResources, policyResources)
 
-	// Delete pods when evict is called
+	// Delete pods when evict is called.
 	clientset.PrependReactor("create", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
 		if action.GetSubresource() != "eviction" {
 			return false, nil, nil
