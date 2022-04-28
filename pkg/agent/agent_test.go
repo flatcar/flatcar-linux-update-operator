@@ -2046,7 +2046,7 @@ func addEvictionSupport(t *testing.T, clientset *fake.Clientset, version string)
 		Name:    "pods/eviction",
 		Kind:    "Eviction",
 		Group:   "policy",
-		Version: version,
+		Version: "v1",
 	}
 	coreResources := &metav1.APIResourceList{
 		GroupVersion: "v1",
