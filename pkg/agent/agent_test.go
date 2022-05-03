@@ -819,13 +819,10 @@ func Test_Running_agent(t *testing.T) {
 					return testPodRemoval(eviction.Name)
 				})
 
-			expectedGetPodCalls := 1
-			podGetRequest := make(chan struct{}, expectedGetPodCalls)
+			podGetRequest := make(chan struct{}, 1)
 
 			fakeClient.PrependReactor("get", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
-				if len(podGetRequest) < expectedGetPodCalls {
-					podGetRequest <- struct{}{}
-				}
+				podGetRequest <- struct{}{}
 
 				return false, nil, nil
 			})
@@ -1573,13 +1570,10 @@ func Test_Running_agent(t *testing.T) {
 				},
 			}
 
-			expectedGetPodCalls := 1
-			getPodCalls := make(chan struct{}, expectedGetPodCalls)
+			getPodCalls := make(chan struct{}, 1)
 
 			fakeClient.PrependReactor("get", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
-				if len(getPodCalls) < expectedGetPodCalls {
-					getPodCalls <- struct{}{}
-				}
+				getPodCalls <- struct{}{}
 
 				return true, nil, fmt.Errorf(t.Name())
 			})
