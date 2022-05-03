@@ -766,16 +766,10 @@ func Test_Running_agent(t *testing.T) {
 
 			allExpectedPodsScheduledForRemoval := make(chan struct{}, 2)
 
-			fakeClient.PrependReactor("delete", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
-				deleteAction, ok := action.(k8stesting.DeleteActionImpl)
-				if !ok {
-					del := k8stesting.DeleteActionImpl{}
-
-					return true, nil, fmt.Errorf("unexpected action, expected %T, got %T", del, action)
-				}
-
-				if _, ok := expectedPodsRemovedNames[deleteAction.Name]; !ok {
-					t.Fatalf("Unexpected pod %q removed", deleteAction.Name)
+			testPodRemoval := func(podName string) (bool, runtime.Object, error) { //nolint:unparam // false positive
+				t.Helper()
+				if _, ok := expectedPodsRemovedNames[podName]; !ok {
+					t.Fatalf("Unexpected pod %q removed", podName)
 				}
 
 				expectedPodRemovedMutex.Lock()
@@ -789,40 +783,40 @@ func Test_Running_agent(t *testing.T) {
 					}
 				}(expectedPodRemoved)
 
-				// After removal attempt of all pods which are expected to be removed, allow real removal by test code.
 				return expectedPodRemoved >= 0, nil, nil
+			}
+
+			fakeClient.PrependReactor("delete", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
+				deleteAction, ok := action.(k8stesting.DeleteActionImpl)
+				if !ok {
+					del := k8stesting.DeleteActionImpl{}
+
+					return true, nil, fmt.Errorf("unexpected action, expected %T, got %T", del, action)
+				}
+
+				return testPodRemoval(deleteAction.Name)
 			})
 
+			verb := "create"
 			fakeClient.PrependReactor(
-				"create",
+				verb,
 				"pods/eviction",
 				func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
-					createAction, ok := action.(k8stesting.CreateActionImpl)
+					createAction, ok := action.(k8stesting.CreateActionImpl) //nolint:varnamelen // false positive
 					if !ok {
 						del := k8stesting.CreateActionImpl{}
 
 						return true, nil, fmt.Errorf("unexpected action, expected %T, got %T", del, action)
 					}
 
-					if eviction, ok := createAction.Object.(*policyv1.Eviction); !ok {
-						if _, ok := expectedPodsRemovedNames[eviction.GetObjectMeta().GetName()]; !ok {
-							t.Fatalf("Unexpected eviction for %q created", createAction.Name)
-						}
+					eviction, ok := createAction.Object.(*policyv1.Eviction)
+					if !ok {
+						expectedEviction := &policyv1.Eviction{}
+
+						return true, nil, fmt.Errorf("unexpected eviction type, expected %T, got %T", expectedEviction, eviction)
 					}
 
-					expectedPodRemovedMutex.Lock()
-					defer expectedPodRemovedMutex.Unlock()
-					expectedPodRemoved--
-
-					defer func(i int) {
-						if i == 0 {
-							allExpectedPodsScheduledForRemoval <- struct{}{}
-							allExpectedPodsScheduledForRemoval <- struct{}{}
-						}
-					}(expectedPodRemoved)
-
-					// After removal attempt of all pods which are expected to be removed, allow real removal by test code.
-					return expectedPodRemoved >= 0, nil, nil
+					return testPodRemoval(eviction.Name)
 				})
 
 			expectedGetPodCalls := 1
