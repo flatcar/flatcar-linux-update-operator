@@ -775,12 +775,10 @@ func Test_Running_agent(t *testing.T) {
 				defer expectedPodRemovedMutex.Unlock()
 				expectedPodRemoved--
 
-				defer func(i int) {
-					if i == 0 {
-						allExpectedPodsScheduledForRemoval <- struct{}{}
-						allExpectedPodsScheduledForRemoval <- struct{}{}
-					}
-				}(expectedPodRemoved)
+				if expectedPodRemoved == 0 {
+					allExpectedPodsScheduledForRemoval <- struct{}{}
+					allExpectedPodsScheduledForRemoval <- struct{}{}
+				}
 
 				return expectedPodRemoved >= 0, nil, nil
 			}
