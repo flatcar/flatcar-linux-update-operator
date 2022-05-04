@@ -274,7 +274,7 @@ func (k *klocksmith) process(ctx context.Context) error {
 	klog.Info("Getting pod list for deletion")
 
 	pods, errs := drainer.GetPodsForDeletion(k.nodeName)
-	if len(errs) != 0 {
+	if len(errs) > 0 {
 		return fmt.Errorf("getting pods for deletion: %v", errs)
 	}
 
