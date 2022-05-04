@@ -62,13 +62,13 @@ type Klocksmith interface {
 type klocksmith struct {
 	nodeName                string
 	nc                      corev1client.NodeInterface
+	clientset               kubernetes.Interface
 	ue                      StatusReceiver
 	lc                      Rebooter
 	reapTimeout             time.Duration
 	hostFilesPrefix         string
 	pollInterval            time.Duration
 	maxOperatorResponseTime time.Duration
-	clientset               kubernetes.Interface
 }
 
 const (
@@ -116,13 +116,13 @@ func New(config *Config) (Klocksmith, error) {
 	return &klocksmith{
 		nodeName:                config.NodeName,
 		nc:                      config.Clientset.CoreV1().Nodes(),
+		clientset:               config.Clientset,
 		ue:                      config.StatusReceiver,
 		lc:                      config.Rebooter,
 		reapTimeout:             config.PodDeletionGracePeriod,
 		hostFilesPrefix:         config.HostFilesPrefix,
 		pollInterval:            pollInterval,
 		maxOperatorResponseTime: maxOperatorResponseTime,
-		clientset:               config.Clientset,
 	}, nil
 }
 
