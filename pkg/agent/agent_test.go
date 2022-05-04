@@ -767,7 +767,7 @@ func Test_Running_agent(t *testing.T) {
 
 			testPodRemoval := func(podName string) (bool, runtime.Object, error) { //nolint:unparam // false positive
 				t.Helper()
-				
+
 				if _, ok := expectedPodsRemovedNames[podName]; !ok {
 					t.Fatalf("Unexpected pod %q removed", podName)
 				}
@@ -849,7 +849,6 @@ func Test_Running_agent(t *testing.T) {
 			})
 
 			t.Run("waits_for_removed_pods_to_terminate_before_rebooting", func(t *testing.T) {
-				t.Parallel()
 
 				select {
 				case <-ctx.Done():
