@@ -795,10 +795,7 @@ func Test_Running_agent(t *testing.T) {
 				return testPodRemoval(deleteAction.Name)
 			})
 
-			verb := "create"
-			fakeClient.PrependReactor(
-				verb,
-				"pods/eviction",
+			fakeClient.PrependReactor("create", "pods/eviction",
 				func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
 					createAction, ok := action.(k8stesting.CreateActionImpl) //nolint:varnamelen // false positive
 					if !ok {
