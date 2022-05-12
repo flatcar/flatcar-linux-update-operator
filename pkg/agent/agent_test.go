@@ -765,7 +765,7 @@ func Test_Running_agent(t *testing.T) {
 
 			allExpectedPodsScheduledForRemoval := make(chan struct{}, 2)
 
-			testPodRemoval := func(podName string) (bool, runtime.Object, error) { //nolint:unparam // false positive
+			testPodRemoval := func(podName string) bool {
 				t.Helper()
 
 				if _, ok := expectedPodsRemovedNames[podName]; !ok {
