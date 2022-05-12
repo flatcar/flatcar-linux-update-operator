@@ -1162,7 +1162,6 @@ func Test_Running_agent(t *testing.T) {
 				case err := <-done:
 					t.Fatalf("expected reboot received context done: %v", err)
 				case <-rebootTriggerred:
-					<-done
 				}
 			})
 		})
