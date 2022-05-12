@@ -296,7 +296,7 @@ func stealLeaderElection(ctx context.Context, t *testing.T, config operator.Conf
 
 	leader, ok := lock.Annotations[leaderAnnotation]
 	if !ok {
-		t.Fatalf("expected annotation %q not found", leaderAnnotation)
+		t.Fatalf("Expected annotation %q not found", leaderAnnotation)
 	}
 
 	leaderLease := &struct {
