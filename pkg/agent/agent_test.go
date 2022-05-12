@@ -797,7 +797,7 @@ func Test_Running_agent(t *testing.T) {
 
 			fakeClient.PrependReactor("create", "pods/eviction",
 				func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
-					createAction, ok := action.(k8stesting.CreateActionImpl) //nolint:varnamelen // false positive
+					createAction, ok := action.(k8stesting.CreateActionImpl) //nolint:varnamelen // False positive.
 					if !ok {
 						del := k8stesting.CreateActionImpl{}
 
