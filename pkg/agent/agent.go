@@ -281,9 +281,9 @@ func (k *klocksmith) process(ctx context.Context) error {
 	klog.Infof("Deleting/Evicting %d pods", len(pods.Pods()))
 
 	drainErr := make(chan error, 1)
-	go func(err chan error, p *drain.PodDeleteList) {
-		err <- drainer.DeleteOrEvictPods(p.Pods())
-	}(drainErr, pods)
+	go func() {
+		drainErr <- drainer.DeleteOrEvictPods(pods.Pods())
+	}()
 
 	select {
 	case <-ctx.Done():
