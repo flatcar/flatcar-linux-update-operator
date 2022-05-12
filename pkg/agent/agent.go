@@ -280,22 +280,12 @@ func (k *klocksmith) process(ctx context.Context) error {
 
 	klog.Infof("Deleting/Evicting %d pods", len(pods.Pods()))
 
-	drainErr := make(chan error, 1)
-	go func() {
-		drainErr <- drainer.DeleteOrEvictPods(pods.Pods())
-	}()
-
-	select {
-	case <-ctx.Done():
-		return fmt.Errorf("deleting/evicting pods: %w", ctx.Err())
-	case err := <-drainErr:
+	if err := drainer.DeleteOrEvictPods(pods.Pods()); err != nil {
 		if ctx.Err() != nil {
 			return fmt.Errorf("deleting/evicting pods: %w", ctx.Err())
 		}
 
-		if err != nil {
-			klog.Errorf("Deleting/evicting pods: %v", err)
-		}
+		klog.Errorf("Ignoring node drain error and proceeding with reboot: %v", err)
 	}
 
 	klog.Info("Node drained, rebooting")

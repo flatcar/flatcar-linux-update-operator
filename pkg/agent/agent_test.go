@@ -781,7 +781,7 @@ func Test_Running_agent(t *testing.T) {
 					allExpectedPodsScheduledForRemoval <- struct{}{}
 				}
 
-				return expectedPodRemoved >= 0, nil, nil
+				return expectedPodRemoved >= 0
 			}
 
 			fakeClient.PrependReactor("delete", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
@@ -792,7 +792,7 @@ func Test_Running_agent(t *testing.T) {
 					return true, nil, fmt.Errorf("unexpected action, expected %T, got %T", del, action)
 				}
 
-				return testPodRemoval(deleteAction.Name)
+				return testPodRemoval(deleteAction.Name), nil, nil
 			})
 
 			fakeClient.PrependReactor("create", "pods/eviction",
@@ -811,7 +811,7 @@ func Test_Running_agent(t *testing.T) {
 						return true, nil, fmt.Errorf("unexpected eviction type, expected %T, got %T", expectedEviction, eviction)
 					}
 
-					return testPodRemoval(eviction.Name)
+					return testPodRemoval(eviction.Name), nil, nil
 				})
 
 			podGetRequest := make(chan struct{}, 1)
