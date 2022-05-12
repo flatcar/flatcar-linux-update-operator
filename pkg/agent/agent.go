@@ -12,17 +12,16 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
+	"k8s.io/kubectl/pkg/drain"
+
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
-	appsv1client "k8s.io/client-go/kubernetes/typed/apps/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/klog/v2"
@@ -62,9 +61,8 @@ type Klocksmith interface {
 // Klocksmith implements agent part of FLUO.
 type klocksmith struct {
 	nodeName                string
-	pg                      corev1client.PodsGetter
 	nc                      corev1client.NodeInterface
-	dsg                     appsv1client.DaemonSetsGetter
+	clientset               kubernetes.Interface
 	ue                      StatusReceiver
 	lc                      Rebooter
 	reapTimeout             time.Duration
@@ -117,9 +115,8 @@ func New(config *Config) (Klocksmith, error) {
 
 	return &klocksmith{
 		nodeName:                config.NodeName,
-		pg:                      config.Clientset.CoreV1(),
-		dsg:                     config.Clientset.AppsV1(),
 		nc:                      config.Clientset.CoreV1().Nodes(),
+		clientset:               config.Clientset,
 		ue:                      config.StatusReceiver,
 		lc:                      config.Rebooter,
 		reapTimeout:             config.PodDeletionGracePeriod,
@@ -262,13 +259,6 @@ func (k *klocksmith) process(ctx context.Context) error {
 		return fmt.Errorf("setting node %q annotations: %w", k.nodeName, err)
 	}
 
-	// Drain self equates to:
-	// 1. set Unschedulable if necessary
-	// 2. delete all pods
-	// unlike `kubectl drain`, we do not care about emptyDir or orphan pods
-	// ('any pods that are neither mirror pods nor managed by
-	// ReplicationController, ReplicaSet, DaemonSet or Job').
-
 	if !alreadyUnschedulable {
 		klog.Info("Marking node as unschedulable")
 
@@ -279,57 +269,23 @@ func (k *klocksmith) process(ctx context.Context) error {
 		klog.Info("Node already marked as unschedulable")
 	}
 
+	drainer := newDrainer(ctx, k.clientset, k.reapTimeout)
+
 	klog.Info("Getting pod list for deletion")
 
-	pods, err := k.getPodsForDeletion(ctx)
-	if err != nil {
-		return fmt.Errorf("getting list of pods for deletion: %w", err)
+	pods, errs := drainer.GetPodsForDeletion(k.nodeName)
+	if len(errs) > 0 {
+		return fmt.Errorf("getting pods for deletion: %v", errs)
 	}
 
-	// Delete the pods.
-	// TODO(mischief): Explicitly don't terminate self? we'll probably just be a
-	// Mirror pod or daemonset anyway..
-	klog.Infof("Deleting %d pods", len(pods))
+	klog.Infof("Deleting/Evicting %d pods", len(pods.Pods()))
 
-	for _, pod := range pods {
-		klog.Infof("Terminating pod %q...", pod.Name)
-
-		if err := k.pg.Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{}); err != nil {
-			// Continue anyways, the reboot should terminate it.
-			klog.Errorf("Failed terminating pod %q: %v", pod.Name, err)
+	if err := drainer.DeleteOrEvictPods(pods.Pods()); err != nil {
+		if ctx.Err() != nil {
+			return fmt.Errorf("deleting/evicting pods: %w", ctx.Err())
 		}
-	}
 
-	// Wait for the pods to delete completely.
-	//
-	//nolint:varnamelen // Conventional name.
-	wg := sync.WaitGroup{}
-
-	for _, pod := range pods {
-		wg.Add(1)
-
-		go func(pod corev1.Pod) {
-			klog.Infof("Waiting for pod %q to terminate", pod.Name)
-
-			if err := k.waitForPodDeletion(ctx, pod); err != nil {
-				klog.Errorf("Skipping wait on pod %q: %v", pod.Name, err)
-			}
-
-			wg.Done()
-		}(pod)
-	}
-
-	allPodsTerminated := make(chan struct{})
-
-	go func() {
-		wg.Wait()
-		allPodsTerminated <- struct{}{}
-	}()
-
-	select {
-	case <-allPodsTerminated:
-	case <-ctx.Done():
-		return fmt.Errorf("waiting for all pods to terminate before the reboot interrupted")
+		klog.Errorf("Ignoring node drain error and proceeding with reboot: %v", err)
 	}
 
 	klog.Info("Node drained, rebooting")
@@ -525,40 +481,35 @@ func (k *klocksmith) waitForNotOkToReboot(ctx context.Context) error {
 	return nil
 }
 
-func (k *klocksmith) getPodsForDeletion(ctx context.Context) ([]corev1.Pod, error) {
-	pods, err := k8sutil.GetPodsForDeletion(ctx, k.pg, k.dsg, k.nodeName)
-	if err != nil {
-		return nil, fmt.Errorf("getting list of pods for deletion: %w", err)
-	}
-
-	// XXX: Ignoring kube-system is a simple way to avoid eviciting
-	// critical components such as kube-scheduler and
-	// kube-controller-manager.
-
-	pods = k8sutil.FilterPods(pods, func(p *corev1.Pod) bool {
-		return p.Namespace != "kube-system"
-	})
-
-	return pods, nil
+type drainer interface {
+	GetPodsForDeletion(nodeName string) (*drain.PodDeleteList, []error)
+	DeleteOrEvictPods([]corev1.Pod) error
 }
 
-// waitForPodDeletion waits for a pod to be deleted.
-func (k *klocksmith) waitForPodDeletion(ctx context.Context, pod corev1.Pod) error {
-	return wait.PollImmediate(k.pollInterval, k.reapTimeout, func() (bool, error) {
-		p, err := k.pg.Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
-		if errors.IsNotFound(err) || (p != nil && p.ObjectMeta.UID != pod.ObjectMeta.UID) {
-			klog.Infof("Deleted pod %q", pod.Name)
-
-			return true, nil
-		}
-
-		// Most errors will be transient. Log the error and continue polling.
-		if err != nil {
-			klog.Errorf("Failed to get pod %q: %v", pod.Name, err)
-		}
-
-		return false, nil
-	})
+func newDrainer(ctx context.Context, cs kubernetes.Interface, timeout time.Duration) drainer {
+	return &drain.Helper{
+		Ctx:                ctx,
+		Client:             cs,
+		Force:              false,
+		GracePeriodSeconds: -1,
+		Timeout:            timeout,
+		// Explicitly don't terminate self? we'll probably just be a
+		// Mirror pod or daemonset anyway..
+		IgnoreAllDaemonSets: true,
+		DeleteEmptyDirData:  true,
+		Out:                 &klogWriter{klog.Info},
+		ErrOut:              &klogWriter{klog.Error},
+		AdditionalFilters: []drain.PodFilter{
+			// XXX: Ignoring kube-system is a simple way to avoid eviciting
+			// critical components such as kube-scheduler and
+			// kube-controller-manager.
+			func(pod corev1.Pod) drain.PodDeleteStatus {
+				return drain.PodDeleteStatus{
+					Delete: pod.Namespace != "kube-system",
+				}
+			},
+		},
+	}
 }
 
 // sleepOrDone blocks until the done channel receives
@@ -662,4 +613,14 @@ func getVersionInfo(filesPathPrefix string) (*versionInfo, error) {
 		group:   updateconf["GROUP"],
 		version: osrelease["VERSION"],
 	}, nil
+}
+
+type klogWriter struct {
+	wf func(args ...interface{})
+}
+
+func (r klogWriter) Write(data []byte) (int, error) {
+	r.wf(string(data))
+
+	return len(data), nil
 }

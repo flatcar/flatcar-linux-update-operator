@@ -92,6 +92,12 @@ rules:
       - list
       - delete
   - apiGroups:
+      - ""
+    resources:
+      - pods/eviction
+    verbs:
+      - create
+  - apiGroups:
       - "apps"
     resources:
       - daemonsets

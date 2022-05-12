@@ -13,6 +13,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -22,6 +23,7 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/pointer"
 
 	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/agent"
 	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/constants"
@@ -705,12 +707,12 @@ func Test_Running_agent(t *testing.T) {
 			t.Parallel()
 
 			expectedPodsRemovedNames := map[string]struct{}{"pod-to-be-removed": {}}
-
 			podsToCreate := []*corev1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "pod-to-be-removed",
-						Namespace: "default",
+						Name:            "pod-to-be-removed",
+						Namespace:       "default",
+						OwnerReferences: testPodControllerReference(),
 					},
 					Spec: corev1.PodSpec{
 						NodeName: testNode().Name,
@@ -718,8 +720,9 @@ func Test_Running_agent(t *testing.T) {
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "pod-filtered-from-removal-because-of-namespace",
-						Namespace: "kube-system",
+						Name:            "pod-filtered-from-removal-because-of-namespace",
+						Namespace:       "kube-system",
+						OwnerReferences: testPodControllerReference(),
 					},
 					Spec: corev1.PodSpec{
 						NodeName: testNode().Name,
@@ -727,8 +730,9 @@ func Test_Running_agent(t *testing.T) {
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "pod-on-another-node",
-						Namespace: "another",
+						Name:            "pod-on-another-node",
+						Namespace:       "another",
+						OwnerReferences: testPodControllerReference(),
 					},
 					Spec: corev1.PodSpec{
 						NodeName: "baz",
@@ -737,6 +741,7 @@ func Test_Running_agent(t *testing.T) {
 			}
 
 			fakeClient := fake.NewSimpleClientset(podsToCreate[0], podsToCreate[1], podsToCreate[2], testNode())
+			addEvictionSupport(t, fakeClient)
 
 			testConfig, node, _ := validTestConfig(t, testNode())
 			testConfig.Clientset = fakeClient
@@ -760,6 +765,25 @@ func Test_Running_agent(t *testing.T) {
 
 			allExpectedPodsScheduledForRemoval := make(chan struct{}, 2)
 
+			testPodRemoval := func(podName string) bool {
+				t.Helper()
+
+				if _, ok := expectedPodsRemovedNames[podName]; !ok {
+					t.Fatalf("Unexpected pod %q removed", podName)
+				}
+
+				expectedPodRemovedMutex.Lock()
+				defer expectedPodRemovedMutex.Unlock()
+				expectedPodRemoved--
+
+				if expectedPodRemoved == 0 {
+					allExpectedPodsScheduledForRemoval <- struct{}{}
+					allExpectedPodsScheduledForRemoval <- struct{}{}
+				}
+
+				return expectedPodRemoved >= 0
+			}
+
 			fakeClient.PrependReactor("delete", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
 				deleteAction, ok := action.(k8stesting.DeleteActionImpl)
 				if !ok {
@@ -768,32 +792,32 @@ func Test_Running_agent(t *testing.T) {
 					return true, nil, fmt.Errorf("unexpected action, expected %T, got %T", del, action)
 				}
 
-				if _, ok := expectedPodsRemovedNames[deleteAction.Name]; !ok {
-					t.Fatalf("Unexpected pod %q removed", deleteAction.Name)
-				}
-
-				expectedPodRemovedMutex.Lock()
-				defer expectedPodRemovedMutex.Unlock()
-				expectedPodRemoved--
-
-				defer func(i int) {
-					if i == 0 {
-						allExpectedPodsScheduledForRemoval <- struct{}{}
-						allExpectedPodsScheduledForRemoval <- struct{}{}
-					}
-				}(expectedPodRemoved)
-
-				// After removal attempt of all pods which are expected to be removed, allow real removal by test code.
-				return expectedPodRemoved >= 0, nil, nil
+				return testPodRemoval(deleteAction.Name), nil, nil
 			})
 
-			expectedGetPodCalls := 1
-			podGetRequest := make(chan struct{}, expectedGetPodCalls)
+			fakeClient.PrependReactor("create", "pods/eviction",
+				func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+					createAction, ok := action.(k8stesting.CreateActionImpl) //nolint:varnamelen // False positive.
+					if !ok {
+						del := k8stesting.CreateActionImpl{}
+
+						return true, nil, fmt.Errorf("unexpected action, expected %T, got %T", del, action)
+					}
+
+					eviction, ok := createAction.Object.(*policyv1.Eviction)
+					if !ok {
+						expectedEviction := &policyv1.Eviction{}
+
+						return true, nil, fmt.Errorf("unexpected eviction type, expected %T, got %T", expectedEviction, eviction)
+					}
+
+					return testPodRemoval(eviction.Name), nil, nil
+				})
+
+			podGetRequest := make(chan struct{}, 1)
 
 			fakeClient.PrependReactor("get", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
-				if len(podGetRequest) < expectedGetPodCalls {
-					podGetRequest <- struct{}{}
-				}
+				podGetRequest <- struct{}{}
 
 				return false, nil, nil
 			})
@@ -825,7 +849,6 @@ func Test_Running_agent(t *testing.T) {
 			})
 
 			t.Run("waits_for_removed_pods_to_terminate_before_rebooting", func(t *testing.T) {
-				t.Parallel()
 
 				select {
 				case <-ctx.Done():
@@ -864,8 +887,9 @@ func Test_Running_agent(t *testing.T) {
 			podsToCreate := []*corev1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "foo",
-						Namespace: "default",
+						Name:            "foo",
+						Namespace:       "default",
+						OwnerReferences: testPodControllerReference(),
 					},
 					Spec: corev1.PodSpec{
 						NodeName: testNode().Name,
@@ -874,6 +898,7 @@ func Test_Running_agent(t *testing.T) {
 			}
 
 			fakeClient := fake.NewSimpleClientset(podsToCreate[0], testNode())
+			addEvictionSupport(t, fakeClient)
 
 			testConfig, node, _ := validTestConfig(t, testNode())
 			testConfig.Clientset = fakeClient
@@ -883,8 +908,10 @@ func Test_Running_agent(t *testing.T) {
 				},
 			}
 
-			fakeClient.PrependReactor("delete", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
-				return true, nil, fmt.Errorf(t.Name())
+			// We only handle the creating of the eviction and not the delete which will block and cause the timeout
+			// condition we're looking for.
+			fakeClient.PrependReactor("create", "pods/eviction", func(action k8stesting.Action) (bool, runtime.Object, error) {
+				return true, nil, nil
 			})
 
 			ctx := contextWithTimeout(t, agentRunTimeLimit)
@@ -1085,22 +1112,16 @@ func Test_Running_agent(t *testing.T) {
 					t.Fatalf("Expected agent to shut down gracefully after waiting for OK error, got: %v", err)
 				}
 			})
-		})
 
-		for testName, verb := range map[string]string{
-			"removing_pod_on_node_fails":                       "delete",
-			"getting_pods_while_waiting_for_termination_fails": "get",
-		} {
-			verb := verb
-
-			t.Run(testName, func(t *testing.T) {
+			t.Run("draining_node_fails", func(t *testing.T) {
 				t.Parallel()
 
 				podsToCreate := []*corev1.Pod{
 					{
 						ObjectMeta: metav1.ObjectMeta{
-							Name:      "foo",
-							Namespace: "default",
+							Name:            "foo",
+							Namespace:       "default",
+							OwnerReferences: testPodControllerReference(),
 						},
 						Spec: corev1.PodSpec{
 							NodeName: testNode().Name,
@@ -1109,11 +1130,19 @@ func Test_Running_agent(t *testing.T) {
 				}
 
 				fakeClient := fake.NewSimpleClientset(podsToCreate[0], testNode())
+				addEvictionSupport(t, fakeClient)
+
+				rebootTriggerred := make(chan bool, 1)
 
 				testConfig, node, _ := validTestConfig(t, testNode())
 				testConfig.Clientset = fakeClient
+				testConfig.Rebooter = &mockRebooter{
+					rebootF: func(auth bool) {
+						rebootTriggerred <- auth
+					},
+				}
 
-				fakeClient.PrependReactor(verb, "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
+				fakeClient.PrependReactor("get", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
 					return true, nil, fmt.Errorf(t.Name())
 				})
 
@@ -1129,9 +1158,13 @@ func Test_Running_agent(t *testing.T) {
 
 				okToReboot(ctx, t, testConfig.Clientset.CoreV1().Nodes(), node.Name)
 
-				<-done
+				select {
+				case err := <-done:
+					t.Fatalf("Expected reboot, got agent running error: %v", err)
+				case <-rebootTriggerred:
+				}
 			})
-		}
+		})
 	})
 
 	t.Run("stops_gracefully_when_shutdown_is_requested_and_agent_is", func(t *testing.T) {
@@ -1488,7 +1521,7 @@ func Test_Running_agent(t *testing.T) {
 			}
 		})
 
-		t.Run("getting_nodes_for_deletion_fails", func(t *testing.T) {
+		t.Run("getting_pods_for_deletion_fails", func(t *testing.T) {
 			t.Parallel()
 
 			testConfig, node, fakeClient := validTestConfig(t, testNode())
@@ -1500,8 +1533,9 @@ func Test_Running_agent(t *testing.T) {
 			_, f := failOnNthCall(0, expectedError)
 			fakeClient.PrependReactor("list", "pods", f)
 
-			if err := getAgentRunningError(t, testConfig); !errors.Is(err, expectedError) {
-				t.Fatalf("Expected error %q, got %q", expectedError, err)
+			expectedErrorWrapped := fmt.Errorf("processing: getting pods for deletion: %v", []error{expectedError})
+			if err := getAgentRunningError(t, testConfig); err.Error() != expectedErrorWrapped.Error() {
+				t.Fatalf("Expected error %q, got %q", expectedErrorWrapped, err)
 			}
 		})
 
@@ -1513,9 +1547,11 @@ func Test_Running_agent(t *testing.T) {
 			podsToCreate := []*corev1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "foo",
-						Namespace: "default",
+						Name:            "foo",
+						Namespace:       "default",
+						OwnerReferences: testPodControllerReference(),
 					},
+
 					Spec: corev1.PodSpec{
 						NodeName: testNode().Name,
 					},
@@ -1523,6 +1559,7 @@ func Test_Running_agent(t *testing.T) {
 			}
 
 			fakeClient := fake.NewSimpleClientset(podsToCreate[0], testNode())
+			addEvictionSupport(t, fakeClient)
 
 			testConfig, node, _ := validTestConfig(t, testNode())
 			testConfig.Clientset = fakeClient
@@ -1532,17 +1569,6 @@ func Test_Running_agent(t *testing.T) {
 					rebootTriggerred <- auth
 				},
 			}
-
-			expectedGetPodCalls := 2
-			getPodCalls := make(chan struct{}, expectedGetPodCalls)
-
-			fakeClient.PrependReactor("get", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
-				if len(getPodCalls) < expectedGetPodCalls {
-					getPodCalls <- struct{}{}
-				}
-
-				return true, nil, fmt.Errorf(t.Name())
-			})
 
 			ctx, cancel := context.WithCancel(contextWithTimeout(t, agentRunTimeLimit))
 
@@ -1556,9 +1582,7 @@ func Test_Running_agent(t *testing.T) {
 
 			okToReboot(ctx, t, testConfig.Clientset.CoreV1().Nodes(), node.Name)
 
-			<-getPodCalls
 			cancel()
-			<-getPodCalls
 
 			select {
 			case err := <-done:
@@ -1965,4 +1989,34 @@ func updateActionToNode(t *testing.T, action k8stesting.Action) *corev1.Node {
 	}
 
 	return node
+}
+
+// Lifted from https://github.com/kubernetes/kubectl/blob/master/pkg/drain/drain_test.go.
+func addEvictionSupport(t *testing.T, clientset *fake.Clientset) {
+	t.Helper()
+
+	podsEviction := metav1.APIResource{
+		Name:    "pods/eviction",
+		Kind:    "Eviction",
+		Group:   "policy",
+		Version: "v1",
+	}
+	coreResources := &metav1.APIResourceList{
+		GroupVersion: "v1",
+		APIResources: []metav1.APIResource{podsEviction},
+	}
+
+	policyResources := &metav1.APIResourceList{
+		GroupVersion: "policy/v1",
+	}
+	clientset.Resources = append(clientset.Resources, coreResources, policyResources)
+}
+
+func testPodControllerReference() []metav1.OwnerReference {
+	return []metav1.OwnerReference{
+		{
+			Name:       "fake-owner",
+			Controller: pointer.BoolPtr(true),
+		},
+	}
 }
