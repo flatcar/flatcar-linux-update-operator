@@ -294,7 +294,7 @@ func (k *klocksmith) process(ctx context.Context) error {
 		}
 
 		if err != nil {
-			klog.Errorf("deleting/evicting pods: %v", err)
+			klog.Errorf("Deleting/evicting pods: %v", err)
 		}
 	}
 
