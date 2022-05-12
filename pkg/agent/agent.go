@@ -280,14 +280,21 @@ func (k *klocksmith) process(ctx context.Context) error {
 
 	klog.Infof("Deleting/Evicting %d pods", len(pods.Pods()))
 
-	if err := drainer.DeleteOrEvictPods(pods.Pods()); err != nil {
-		// Not ideal but its untyped and the only way this condition is propagated,
-		// When we're ready to hand over the reigns for timeouts we can drop this.
-		if strings.Contains(err.Error(), "global timeout reached") {
-			// Continue anyways, the reboot should terminate it.
-			klog.Warningf("Timed out draining node, continuing...")
-		} else {
-			return fmt.Errorf("deleting/evicting pods: %w", err)
+	drainErr := make(chan error)
+	go func(err chan error, p *drain.PodDeleteList) {
+		err <- drainer.DeleteOrEvictPods(p.Pods())
+	}(drainErr, pods)
+
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("deleting/evicting pods: %w", ctx.Err())
+	case err := <-drainErr:
+		if ctx.Err() != nil {
+			return fmt.Errorf("deleting/evicting pods: %w", ctx.Err())
+		}
+
+		if err != nil {
+			klog.Errorf("deleting/evicting pods: %v", err)
 		}
 	}
 

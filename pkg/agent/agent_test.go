@@ -1112,22 +1112,16 @@ func Test_Running_agent(t *testing.T) {
 					t.Fatalf("Expected agent to shut down gracefully after waiting for OK error, got: %v", err)
 				}
 			})
-		})
 
-		for testName, verb := range map[string]string{
-			"removing_pod_on_node_fails":                       "delete",
-			"getting_pods_while_waiting_for_termination_fails": "get",
-		} {
-			verb := verb
-
-			t.Run(testName, func(t *testing.T) {
+			t.Run("draining_node_fails", func(t *testing.T) {
 				t.Parallel()
 
 				podsToCreate := []*corev1.Pod{
 					{
 						ObjectMeta: metav1.ObjectMeta{
-							Name:      "foo",
-							Namespace: "default",
+							Name:            "foo",
+							Namespace:       "default",
+							OwnerReferences: testPodControllerReference(),
 						},
 						Spec: corev1.PodSpec{
 							NodeName: testNode().Name,
@@ -1136,11 +1130,19 @@ func Test_Running_agent(t *testing.T) {
 				}
 
 				fakeClient := fake.NewSimpleClientset(podsToCreate[0], testNode())
+				addEvictionSupport(t, fakeClient)
+
+				rebootTriggerred := make(chan bool, 1)
 
 				testConfig, node, _ := validTestConfig(t, testNode())
 				testConfig.Clientset = fakeClient
+				testConfig.Rebooter = &mockRebooter{
+					rebootF: func(auth bool) {
+						rebootTriggerred <- auth
+					},
+				}
 
-				fakeClient.PrependReactor(verb, "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
+				fakeClient.PrependReactor("get", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
 					return true, nil, fmt.Errorf(t.Name())
 				})
 
@@ -1156,9 +1158,14 @@ func Test_Running_agent(t *testing.T) {
 
 				okToReboot(ctx, t, testConfig.Clientset.CoreV1().Nodes(), node.Name)
 
-				<-done
+				select {
+				case err := <-done:
+					t.Fatalf("expected reboot received context done: %v", err)
+				case <-rebootTriggerred:
+					<-done
+				}
 			})
-		}
+		})
 	})
 
 	t.Run("stops_gracefully_when_shutdown_is_requested_and_agent_is", func(t *testing.T) {
@@ -1564,14 +1571,6 @@ func Test_Running_agent(t *testing.T) {
 				},
 			}
 
-			getPodCalls := make(chan struct{}, 1)
-
-			fakeClient.PrependReactor("get", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
-				getPodCalls <- struct{}{}
-
-				return true, nil, fmt.Errorf(t.Name())
-			})
-
 			ctx, cancel := context.WithCancel(contextWithTimeout(t, agentRunTimeLimit))
 
 			done := runAgent(ctx, t, testConfig)
@@ -1584,7 +1583,6 @@ func Test_Running_agent(t *testing.T) {
 
 			okToReboot(ctx, t, testConfig.Clientset.CoreV1().Nodes(), node.Name)
 
-			<-getPodCalls
 			cancel()
 
 			select {
