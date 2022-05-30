@@ -149,7 +149,7 @@ func New(config Config) (*Kontroller, error) {
 
 	reconciliationPeriod := config.ReconciliationPeriod
 	if reconciliationPeriod == 0 {
-		reconciliationPeriod = defaultLeaderElectionLease
+		reconciliationPeriod = defaultReconciliationPeriod
 	}
 
 	leaderElectionLeaseDuration := config.LeaderElectionLease
