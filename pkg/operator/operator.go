@@ -28,6 +28,7 @@ import (
 const (
 	leaderElectionEventSourceComponent = "update-operator-leader-election"
 	defaultMaxRebootingNodes           = 1
+	defaultLockType                    = resourcelock.ConfigMapsLeasesResourceLock
 
 	leaderElectionResourceName = "flatcar-linux-update-operator-lock"
 
@@ -93,6 +94,7 @@ type Config struct {
 	RebootWindowLength   string
 	Namespace            string
 	LockID               string
+	LockType             string
 	ReconciliationPeriod time.Duration
 	LeaderElectionLease  time.Duration
 	MaxRebootingNodes    int
@@ -121,26 +123,21 @@ type Kontroller struct {
 
 	leaderElectionLease time.Duration
 
-	lockID string
+	resourceLock resourcelock.Interface
 }
 
 // New initializes a new Kontroller.
 func New(config Config) (*Kontroller, error) {
-	// Kubernetes client.
-	if config.Client == nil {
-		return nil, fmt.Errorf("kubernetes client must not be nil")
+	if err := checkConfig(config); err != nil {
+		return nil, fmt.Errorf("check configuration: %w", err)
 	}
 
-	if config.Namespace == "" {
-		return nil, fmt.Errorf("namespace must not be empty")
-	}
-
-	if config.LockID == "" {
-		return nil, fmt.Errorf("lockID must not be empty")
+	resourceLock, err := newResourceLock(config)
+	if err != nil {
+		return nil, fmt.Errorf("creating new resource lock: %w", err)
 	}
 
 	var rebootWindow *timeutil.Periodic
-
 	if config.RebootWindowStart != "" && config.RebootWindowLength != "" {
 		rw, err := timeutil.ParsePeriodic(config.RebootWindowStart, config.RebootWindowLength)
 		if err != nil {
@@ -149,8 +146,6 @@ func New(config Config) (*Kontroller, error) {
 
 		rebootWindow = rw
 	}
-
-	kc := config.Client
 
 	reconciliationPeriod := config.ReconciliationPeriod
 	if reconciliationPeriod == 0 {
@@ -168,8 +163,8 @@ func New(config Config) (*Kontroller, error) {
 	}
 
 	return &Kontroller{
-		kc:                      kc,
-		nc:                      kc.CoreV1().Nodes(),
+		kc:                      config.Client,
+		nc:                      config.Client.CoreV1().Nodes(),
 		beforeRebootAnnotations: config.BeforeRebootAnnotations,
 		afterRebootAnnotations:  config.AfterRebootAnnotations,
 		namespace:               config.Namespace,
@@ -177,8 +172,54 @@ func New(config Config) (*Kontroller, error) {
 		maxRebootingNodes:       maxRebootingNodes,
 		reconciliationPeriod:    reconciliationPeriod,
 		leaderElectionLease:     leaderElectionLeaseDuration,
-		lockID:                  config.LockID,
+		resourceLock:            resourceLock,
 	}, nil
+}
+
+// checkConfig checks a Kontroller configuration.
+func checkConfig(config Config) error {
+	// Kubernetes client.
+	if config.Client == nil {
+		return fmt.Errorf("kubernetes client must not be nil")
+	}
+
+	if config.Namespace == "" {
+		return fmt.Errorf("namespace must not be empty")
+	}
+
+	if config.LockID == "" {
+		return fmt.Errorf("lockID must not be empty")
+	}
+
+	return nil
+}
+
+// newResourceLock creates a resource for locking on arbitrary resources
+// used in leader election.
+func newResourceLock(config Config) (resourcelock.Interface, error) {
+	lockType := config.LockType
+	if lockType == "" {
+		lockType = defaultLockType
+	}
+
+	leaderElectionBroadcaster := record.NewBroadcaster()
+	leaderElectionBroadcaster.StartRecordingToSink(&corev1client.EventSinkImpl{
+		Interface: config.Client.CoreV1().Events(config.Namespace),
+	})
+
+	return resourcelock.New(
+		lockType,
+		config.Namespace,
+		leaderElectionResourceName,
+		config.Client.CoreV1(),
+		config.Client.CoordinationV1(),
+		resourcelock.ResourceLockConfig{
+			Identity: config.LockID,
+			EventRecorder: leaderElectionBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{
+				Component: leaderElectionEventSourceComponent,
+			}),
+		},
+	)
 }
 
 // Run starts the operator reconcilitation process and runs until the stop
@@ -200,33 +241,9 @@ func (k *Kontroller) Run(stop <-chan struct{}) error {
 	return <-errCh
 }
 
-// newResourceLock creates a resource for locking on arbitrary resources
-// used in leader election.
-func (k *Kontroller) newResourceLock() resourcelock.Interface {
-	leaderElectionBroadcaster := record.NewBroadcaster()
-	leaderElectionBroadcaster.StartRecordingToSink(&corev1client.EventSinkImpl{
-		Interface: k.kc.CoreV1().Events(k.namespace),
-	})
-
-	return &resourcelock.ConfigMapLock{
-		ConfigMapMeta: metav1.ObjectMeta{
-			Namespace: k.namespace,
-			Name:      leaderElectionResourceName,
-		},
-		Client: k.kc.CoreV1(),
-		LockConfig: resourcelock.ResourceLockConfig{
-			Identity: k.lockID,
-			EventRecorder: leaderElectionBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{
-				Component: leaderElectionEventSourceComponent,
-			}),
-		},
-	}
-}
-
 // withLeaderElection creates a new context which is cancelled when this
 // operator does not hold a lock to operate on the cluster.
 func (k *Kontroller) withLeaderElection(stop <-chan struct{}, errCh chan<- error) context.Context {
-	resLock := k.newResourceLock()
 	ctx, cancel := context.WithCancel(context.Background())
 
 	go func() {
@@ -246,7 +263,7 @@ func (k *Kontroller) withLeaderElection(stop <-chan struct{}, errCh chan<- error
 		// See also
 		// https://github.com/kubernetes/kubernetes/blob/fc31dae165f406026142f0dd9a98cada8474682a/pkg/client/leaderelection/leaderelection.go#L17
 		leaderelection.RunOrDie(ctx, leaderelection.LeaderElectionConfig{
-			Lock:          resLock,
+			Lock:          k.resourceLock,
 			LeaseDuration: k.leaderElectionLease,
 			//nolint:gomnd // Set renew deadline to 2/3rd of the lease duration to give
 			//             // controller enough time to renew the lease.
