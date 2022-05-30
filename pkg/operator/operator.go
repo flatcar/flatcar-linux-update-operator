@@ -184,11 +184,11 @@ func New(config Config) (*Kontroller, error) {
 // Run starts the operator reconcilitation process and runs until the stop
 // channel is closed.
 func (k *Kontroller) Run(stop <-chan struct{}) error {
-	err := make(chan error, 1)
+	errCh := make(chan error, 1)
 
 	// Leader election is responsible for shutting down the controller, so when leader election
 	// is lost, controller is immediately stopped, as shared context will be cancelled.
-	ctx := k.withLeaderElection(stop, err)
+	ctx := k.withLeaderElection(stop, errCh)
 
 	klog.V(5).Info("Starting controller")
 
@@ -197,18 +197,18 @@ func (k *Kontroller) Run(stop <-chan struct{}) error {
 
 	klog.V(5).Info("Stopping controller")
 
-	return <-err
+	return <-errCh
 }
 
-// withLeaderElection creates a new context which is cancelled when this
-// operator does not hold a lock to operate on the cluster.
-func (k *Kontroller) withLeaderElection(stop <-chan struct{}, err chan<- error) context.Context {
+// newResourceLock creates a resource for locking on arbitrary resources
+// used in leader election.
+func (k *Kontroller) newResourceLock() resourcelock.Interface {
 	leaderElectionBroadcaster := record.NewBroadcaster()
 	leaderElectionBroadcaster.StartRecordingToSink(&corev1client.EventSinkImpl{
 		Interface: k.kc.CoreV1().Events(k.namespace),
 	})
 
-	resLock := &resourcelock.ConfigMapLock{
+	return &resourcelock.ConfigMapLock{
 		ConfigMapMeta: metav1.ObjectMeta{
 			Namespace: k.namespace,
 			Name:      leaderElectionResourceName,
@@ -221,13 +221,18 @@ func (k *Kontroller) withLeaderElection(stop <-chan struct{}, err chan<- error) 
 			}),
 		},
 	}
+}
 
+// withLeaderElection creates a new context which is cancelled when this
+// operator does not hold a lock to operate on the cluster.
+func (k *Kontroller) withLeaderElection(stop <-chan struct{}, errCh chan<- error) context.Context {
+	resLock := k.newResourceLock()
 	ctx, cancel := context.WithCancel(context.Background())
 
 	go func() {
 		// When user requests to stop the controller, cancel context to interrupt any ongoing operation.
 		<-stop
-		err <- nil
+		errCh <- nil
 
 		cancel()
 	}()
@@ -255,7 +260,7 @@ func (k *Kontroller) withLeaderElection(stop <-chan struct{}, err chan<- error) 
 					waitLeading <- struct{}{}
 				},
 				OnStoppedLeading: func() {
-					err <- fmt.Errorf("leaderelection lost")
+					errCh <- fmt.Errorf("leaderelection lost")
 					cancel()
 				},
 			},
