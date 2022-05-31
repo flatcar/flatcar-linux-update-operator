@@ -141,7 +141,7 @@ func (k *klocksmith) Run(ctx context.Context) error {
 // process performs the agent reconciliation to reboot the node or stops when
 // the stop channel is closed.
 //
-//nolint:funlen,cyclop,gocognit // This will be refactored once we have tests in place.
+//nolint:funlen,cyclop // This will be refactored once we have tests in place.
 func (k *klocksmith) process(ctx context.Context) error {
 	klog.Info("Setting info labels")
 
@@ -376,6 +376,38 @@ func (k *klocksmith) waitForOkToReboot(ctx context.Context) error {
 		return fmt.Errorf("getting self node (%q): %w", k.nodeName, err)
 	}
 
+	shouldRebootSelector := fields.Set(map[string]string{
+		constants.AnnotationOkToReboot:   constants.True,
+		constants.AnnotationRebootNeeded: constants.True,
+	}).AsSelector()
+
+	return k.waitForNodeCondition(ctx, node, func(annotations map[string]string) bool {
+		return shouldRebootSelector.Matches(fields.Set(annotations))
+	})
+}
+
+func (k *klocksmith) waitForNotOkToReboot(ctx context.Context) error {
+	node, err := k.nc.Get(ctx, k.nodeName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("getting self node (%q): %w", k.nodeName, err)
+	}
+
+	if node.Annotations[constants.AnnotationOkToReboot] != constants.True {
+		return nil
+	}
+
+	return k.waitForNodeCondition(ctx, node, func(annotations map[string]string) bool {
+		// Use a custom condition function to use the more correct 'OkToReboot !=
+		// true' vs '== False'; due to the operator matching on '== True', and not
+		// going out of its way to convert '' => 'False', checking the exact inverse
+		// of what the operator checks is the correct thing to do.
+		return annotations[constants.AnnotationOkToReboot] != constants.True
+	})
+}
+
+type conditionF func(annotations map[string]string) bool
+
+func (k *klocksmith) waitForNodeCondition(ctx context.Context, node *corev1.Node, conditionF conditionF) error {
 	// XXX: Set timeout > 0?
 	watcher, err := k.nc.Watch(ctx, metav1.ListOptions{
 		FieldSelector:   fields.OneTermEqualSelector("metadata.name", node.Name).String(),
@@ -387,49 +419,9 @@ func (k *klocksmith) waitForOkToReboot(ctx context.Context) error {
 
 	// Hopefully 24 hours is enough time between indicating we need a
 	// reboot and the controller telling us to do it.
-	ctx, _ = watchtools.ContextWithOptionalTimeout(ctx, k.maxOperatorResponseTime)
-
-	shouldRebootSelector := fields.Set(map[string]string{
-		constants.AnnotationOkToReboot:   constants.True,
-		constants.AnnotationRebootNeeded: constants.True,
-	}).AsSelector()
-
-	watchF := k8sutil.NodeAnnotationCondition(shouldRebootSelector)
-
-	if _, err := watchtools.UntilWithoutRetry(ctx, watcher, watchF); err != nil {
-		return fmt.Errorf("waiting for annotation %q failed: %w", constants.AnnotationOkToReboot, err)
-	}
-
-	return nil
-}
-
-//nolint:cyclop // We will deal with complexity once we have proper tests.
-func (k *klocksmith) waitForNotOkToReboot(ctx context.Context) error {
-	node, err := k.nc.Get(ctx, k.nodeName, metav1.GetOptions{})
-	if err != nil {
-		return fmt.Errorf("getting self node (%q): %w", k.nodeName, err)
-	}
-
-	if node.Annotations[constants.AnnotationOkToReboot] != constants.True {
-		return nil
-	}
-
-	// XXX: Set timeout > 0?
-	watcher, err := k.nc.Watch(ctx, metav1.ListOptions{
-		FieldSelector:   fields.OneTermEqualSelector("metadata.name", node.Name).String(),
-		ResourceVersion: node.ResourceVersion,
-	})
-	if err != nil {
-		return fmt.Errorf("creating watcher for self node (%q): %w", k.nodeName, err)
-	}
-
-	// Within 24 hours of indicating we don't need a reboot we should be given a not-ok.
+	//
 	// If that isn't the case, it likely means the operator isn't running, and
 	// we'll just crash-loop in that case, and hopefully that will help the user realize something's wrong.
-	// Use a custom condition function to use the more correct 'OkToReboot !=
-	// true' vs '== False'; due to the operator matching on '== True', and not
-	// going out of its way to convert '' => 'False', checking the exact inverse
-	// of what the operator checks is the correct thing to do.
 	ctx, _ = watchtools.ContextWithOptionalTimeout(ctx, k.maxOperatorResponseTime)
 
 	watchF := func(event watch.Event) (bool, error) {
@@ -440,7 +432,7 @@ func (k *klocksmith) waitForNotOkToReboot(ctx context.Context) error {
 				return false, fmt.Errorf("extracting annotations from event object: %w", err)
 			}
 
-			return annotations[constants.AnnotationOkToReboot] != constants.True, nil
+			return conditionF(annotations), nil
 		case watch.Error:
 			return false, fmt.Errorf("watching node: %v", event.Object)
 		case watch.Deleted:
