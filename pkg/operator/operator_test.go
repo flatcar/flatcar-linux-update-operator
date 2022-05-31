@@ -132,7 +132,7 @@ func Test_Operator_exits_gracefully_when_user_requests_shutdown(t *testing.T) {
 	}
 }
 
-//nolint:funlen // Should likely be refactored.
+//nolint:funlen // TODO: Should likely be refactored.
 func Test_Operator_shuts_down_leader_election_process_when_user_requests_shutdown(t *testing.T) {
 	t.Parallel()
 

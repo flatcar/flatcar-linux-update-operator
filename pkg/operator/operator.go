@@ -38,7 +38,7 @@ const (
 	defaultReconciliationPeriod = 30 * time.Second
 )
 
-//nolint:godot // Complaining about not capitalized comments for variables. We should get rid of those completely.
+//nolint:godot // TODO: Complaining about not capitalized comments for variables. We should get rid of those completely.
 var (
 	// justRebootedSelector is a selector for combination of annotations
 	// expected to be on a node after it has completed a reboot.

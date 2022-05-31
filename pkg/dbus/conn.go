@@ -49,7 +49,7 @@ func New(connector Connector) (Client, error) {
 	if err := conn.Auth(methods); err != nil {
 		// Best effort closing the connection.
 		//
-		//nolint:errcheck // We will add logger as a dependencty to client to fix it.
+		//nolint:errcheck // TODO: We will add logger as a dependencty to client to fix it.
 		_ = conn.Close()
 
 		return nil, fmt.Errorf("authenticating to D-Bus: %w", err)
@@ -58,7 +58,7 @@ func New(connector Connector) (Client, error) {
 	if err := conn.Hello(); err != nil {
 		// Best effort closing the connection.
 		//
-		//nolint:errcheck // We will add logger as a dependencty to client to fix it.
+		//nolint:errcheck // TODO: We will add logger as a dependencty to client to fix it.
 		_ = conn.Close()
 
 		return nil, fmt.Errorf("sending hello to D-Bus: %w", err)

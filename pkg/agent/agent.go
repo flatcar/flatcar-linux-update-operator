@@ -141,7 +141,7 @@ func (k *klocksmith) Run(ctx context.Context) error {
 // process performs the agent reconciliation to reboot the node or stops when
 // the stop channel is closed.
 //
-//nolint:funlen,cyclop // This will be refactored once we have tests in place.
+//nolint:funlen,cyclop // TODO: This will be refactored once we have tests in place.
 func (k *klocksmith) process(ctx context.Context) error {
 	klog.Info("Setting info labels")
 

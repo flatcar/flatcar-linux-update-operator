@@ -44,7 +44,7 @@ type Status struct {
 
 // NewStatus constructs status from received D-Bus signal body.
 //
-//nolint:forcetypeassert // To be refactored to return errors.
+//nolint:forcetypeassert // TODO: To be refactored to return errors.
 func NewStatus(body []interface{}) Status {
 	return Status{
 		LastCheckedTime:  body[0].(int64),
