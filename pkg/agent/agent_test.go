@@ -796,7 +796,7 @@ func Test_Running_agent(t *testing.T) {
 			})
 
 			fakeClient.PrependReactor("create", "pods/eviction",
-				func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
+				func(action k8stesting.Action) (bool, runtime.Object, error) {
 					createAction, ok := action.(k8stesting.CreateActionImpl) //nolint:varnamelen // False positive.
 					if !ok {
 						del := k8stesting.CreateActionImpl{}
@@ -849,7 +849,6 @@ func Test_Running_agent(t *testing.T) {
 			})
 
 			t.Run("waits_for_removed_pods_to_terminate_before_rebooting", func(t *testing.T) {
-
 				select {
 				case <-ctx.Done():
 					t.Fatalf("Timed out waiting for all pods to be scheduled for removal")
@@ -1041,7 +1040,7 @@ func Test_Running_agent(t *testing.T) {
 
 				failingWatcherCreation := make(chan struct{}, 1)
 
-				failOnWatchCreation := func(action k8stesting.Action) (handled bool, ret watch.Interface, err error) {
+				failOnWatchCreation := func(action k8stesting.Action) (bool, watch.Interface, error) {
 					if len(failingWatcherCreation) == 0 {
 						failingWatcherCreation <- struct{}{}
 					}
@@ -1312,7 +1311,7 @@ func Test_Running_agent(t *testing.T) {
 				testConfig, _, fakeClient := validTestConfig(t, okToRebootNode())
 
 				expectedError := errors.New("creating watcher")
-				f := func(action k8stesting.Action) (handled bool, ret watch.Interface, err error) {
+				f := func(action k8stesting.Action) (bool, watch.Interface, error) {
 					return true, nil, expectedError
 				}
 

@@ -14,8 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/kubectl/pkg/drain"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -25,6 +23,7 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/klog/v2"
+	"k8s.io/kubectl/pkg/drain"
 
 	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/constants"
 	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/k8sutil"
