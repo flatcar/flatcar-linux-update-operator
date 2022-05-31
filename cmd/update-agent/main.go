@@ -18,11 +18,13 @@ import (
 	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/version"
 )
 
+const defaultGracePeriodSeconds = 600
+
 var (
 	node         = flag.String("node", "", "Kubernetes node name")
 	printVersion = flag.Bool("version", false, "Print version and exit")
 
-	reapTimeout = flag.Int("grace-period", 600,
+	reapTimeout = flag.Int("grace-period", defaultGracePeriodSeconds,
 		"Period of time in seconds given to a pod to terminate when rebooting for an update")
 )
 

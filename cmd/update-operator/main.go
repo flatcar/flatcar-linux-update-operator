@@ -13,7 +13,7 @@ import (
 	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/version"
 )
 
-type flags struct {
+type flagsSet struct {
 	beforeRebootAnnotations flagutil.StringSliceFlag
 	afterRebootAnnotations  flagutil.StringSliceFlag
 	kubeconfig              *string
@@ -22,8 +22,8 @@ type flags struct {
 	printVersion            *bool
 }
 
-func handleFlags() *flags {
-	f := &flags{
+func handleFlags() *flagsSet {
+	flags := &flagsSet{
 		kubeconfig: flag.String("kubeconfig", "",
 			"Path to a kubeconfig file. Default to the in-cluster config if not provided."),
 
@@ -35,10 +35,10 @@ func handleFlags() *flags {
 		printVersion:       flag.Bool("version", false, "Print version and exit"),
 	}
 
-	flag.Var(&f.beforeRebootAnnotations, "before-reboot-annotations",
+	flag.Var(&flags.beforeRebootAnnotations, "before-reboot-annotations",
 		"List of comma-separated Kubernetes node annotations that must be set to 'true' before a reboot is allowed")
 
-	flag.Var(&f.afterRebootAnnotations, "after-reboot-annotations",
+	flag.Var(&flags.afterRebootAnnotations, "after-reboot-annotations",
 		"List of comma-separated Kubernetes node annotations that must be set to 'true' before a node is marked "+
 			"schedulable and the operator lock is released")
 
@@ -55,23 +55,23 @@ func handleFlags() *flags {
 	}
 
 	// Respect KUBECONFIG without the prefix as well.
-	if *f.kubeconfig == "" {
-		*f.kubeconfig = os.Getenv("KUBECONFIG")
+	if *flags.kubeconfig == "" {
+		*flags.kubeconfig = os.Getenv("KUBECONFIG")
 	}
 
-	return f
+	return flags
 }
 
 func main() {
-	f := handleFlags()
+	flags := handleFlags()
 
-	if *f.printVersion {
+	if *flags.printVersion {
 		fmt.Println(version.Format())
 		os.Exit(0)
 	}
 
 	// Create Kubernetes client (clientset).
-	client, err := k8sutil.GetClient(*f.kubeconfig)
+	client, err := k8sutil.GetClient(*flags.kubeconfig)
 	if err != nil {
 		klog.Fatalf("Failed to create Kubernetes client: %v", err)
 	}
@@ -91,12 +91,12 @@ func main() {
 	}
 
 	// Construct update-operator.
-	o, err := operator.New(operator.Config{
+	operatorInstance, err := operator.New(operator.Config{
 		Client:                  client,
-		BeforeRebootAnnotations: f.beforeRebootAnnotations,
-		AfterRebootAnnotations:  f.afterRebootAnnotations,
-		RebootWindowStart:       *f.rebootWindowStart,
-		RebootWindowLength:      *f.rebootWindowLength,
+		BeforeRebootAnnotations: flags.beforeRebootAnnotations,
+		AfterRebootAnnotations:  flags.afterRebootAnnotations,
+		RebootWindowStart:       *flags.rebootWindowStart,
+		RebootWindowLength:      *flags.rebootWindowLength,
 		Namespace:               namespace,
 		LockID:                  hostname,
 	})
@@ -110,7 +110,7 @@ func main() {
 	stop := make(chan struct{})
 	defer close(stop)
 
-	if err := o.Run(stop); err != nil {
+	if err := operatorInstance.Run(stop); err != nil {
 		klog.Fatalf("Error while running %s: %v", os.Args[0], err)
 	}
 }
