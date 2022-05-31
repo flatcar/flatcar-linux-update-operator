@@ -38,6 +38,7 @@ const (
 	defaultReconciliationPeriod = 30 * time.Second
 )
 
+//nolint:godot // Complaining about not capitalized comments for variables. We should get rid of those completely.
 var (
 	// justRebootedSelector is a selector for combination of annotations
 	// expected to be on a node after it has completed a reboot.
@@ -77,9 +78,8 @@ var (
 	afterRebootReq = k8sutil.NewRequirementOrDie(constants.LabelAfterReboot, selection.In, []string{constants.True})
 
 	// notBeforeRebootReq is the inverse of the above checks.
-	//
-	//nolint:lll
-	notBeforeRebootReq = k8sutil.NewRequirementOrDie(constants.LabelBeforeReboot, selection.NotIn, []string{constants.True})
+	notBeforeRebootReq = k8sutil.NewRequirementOrDie(
+		constants.LabelBeforeReboot, selection.NotIn, []string{constants.True})
 )
 
 // Config configures a Kontroller.
@@ -138,6 +138,7 @@ func New(config Config) (*Kontroller, error) {
 	}
 
 	var rebootWindow *timeutil.Periodic
+
 	if config.RebootWindowStart != "" && config.RebootWindowLength != "" {
 		rw, err := timeutil.ParsePeriodic(config.RebootWindowStart, config.RebootWindowLength)
 		if err != nil {
@@ -359,8 +360,8 @@ func (k *Kontroller) cleanupState(ctx context.Context) error {
 		return fmt.Errorf("listing nodes: %w", err)
 	}
 
-	for _, n := range nodelist.Items {
-		err = k8sutil.UpdateNodeRetry(ctx, k.nc, n.Name, func(node *corev1.Node) {
+	for _, node := range nodelist.Items {
+		err = k8sutil.UpdateNodeRetry(ctx, k.nc, node.Name, func(node *corev1.Node) {
 			// Make sure that nodes with the before-reboot label actually
 			// still wants to reboot.
 			if _, exists := node.Labels[constants.LabelBeforeReboot]; !exists {
@@ -379,7 +380,7 @@ func (k *Kontroller) cleanupState(ctx context.Context) error {
 			}
 		})
 		if err != nil {
-			return fmt.Errorf("cleaning up node %q: %w", n.Name, err)
+			return fmt.Errorf("cleaning up node %q: %w", node.Name, err)
 		}
 	}
 
@@ -412,16 +413,16 @@ func (k *Kontroller) checkReboot(ctx context.Context, opt checkRebootOptions) er
 
 	nodes := k8sutil.FilterNodesByRequirement(nodelist.Items, opt.req)
 
-	for _, n := range nodes {
-		if !hasAllAnnotations(n, opt.annotations) {
+	for _, node := range nodes {
+		if !hasAllAnnotations(node, opt.annotations) {
 			continue
 		}
 
-		klog.V(4).Infof("Deleting label %q for %q", opt.label, n.Name)
+		klog.V(4).Infof("Deleting label %q for %q", opt.label, node.Name)
 		klog.V(4).Infof("Setting annotation %q to %q for %q",
-			constants.AnnotationOkToReboot, opt.okToReboot, n.Name)
+			constants.AnnotationOkToReboot, opt.okToReboot, node.Name)
 
-		if err := k8sutil.UpdateNodeRetry(ctx, k.nc, n.Name, func(node *corev1.Node) {
+		if err := k8sutil.UpdateNodeRetry(ctx, k.nc, node.Name, func(node *corev1.Node) {
 			delete(node.Labels, opt.label)
 
 			// Cleanup the annotations.
@@ -432,7 +433,7 @@ func (k *Kontroller) checkReboot(ctx context.Context, opt checkRebootOptions) er
 
 			node.Annotations[constants.AnnotationOkToReboot] = opt.okToReboot
 		}); err != nil {
-			return fmt.Errorf("updating node %q: %w", n.Name, err)
+			return fmt.Errorf("updating node %q: %w", node.Name, err)
 		}
 	}
 
