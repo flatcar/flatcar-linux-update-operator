@@ -38,23 +38,6 @@ rules:
   - apiGroups:
       - ""
     resources:
-      - configmaps
-    verbs:
-      - create
-      - get
-      - update
-      - list
-      - watch
-  - apiGroups:
-      - ""
-    resources:
-      - events
-    verbs:
-      - create
-      - watch
-  - apiGroups:
-      - ""
-    resources:
       - pods
     verbs:
       - get

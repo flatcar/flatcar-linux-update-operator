@@ -1,0 +1,25 @@
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: flatcar-linux-update-operator
+  namespace: reboot-coordinator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: flatcar-linux-update-operator
+subjects:
+  - kind: ServiceAccount
+    name: flatcar-linux-update-operator-sa
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: flatcar-linux-update-agent
+  namespace: reboot-coordinator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: flatcar-linux-update-agent
+subjects:
+  - kind: ServiceAccount
+    name: flatcar-linux-update-agent
