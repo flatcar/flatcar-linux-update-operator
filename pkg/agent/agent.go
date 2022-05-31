@@ -79,11 +79,6 @@ const (
 	osReleasePath          = "/etc/os-release"
 )
 
-var shouldRebootSelector = fields.Set(map[string]string{
-	constants.AnnotationOkToReboot:   constants.True,
-	constants.AnnotationRebootNeeded: constants.True,
-}).AsSelector()
-
 // New returns initialized klocksmith.
 func New(config *Config) (Klocksmith, error) {
 	if config.Clientset == nil {
@@ -399,6 +394,11 @@ func (k *klocksmith) waitForOkToReboot(ctx context.Context) error {
 	// Hopefully 24 hours is enough time between indicating we need a
 	// reboot and the controller telling us to do it.
 	ctx, _ = watchtools.ContextWithOptionalTimeout(ctx, k.maxOperatorResponseTime)
+
+	shouldRebootSelector := fields.Set(map[string]string{
+		constants.AnnotationOkToReboot:   constants.True,
+		constants.AnnotationRebootNeeded: constants.True,
+	}).AsSelector()
 
 	event, err := watchtools.UntilWithoutRetry(ctx, watcher, k8sutil.NodeAnnotationCondition(shouldRebootSelector))
 	if err != nil {
