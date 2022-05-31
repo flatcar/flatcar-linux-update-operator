@@ -1549,8 +1549,6 @@ func Test_Running_agent(t *testing.T) {
 		t.Run("agent_receives_termination_signal_while_waiting_for_all_pods_to_be_terminated", func(t *testing.T) {
 			t.Parallel()
 
-			rebootTriggerred := make(chan bool, 1)
-
 			podsToCreate := []*corev1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -1567,6 +1565,19 @@ func Test_Running_agent(t *testing.T) {
 
 			fakeClient := fake.NewSimpleClientset(podsToCreate[0], testNode())
 			addEvictionSupport(t, fakeClient)
+
+			podDeletionAttemptCh := make(chan struct{}, 1)
+
+			actionF := func(action k8stesting.Action) (bool, runtime.Object, error) {
+				podDeletionAttemptCh <- struct{}{}
+
+				// Never actually remove any pod.
+				return true, nil, nil
+			}
+
+			fakeClient.PrependReactor("create", "pods/eviction", actionF)
+
+			rebootTriggerred := make(chan bool, 1)
 
 			testConfig, node, _ := validTestConfig(t, testNode())
 			testConfig.Clientset = fakeClient
@@ -1588,6 +1599,9 @@ func Test_Running_agent(t *testing.T) {
 			})
 
 			okToReboot(ctx, t, testConfig.Clientset.CoreV1().Nodes(), node.Name)
+
+			// Wait until we try to delete a pod.
+			<-podDeletionAttemptCh
 
 			cancel()
 
@@ -2017,6 +2031,10 @@ func addEvictionSupport(t *testing.T, clientset *fake.Clientset) {
 		GroupVersion: "policy/v1",
 	}
 	clientset.Resources = append(clientset.Resources, coreResources, policyResources)
+
+	clientset.PrependReactor("create", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		return action.GetSubresource() == "eviction", nil, nil
+	})
 }
 
 func testPodControllerReference() []metav1.OwnerReference {
