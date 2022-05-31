@@ -435,10 +435,6 @@ func (k *klocksmith) waitForNotOkToReboot(ctx context.Context) error {
 	watchF := func(event watch.Event) (bool, error) {
 		//nolint:exhaustive // Handle for event type Bookmark will be added once we have tests in place.
 		switch event.Type {
-		case watch.Error:
-			return false, fmt.Errorf("watching node: %v", event.Object)
-		case watch.Deleted:
-			return false, fmt.Errorf("our node was deleted while we were waiting for ready")
 		case watch.Added, watch.Modified:
 			annotations, err := meta.NewAccessor().Annotations(event.Object)
 			if err != nil {
@@ -446,6 +442,10 @@ func (k *klocksmith) waitForNotOkToReboot(ctx context.Context) error {
 			}
 
 			return annotations[constants.AnnotationOkToReboot] != constants.True, nil
+		case watch.Error:
+			return false, fmt.Errorf("watching node: %v", event.Object)
+		case watch.Deleted:
+			return false, fmt.Errorf("our node was deleted while we were waiting for ready")
 		default:
 			return false, fmt.Errorf("unknown event type: %v", event.Type)
 		}
