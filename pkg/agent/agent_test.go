@@ -1338,6 +1338,10 @@ func Test_Running_agent(t *testing.T) {
 						watchEvent:    func(w *watch.FakeWatcher) { w.Delete(nil) },
 						expectedError: "node was deleted",
 					},
+					"returns_malformed_object": {
+						watchEvent:    func(w *watch.FakeWatcher) { w.Modify(nil) },
+						expectedError: "extracting annotations from event object",
+					},
 					"returns_unknown_event_type": {
 						watchEvent:    func(w *watch.FakeWatcher) { w.Action(watch.Bookmark, nil) },
 						expectedError: "unknown event type",

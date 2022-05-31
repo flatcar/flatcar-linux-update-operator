@@ -15,6 +15,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -439,8 +440,12 @@ func (k *klocksmith) waitForNotOkToReboot(ctx context.Context) error {
 		case watch.Deleted:
 			return false, fmt.Errorf("our node was deleted while we were waiting for ready")
 		case watch.Added, watch.Modified:
-			//nolint:forcetypeassert // Will be addressed once we have proper tests in place.
-			return event.Object.(*corev1.Node).Annotations[constants.AnnotationOkToReboot] != constants.True, nil
+			annotations, err := meta.NewAccessor().Annotations(event.Object)
+			if err != nil {
+				return false, fmt.Errorf("extracting annotations from event object: %w", err)
+			}
+
+			return annotations[constants.AnnotationOkToReboot] != constants.True, nil
 		default:
 			return false, fmt.Errorf("unknown event type: %v", event.Type)
 		}
