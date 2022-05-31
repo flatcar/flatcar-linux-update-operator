@@ -796,8 +796,8 @@ func Test_Running_agent(t *testing.T) {
 			})
 
 			fakeClient.PrependReactor("create", "pods/eviction",
-				func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
-					createAction, ok := action.(k8stesting.CreateActionImpl) //nolint:varnamelen // False positive.
+				func(action k8stesting.Action) (bool, runtime.Object, error) {
+					createAction, ok := action.(k8stesting.CreateActionImpl)
 					if !ok {
 						del := k8stesting.CreateActionImpl{}
 
@@ -849,7 +849,6 @@ func Test_Running_agent(t *testing.T) {
 			})
 
 			t.Run("waits_for_removed_pods_to_terminate_before_rebooting", func(t *testing.T) {
-
 				select {
 				case <-ctx.Done():
 					t.Fatalf("Timed out waiting for all pods to be scheduled for removal")
@@ -1041,7 +1040,7 @@ func Test_Running_agent(t *testing.T) {
 
 				failingWatcherCreation := make(chan struct{}, 1)
 
-				failOnWatchCreation := func(action k8stesting.Action) (handled bool, ret watch.Interface, err error) {
+				failOnWatchCreation := func(action k8stesting.Action) (bool, watch.Interface, error) {
 					if len(failingWatcherCreation) == 0 {
 						failingWatcherCreation <- struct{}{}
 					}
@@ -1312,7 +1311,7 @@ func Test_Running_agent(t *testing.T) {
 				testConfig, _, fakeClient := validTestConfig(t, okToRebootNode())
 
 				expectedError := errors.New("creating watcher")
-				f := func(action k8stesting.Action) (handled bool, ret watch.Interface, err error) {
+				f := func(action k8stesting.Action) (bool, watch.Interface, error) {
 					return true, nil, expectedError
 				}
 
@@ -1339,8 +1338,16 @@ func Test_Running_agent(t *testing.T) {
 						watchEvent:    func(w *watch.FakeWatcher) { w.Delete(nil) },
 						expectedError: "node was deleted",
 					},
-					"returns_unknown_event_type": {
+					"returns_malformed_object": {
+						watchEvent:    func(w *watch.FakeWatcher) { w.Modify(nil) },
+						expectedError: "extracting annotations from event object",
+					},
+					"returns_bookmark_event_type": {
 						watchEvent:    func(w *watch.FakeWatcher) { w.Action(watch.Bookmark, nil) },
+						expectedError: "unexpected watch bookmark received",
+					},
+					"returns_unknown_event_type": {
+						watchEvent:    func(w *watch.FakeWatcher) { w.Action("foo", nil) },
 						expectedError: "unknown event type",
 					},
 				}
@@ -1978,7 +1985,7 @@ func notifyOnNodeUnschedulableUpdate(t *testing.T, fakeClient *k8stesting.Fake) 
 func updateActionToNode(t *testing.T, action k8stesting.Action) *corev1.Node {
 	t.Helper()
 
-	updateAction, ok := action.(k8stesting.UpdateActionImpl) //nolint:varnamelen // Below it's different variable.
+	updateAction, ok := action.(k8stesting.UpdateActionImpl)
 	if !ok {
 		t.Fatalf("Expected action %T, got %T", k8stesting.UpdateActionImpl{}, action)
 	}

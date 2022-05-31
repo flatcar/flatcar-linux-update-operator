@@ -29,7 +29,7 @@ const (
 	testNamespace                     = "default"
 )
 
-//nolint:funlen
+//nolint:funlen // Just many test cases.
 func Test_Creating_new_operator(t *testing.T) {
 	t.Parallel()
 
@@ -132,7 +132,7 @@ func Test_Operator_exits_gracefully_when_user_requests_shutdown(t *testing.T) {
 	}
 }
 
-//nolint:funlen // Should likely be refactored.
+//nolint:funlen // TODO: Should likely be refactored.
 func Test_Operator_shuts_down_leader_election_process_when_user_requests_shutdown(t *testing.T) {
 	t.Parallel()
 
@@ -570,7 +570,7 @@ func Test_Operator_does_not_count_nodes_as_rebooting_which(t *testing.T) {
 		},
 	}
 
-	for name, testCase := range cases { //nolint:paralleltest // False positive.
+	for name, testCase := range cases {
 		testCase := testCase
 
 		t.Run(name, func(t *testing.T) {
@@ -614,7 +614,7 @@ func Test_Operator_counts_nodes_as_rebooting_which(t *testing.T) {
 		"just_rebooted":                    justRebootedNode(),
 	}
 
-	for name, extraNode := range cases { //nolint:paralleltest // False positive.
+	for name, extraNode := range cases {
 		extraNode := extraNode
 
 		t.Run(name, func(t *testing.T) {
@@ -662,7 +662,7 @@ func Test_Operator_does_not_count_nodes_as_rebootable_which(t *testing.T) {
 		},
 	}
 
-	for name, mutateF := range cases { //nolint:paralleltest // False positive.
+	for name, mutateF := range cases {
 		mutateF := mutateF
 
 		t.Run(name, func(t *testing.T) {
@@ -853,7 +853,7 @@ func Test_Operator_approves_reboot_process_for_nodes_which_have(t *testing.T) {
 		},
 	}
 
-	for name, testCase := range cases { //nolint:paralleltest // False positive.
+	for name, testCase := range cases {
 		testCase := testCase
 
 		t.Run(name, func(t *testing.T) {
@@ -977,7 +977,7 @@ func Test_Operator_counts_nodes_as_just_rebooted_which(t *testing.T) {
 		},
 	}
 
-	for name, testCase := range cases { //nolint:paralleltest // False positive.
+	for name, testCase := range cases {
 		testCase := testCase
 
 		t.Run(name, func(t *testing.T) {
@@ -1092,7 +1092,7 @@ func Test_Operator_counts_nodes_as_which_finished_rebooting_which_has(t *testing
 		},
 	}
 
-	for name, testCase := range cases { //nolint:paralleltest // False positive.
+	for name, testCase := range cases {
 		testCase := testCase
 
 		t.Run(name, func(t *testing.T) {

@@ -14,9 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/kubectl/pkg/drain"
-
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -25,6 +24,7 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/klog/v2"
+	"k8s.io/kubectl/pkg/drain"
 
 	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/constants"
 	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/k8sutil"
@@ -79,11 +79,6 @@ const (
 	updateConfOverridePath = "/etc/flatcar/update.conf"
 	osReleasePath          = "/etc/os-release"
 )
-
-var shouldRebootSelector = fields.Set(map[string]string{
-	constants.AnnotationOkToReboot:   constants.True,
-	constants.AnnotationRebootNeeded: constants.True,
-}).AsSelector()
 
 // New returns initialized klocksmith.
 func New(config *Config) (Klocksmith, error) {
@@ -146,7 +141,7 @@ func (k *klocksmith) Run(ctx context.Context) error {
 // process performs the agent reconciliation to reboot the node or stops when
 // the stop channel is closed.
 //
-//nolint:funlen,cyclop,gocognit // This will be refactored once we have tests in place.
+//nolint:funlen,cyclop // TODO: This will be refactored once we have tests in place.
 func (k *klocksmith) process(ctx context.Context) error {
 	klog.Info("Setting info labels")
 
@@ -163,9 +158,8 @@ func (k *klocksmith) process(ctx context.Context) error {
 
 	// Only make a node schedulable if a reboot was in progress. This prevents a node from being made schedulable
 	// if it was made unschedulable by something other than the agent.
-	//
-	//nolint:lll // To be addressed.
-	madeUnschedulableAnnotation, madeUnschedulableAnnotationExists := node.Annotations[constants.AnnotationAgentMadeUnschedulable]
+	annotation := constants.AnnotationAgentMadeUnschedulable
+	madeUnschedulableAnnotation, madeUnschedulableAnnotationExists := node.Annotations[annotation]
 	makeSchedulable := madeUnschedulableAnnotation == constants.True
 
 	// Set flatcar-linux.net/update1/reboot-in-progress=false and
@@ -381,13 +375,38 @@ func (k *klocksmith) waitForOkToReboot(ctx context.Context) error {
 		return fmt.Errorf("getting self node (%q): %w", k.nodeName, err)
 	}
 
-	okToReboot := node.Annotations[constants.AnnotationOkToReboot] == constants.True
-	rebootNeeded := node.Annotations[constants.AnnotationRebootNeeded] == constants.True
+	shouldRebootSelector := fields.Set(map[string]string{
+		constants.AnnotationOkToReboot:   constants.True,
+		constants.AnnotationRebootNeeded: constants.True,
+	}).AsSelector()
 
-	if okToReboot && rebootNeeded {
+	return k.waitForNodeCondition(ctx, node, func(annotations map[string]string) bool {
+		return shouldRebootSelector.Matches(fields.Set(annotations))
+	})
+}
+
+func (k *klocksmith) waitForNotOkToReboot(ctx context.Context) error {
+	node, err := k.nc.Get(ctx, k.nodeName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("getting self node (%q): %w", k.nodeName, err)
+	}
+
+	if node.Annotations[constants.AnnotationOkToReboot] != constants.True {
 		return nil
 	}
 
+	return k.waitForNodeCondition(ctx, node, func(annotations map[string]string) bool {
+		// Use a custom condition function to use the more correct 'OkToReboot !=
+		// true' vs '== False'; due to the operator matching on '== True', and not
+		// going out of its way to convert '' => 'False', checking the exact inverse
+		// of what the operator checks is the correct thing to do.
+		return annotations[constants.AnnotationOkToReboot] != constants.True
+	})
+}
+
+type conditionF func(annotations map[string]string) bool
+
+func (k *klocksmith) waitForNodeCondition(ctx context.Context, node *corev1.Node, conditionF conditionF) error {
 	// XXX: Set timeout > 0?
 	watcher, err := k.nc.Watch(ctx, metav1.ListOptions{
 		FieldSelector:   fields.OneTermEqualSelector("metadata.name", node.Name).String(),
@@ -399,83 +418,33 @@ func (k *klocksmith) waitForOkToReboot(ctx context.Context) error {
 
 	// Hopefully 24 hours is enough time between indicating we need a
 	// reboot and the controller telling us to do it.
-	ctx, _ = watchtools.ContextWithOptionalTimeout(ctx, k.maxOperatorResponseTime)
-
-	event, err := watchtools.UntilWithoutRetry(ctx, watcher, k8sutil.NodeAnnotationCondition(shouldRebootSelector))
-	if err != nil {
-		return fmt.Errorf("waiting for annotation %q failed: %w", constants.AnnotationOkToReboot, err)
-	}
-
-	// Sanity check.
-	no, ok := event.Object.(*corev1.Node)
-	if !ok {
-		panic("event contains a non-*api.Node object")
-	}
-
-	if no.Annotations[constants.AnnotationOkToReboot] != constants.True {
-		panic("event did not contain annotation expected")
-	}
-
-	return nil
-}
-
-//nolint:cyclop // We will deal with complexity once we have proper tests.
-func (k *klocksmith) waitForNotOkToReboot(ctx context.Context) error {
-	node, err := k.nc.Get(ctx, k.nodeName, metav1.GetOptions{})
-	if err != nil {
-		return fmt.Errorf("getting self node (%q): %w", k.nodeName, err)
-	}
-
-	if node.Annotations[constants.AnnotationOkToReboot] != constants.True {
-		return nil
-	}
-
-	// XXX: Set timeout > 0?
-	watcher, err := k.nc.Watch(ctx, metav1.ListOptions{
-		FieldSelector:   fields.OneTermEqualSelector("metadata.name", node.Name).String(),
-		ResourceVersion: node.ResourceVersion,
-	})
-	if err != nil {
-		return fmt.Errorf("creating watcher for self node (%q): %w", k.nodeName, err)
-	}
-
-	// Within 24 hours of indicating we don't need a reboot we should be given a not-ok.
+	//
 	// If that isn't the case, it likely means the operator isn't running, and
 	// we'll just crash-loop in that case, and hopefully that will help the user realize something's wrong.
-	// Use a custom condition function to use the more correct 'OkToReboot !=
-	// true' vs '== False'; due to the operator matching on '== True', and not
-	// going out of its way to convert '' => 'False', checking the exact inverse
-	// of what the operator checks is the correct thing to do.
 	ctx, _ = watchtools.ContextWithOptionalTimeout(ctx, k.maxOperatorResponseTime)
 
 	watchF := func(event watch.Event) (bool, error) {
-		//nolint:exhaustive // Handle for event type Bookmark will be added once we have tests in place.
 		switch event.Type {
+		case watch.Added, watch.Modified:
+			annotations, err := meta.NewAccessor().Annotations(event.Object)
+			if err != nil {
+				return false, fmt.Errorf("extracting annotations from event object: %w", err)
+			}
+
+			return conditionF(annotations), nil
 		case watch.Error:
 			return false, fmt.Errorf("watching node: %v", event.Object)
 		case watch.Deleted:
 			return false, fmt.Errorf("our node was deleted while we were waiting for ready")
-		case watch.Added, watch.Modified:
-			//nolint:forcetypeassert // Will be addressed once we have proper tests in place.
-			return event.Object.(*corev1.Node).Annotations[constants.AnnotationOkToReboot] != constants.True, nil
+		case watch.Bookmark:
+			return false, fmt.Errorf("unexpected watch bookmark received")
 		default:
 			return false, fmt.Errorf("unknown event type: %v", event.Type)
 		}
 	}
 
-	event, err := watchtools.UntilWithoutRetry(ctx, watcher, watchF)
-	if err != nil {
+	if _, err := watchtools.UntilWithoutRetry(ctx, watcher, watchF); err != nil {
 		return fmt.Errorf("waiting for annotation %q: %w", constants.AnnotationOkToReboot, err)
-	}
-
-	// Sanity check.
-	no, ok := event.Object.(*corev1.Node)
-	if !ok {
-		return fmt.Errorf("object received in event is not Node, got: %#v", event.Object)
-	}
-
-	if no.Annotations[constants.AnnotationOkToReboot] == constants.True {
-		panic("event did not contain expected annotation")
 	}
 
 	return nil
@@ -530,8 +499,9 @@ func sleepOrDone(d time.Duration, done <-chan struct{}) {
 func splitNewlineEnv(envVars map[string]string, envs string) {
 	sc := bufio.NewScanner(strings.NewReader(envs))
 	for sc.Scan() {
-		//nolint:gomnd // TODO.
-		spl := strings.SplitN(sc.Text(), "=", 2)
+		// Even if value contains the delimiter, we want to ignore it.
+		maxSubstrings := 2
+		spl := strings.SplitN(sc.Text(), "=", maxSubstrings)
 
 		// Just skip empty lines or lines without a value.
 		if len(spl) == 1 {

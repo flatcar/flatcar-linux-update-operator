@@ -43,14 +43,16 @@ type Status struct {
 }
 
 // NewStatus constructs status from received D-Bus signal body.
-func NewStatus(body []interface{}) (s Status) {
-	s.LastCheckedTime = body[0].(int64)
-	s.Progress = body[1].(float64)
-	s.CurrentOperation = body[2].(string)
-	s.NewVersion = body[3].(string)
-	s.NewSize = body[4].(int64)
-
-	return
+//
+//nolint:forcetypeassert // TODO: To be refactored to return errors.
+func NewStatus(body []interface{}) Status {
+	return Status{
+		LastCheckedTime:  body[0].(int64),
+		Progress:         body[1].(float64),
+		CurrentOperation: body[2].(string),
+		NewVersion:       body[3].(string),
+		NewSize:          body[4].(int64),
+	}
 }
 
 // String implements Stringer interface for Status.

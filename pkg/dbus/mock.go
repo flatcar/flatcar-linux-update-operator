@@ -81,9 +81,9 @@ type MockObject struct {
 var _ godbus.BusObject = &MockObject{}
 
 // CallWithContext ...
-//
-//nolint:lll // Upstream signature, can't do much with that.
-func (m *MockObject) CallWithContext(ctx context.Context, method string, flags godbus.Flags, args ...interface{}) *godbus.Call {
+func (m *MockObject) CallWithContext(
+	ctx context.Context, method string, flags godbus.Flags, args ...interface{},
+) *godbus.Call {
 	if m.CallWithContextF == nil {
 		return &godbus.Call{}
 	}
@@ -106,9 +106,9 @@ func (m *MockObject) Go(method string, flags godbus.Flags, ch chan *godbus.Call,
 }
 
 // GoWithContext ...
-//
-//nolint:lll // Upstream signature, can't do much with that.
-func (m *MockObject) GoWithContext(ctx context.Context, method string, flags godbus.Flags, ch chan *godbus.Call, args ...interface{}) *godbus.Call {
+func (m *MockObject) GoWithContext(
+	ctx context.Context, method string, flags godbus.Flags, ch chan *godbus.Call, args ...interface{},
+) *godbus.Call {
 	return &godbus.Call{}
 }
 

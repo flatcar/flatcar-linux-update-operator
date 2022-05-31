@@ -21,7 +21,7 @@ var (
 // Semver is a variable, which holds parsed Version.
 var Semver semver.Version
 
-//nolint:gochecknoinits
+//nolint:gochecknoinits // TODO: Legacy code to be removed.
 func init() {
 	parsedSemVer, err := semver.Parse(Version)
 	if err != nil {

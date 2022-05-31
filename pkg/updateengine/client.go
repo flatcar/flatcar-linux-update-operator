@@ -101,6 +101,8 @@ func New(connector dbus.Connector) (Client, error) {
 func (c *client) ReceiveStatuses(rcvr chan<- Status, stop <-chan struct{}) {
 	// If there is an error getting the current status, ignore it and just
 	// move onto the main loop.
+	//
+	//nolint:errcheck // TODO: This will be fixed once we introduce error handling to receiving statuses.
 	st, _ := c.getStatus()
 	rcvr <- st
 

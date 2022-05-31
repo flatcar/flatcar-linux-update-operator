@@ -70,6 +70,9 @@ linters-settings:
     allow-leading-space: false
     require-explanation: true
     require-specific: true
+  varnamelen:
+    ignore-names:
+      - ok
   wsl:
     force-err-cuddling: true
 
@@ -87,6 +90,7 @@ linters:
     - goerr113
     # We do not require all used structs to have all fields initialized.
     - exhaustivestruct
+    - exhaustruct
     # We do not care about the memory efficiency really.
     - maligned
     # We allow returning interfaces for defensive programming.
@@ -114,6 +118,7 @@ linters:
     - errchkjson
     - errname
     - errorlint
+    - execinquery
     - exhaustive
     - exportloopref
     - forbidigo
@@ -148,6 +153,8 @@ linters:
     - nlreturn
     - noctx
     - nolintlint
+    - nonamedreturns
+    - nosprintfhostport
     - paralleltest
     - prealloc
     - predeclared
