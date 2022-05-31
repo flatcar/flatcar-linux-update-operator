@@ -91,6 +91,15 @@ func Test_Creating_new_operator(t *testing.T) {
 			}
 		})
 
+		t.Run("lockType_is_incorrect", func(t *testing.T) {
+			config := validOperatorConfig()
+			config.LockType = "incorrect"
+
+			if _, err := operator.New(config); err == nil {
+				t.Fatalf("Expected error")
+			}
+		})
+
 		t.Run("invalid_reboot_window_is_configured", func(t *testing.T) {
 			t.Parallel()
 
