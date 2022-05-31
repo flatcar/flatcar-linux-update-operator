@@ -70,6 +70,9 @@ linters-settings:
     allow-leading-space: false
     require-explanation: true
     require-specific: true
+  varnamelen:
+    ignore-names:
+      - ok
   wsl:
     force-err-cuddling: true
 

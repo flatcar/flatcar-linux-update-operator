@@ -797,7 +797,7 @@ func Test_Running_agent(t *testing.T) {
 
 			fakeClient.PrependReactor("create", "pods/eviction",
 				func(action k8stesting.Action) (bool, runtime.Object, error) {
-					createAction, ok := action.(k8stesting.CreateActionImpl) //nolint:varnamelen // False positive.
+					createAction, ok := action.(k8stesting.CreateActionImpl)
 					if !ok {
 						del := k8stesting.CreateActionImpl{}
 
@@ -1985,7 +1985,7 @@ func notifyOnNodeUnschedulableUpdate(t *testing.T, fakeClient *k8stesting.Fake) 
 func updateActionToNode(t *testing.T, action k8stesting.Action) *corev1.Node {
 	t.Helper()
 
-	updateAction, ok := action.(k8stesting.UpdateActionImpl) //nolint:varnamelen // Below it's different variable.
+	updateAction, ok := action.(k8stesting.UpdateActionImpl)
 	if !ok {
 		t.Fatalf("Expected action %T, got %T", k8stesting.UpdateActionImpl{}, action)
 	}
