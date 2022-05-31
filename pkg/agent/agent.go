@@ -375,13 +375,6 @@ func (k *klocksmith) waitForOkToReboot(ctx context.Context) error {
 		return fmt.Errorf("getting self node (%q): %w", k.nodeName, err)
 	}
 
-	okToReboot := node.Annotations[constants.AnnotationOkToReboot] == constants.True
-	rebootNeeded := node.Annotations[constants.AnnotationRebootNeeded] == constants.True
-
-	if okToReboot && rebootNeeded {
-		return nil
-	}
-
 	// XXX: Set timeout > 0?
 	watcher, err := k.nc.Watch(ctx, metav1.ListOptions{
 		FieldSelector:   fields.OneTermEqualSelector("metadata.name", node.Name).String(),
@@ -400,19 +393,10 @@ func (k *klocksmith) waitForOkToReboot(ctx context.Context) error {
 		constants.AnnotationRebootNeeded: constants.True,
 	}).AsSelector()
 
-	event, err := watchtools.UntilWithoutRetry(ctx, watcher, k8sutil.NodeAnnotationCondition(shouldRebootSelector))
-	if err != nil {
+	watchF := k8sutil.NodeAnnotationCondition(shouldRebootSelector)
+
+	if _, err := watchtools.UntilWithoutRetry(ctx, watcher, watchF); err != nil {
 		return fmt.Errorf("waiting for annotation %q failed: %w", constants.AnnotationOkToReboot, err)
-	}
-
-	// Sanity check.
-	no, ok := event.Object.(*corev1.Node)
-	if !ok {
-		panic("event contains a non-*api.Node object")
-	}
-
-	if no.Annotations[constants.AnnotationOkToReboot] != constants.True {
-		panic("event did not contain annotation expected")
 	}
 
 	return nil
@@ -462,19 +446,8 @@ func (k *klocksmith) waitForNotOkToReboot(ctx context.Context) error {
 		}
 	}
 
-	event, err := watchtools.UntilWithoutRetry(ctx, watcher, watchF)
-	if err != nil {
+	if _, err := watchtools.UntilWithoutRetry(ctx, watcher, watchF); err != nil {
 		return fmt.Errorf("waiting for annotation %q: %w", constants.AnnotationOkToReboot, err)
-	}
-
-	// Sanity check.
-	no, ok := event.Object.(*corev1.Node)
-	if !ok {
-		return fmt.Errorf("object received in event is not Node, got: %#v", event.Object)
-	}
-
-	if no.Annotations[constants.AnnotationOkToReboot] == constants.True {
-		panic("event did not contain expected annotation")
 	}
 
 	return nil
