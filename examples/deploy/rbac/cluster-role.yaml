@@ -13,28 +13,6 @@ rules:
       - watch
       - update
   - apiGroups:
-      - ""
-    resources:
-      - configmaps
-    verbs:
-      - create
-  - apiGroups:
-      - ""
-    resources:
-      - configmaps
-    resourceNames:
-      - flatcar-linux-update-operator-lock
-    verbs:
-      - get
-      - update
-  - apiGroups:
-      - ""
-    resources:
-      - events
-    verbs:
-      - create
-      - watch
-  - apiGroups:
       - policy
     resourceNames:
       - flatcar-linux-update-operator
@@ -42,22 +20,6 @@ rules:
       - podsecuritypolicies
     verbs:
       - use
-  # For leases.
-  - apiGroups:
-      - coordination.k8s.io
-    resources:
-      - leases
-    verbs:
-      - create
-  - apiGroups:
-      - coordination.k8s.io
-    resources:
-      - leases
-    resourceNames:
-      - flatcar-linux-update-operator-lock
-    verbs:
-      - get
-      - update
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
