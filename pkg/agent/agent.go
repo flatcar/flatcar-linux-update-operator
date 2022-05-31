@@ -433,7 +433,6 @@ func (k *klocksmith) waitForNotOkToReboot(ctx context.Context) error {
 	ctx, _ = watchtools.ContextWithOptionalTimeout(ctx, k.maxOperatorResponseTime)
 
 	watchF := func(event watch.Event) (bool, error) {
-		//nolint:exhaustive // Handle for event type Bookmark will be added once we have tests in place.
 		switch event.Type {
 		case watch.Added, watch.Modified:
 			annotations, err := meta.NewAccessor().Annotations(event.Object)
@@ -446,6 +445,8 @@ func (k *klocksmith) waitForNotOkToReboot(ctx context.Context) error {
 			return false, fmt.Errorf("watching node: %v", event.Object)
 		case watch.Deleted:
 			return false, fmt.Errorf("our node was deleted while we were waiting for ready")
+		case watch.Bookmark:
+			return false, fmt.Errorf("unexpected watch bookmark received")
 		default:
 			return false, fmt.Errorf("unknown event type: %v", event.Type)
 		}

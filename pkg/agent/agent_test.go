@@ -1342,8 +1342,12 @@ func Test_Running_agent(t *testing.T) {
 						watchEvent:    func(w *watch.FakeWatcher) { w.Modify(nil) },
 						expectedError: "extracting annotations from event object",
 					},
-					"returns_unknown_event_type": {
+					"returns_bookmark_event_type": {
 						watchEvent:    func(w *watch.FakeWatcher) { w.Action(watch.Bookmark, nil) },
+						expectedError: "unexpected watch bookmark received",
+					},
+					"returns_unknown_event_type": {
+						watchEvent:    func(w *watch.FakeWatcher) { w.Action("foo", nil) },
 						expectedError: "unknown event type",
 					},
 				}
