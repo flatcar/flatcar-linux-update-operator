@@ -6,29 +6,9 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/watch"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
-	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/client-go/util/retry"
 )
-
-// NodeAnnotationCondition returns a condition function that succeeds when a
-// node being watched has an annotation of key equal to value.
-func NodeAnnotationCondition(selector fields.Selector) watchtools.ConditionFunc {
-	return func(event watch.Event) (bool, error) {
-		if event.Type == watch.Modified {
-			node, ok := event.Object.(*corev1.Node)
-			if !ok {
-				return false, fmt.Errorf("received event object is not Node, got: %#v", event.Object)
-			}
-
-			return selector.Matches(fields.Set(node.Annotations)), nil
-		}
-
-		return false, fmt.Errorf("unhandled watch case for %#v", event)
-	}
-}
 
 // GetNodeRetry gets a node object, retrying up to DefaultBackoff number of times if it fails.
 func GetNodeRetry(ctx context.Context, nc corev1client.NodeInterface, node string) (*corev1.Node, error) {
