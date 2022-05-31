@@ -18,10 +18,15 @@ rules:
       - configmaps
     verbs:
       - create
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+    resourceNames:
+      - flatcar-linux-update-operator-lock
+    verbs:
       - get
       - update
-      - list
-      - watch
   - apiGroups:
       - ""
     resources:
