@@ -158,9 +158,8 @@ func (k *klocksmith) process(ctx context.Context) error {
 
 	// Only make a node schedulable if a reboot was in progress. This prevents a node from being made schedulable
 	// if it was made unschedulable by something other than the agent.
-	//
-	//nolint:lll // To be addressed.
-	madeUnschedulableAnnotation, madeUnschedulableAnnotationExists := node.Annotations[constants.AnnotationAgentMadeUnschedulable]
+	annotation := constants.AnnotationAgentMadeUnschedulable
+	madeUnschedulableAnnotation, madeUnschedulableAnnotationExists := node.Annotations[annotation]
 	makeSchedulable := madeUnschedulableAnnotation == constants.True
 
 	// Set flatcar-linux.net/update1/reboot-in-progress=false and
@@ -500,8 +499,9 @@ func sleepOrDone(d time.Duration, done <-chan struct{}) {
 func splitNewlineEnv(envVars map[string]string, envs string) {
 	sc := bufio.NewScanner(strings.NewReader(envs))
 	for sc.Scan() {
-		//nolint:gomnd // TODO.
-		spl := strings.SplitN(sc.Text(), "=", 2)
+		// Even if value contains the delimiter, we want to ignore it.
+		maxSubstrings := 2
+		spl := strings.SplitN(sc.Text(), "=", maxSubstrings)
 
 		// Just skip empty lines or lines without a value.
 		if len(spl) == 1 {
