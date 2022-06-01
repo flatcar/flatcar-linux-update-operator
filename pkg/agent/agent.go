@@ -209,23 +209,30 @@ func (k *klocksmith) process(ctx context.Context) error {
 	go k.watchUpdateStatus(ctx, k.updateStatusCallback)
 
 	// Block until constants.AnnotationOkToReboot is set.
-	okToReboot := false
-	for !okToReboot {
+	for okToReboot := false; !okToReboot; {
+		klog.Infof("Waiting for ok-to-reboot from controller...")
+
+		errCh := make(chan error)
+
+		go func() {
+			errCh <- k.waitForOkToReboot(ctx)
+		}()
+
 		select {
 		case <-ctx.Done():
 			klog.Infof("Got stop signal while waiting for ok-to-reboot from controller")
 
 			return nil
-		default:
-			klog.Infof("Waiting for ok-to-reboot from controller...")
+		case err := <-errCh:
+			if err != nil {
+				klog.Warningf("Error waiting for an ok-to-reboot: %v", err)
 
-			err := k.waitForOkToReboot(ctx)
-			if err == nil {
-				// Time to reboot.
-				okToReboot = true
+				// Break select statement to restart watching for ok to reboot.
+				break
 			}
 
-			klog.Warningf("Error waiting for an ok-to-reboot: %v", err)
+			// Time to reboot.
+			okToReboot = true
 		}
 	}
 
