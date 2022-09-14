@@ -6,7 +6,7 @@ on:
     - v*
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: flatcar-linux/flatcar-linux-update-operator
+  IMAGE_NAME: flatcar/flatcar-linux-update-operator
 
 jobs:
   docker:

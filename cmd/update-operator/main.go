@@ -9,9 +9,9 @@ import (
 	"github.com/coreos/pkg/flagutil"
 	"k8s.io/klog/v2"
 
-	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/k8sutil"
-	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/operator"
-	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/version"
+	"github.com/flatcar/flatcar-linux-update-operator/pkg/k8sutil"
+	"github.com/flatcar/flatcar-linux-update-operator/pkg/operator"
+	"github.com/flatcar/flatcar-linux-update-operator/pkg/version"
 )
 
 type flagsSet struct {

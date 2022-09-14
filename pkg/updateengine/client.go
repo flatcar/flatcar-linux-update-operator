@@ -19,7 +19,7 @@ import (
 
 	godbus "github.com/godbus/dbus/v5"
 
-	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/dbus"
+	"github.com/flatcar/flatcar-linux-update-operator/pkg/dbus"
 )
 
 const (

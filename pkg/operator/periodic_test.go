@@ -19,7 +19,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/operator"
+	"github.com/flatcar/flatcar-linux-update-operator/pkg/operator"
 )
 
 //nolint:funlen // Just many sub-tests.

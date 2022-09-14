@@ -25,9 +25,9 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/utils/pointer"
 
-	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/agent"
-	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/constants"
-	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/updateengine"
+	"github.com/flatcar/flatcar-linux-update-operator/pkg/agent"
+	"github.com/flatcar/flatcar-linux-update-operator/pkg/constants"
+	"github.com/flatcar/flatcar-linux-update-operator/pkg/updateengine"
 )
 
 const (

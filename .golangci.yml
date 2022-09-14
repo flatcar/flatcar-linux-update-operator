@@ -54,7 +54,7 @@ linters-settings:
     check-type-assertions: true
     check-blank: true
   gci:
-    local-prefixes: github.com/flatcar-linux/flatcar-linux-update-operator
+    local-prefixes: github.com/flatcar/flatcar-linux-update-operator
   godot:
     capital: true
   gofumpt:
