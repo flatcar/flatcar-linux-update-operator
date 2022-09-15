@@ -1,3 +1,4 @@
+// Package main provides executable for FLUO.
 package main
 
 import (

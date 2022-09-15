@@ -8,7 +8,6 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -532,7 +531,7 @@ func getUpdateMap(filesPathPrefix string) (map[string]string, error) {
 	updateConfPathWithPrefix := filepath.Join(filesPathPrefix, updateConfPath)
 
 	// This file should always be present on Flatcar.
-	b, err := ioutil.ReadFile(updateConfPathWithPrefix)
+	b, err := os.ReadFile(updateConfPathWithPrefix)
 	if err != nil {
 		return nil, fmt.Errorf("reading file %q: %w", updateConfPathWithPrefix, err)
 	}
@@ -541,7 +540,7 @@ func getUpdateMap(filesPathPrefix string) (map[string]string, error) {
 
 	updateConfOverridePathWithPrefix := filepath.Join(filesPathPrefix, updateConfOverridePath)
 
-	updateConfOverride, err := ioutil.ReadFile(updateConfOverridePathWithPrefix)
+	updateConfOverride, err := os.ReadFile(updateConfOverridePathWithPrefix)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			return nil, fmt.Errorf("reading file %q: %w", updateConfOverridePathWithPrefix, err)
@@ -561,7 +560,7 @@ func getReleaseMap(filesPathPrefix string) (map[string]string, error) {
 	osReleasePathWithPrefix := filepath.Join(filesPathPrefix, osReleasePath)
 
 	// This file should always be present on Flatcar.
-	b, err := ioutil.ReadFile(osReleasePathWithPrefix)
+	b, err := os.ReadFile(osReleasePathWithPrefix)
 	if err != nil {
 		return nil, fmt.Errorf("reading file %q: %w", osReleasePathWithPrefix, err)
 	}

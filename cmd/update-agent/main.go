@@ -1,3 +1,4 @@
+// Package main provides executable for FLUO agent.
 package main
 
 import (
