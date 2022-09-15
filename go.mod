@@ -6,7 +6,6 @@ require (
 	github.com/blang/semver/v4 v4.0.0
 	github.com/coreos/go-systemd/v22 v22.3.2
 	github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f
-	github.com/flatcar-linux/locksmith v0.6.2
 	github.com/godbus/dbus/v5 v5.1.0
 	github.com/google/go-cmp v0.5.8
 	k8s.io/api v0.24.1
