@@ -32,7 +32,7 @@ To unmask a service, run `systemctl unmask <name>`.
 To enable a service, run `systemctl enable <name>`.
 To start/stop a service, run `systemctl start <name>` or `systemctl stop <name>` respectively.
 
-or using a [Container Linux Config](https://docs.flatcar-linux.org/os/provisioning/#container-linux-config) file:
+or using a [Container Linux Config](https://www.flatcar.org/docs/latest/provisioning/cl-config/) file:
 ```
 systemd:
   units:

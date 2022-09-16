@@ -17,8 +17,8 @@ import (
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/klog/v2"
 
-	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/constants"
-	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/operator"
+	"github.com/flatcar/flatcar-linux-update-operator/pkg/constants"
+	"github.com/flatcar/flatcar-linux-update-operator/pkg/operator"
 )
 
 const (

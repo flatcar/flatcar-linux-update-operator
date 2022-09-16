@@ -12,11 +12,11 @@ import (
 	"github.com/coreos/pkg/flagutil"
 	"k8s.io/klog/v2"
 
-	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/agent"
-	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/dbus"
-	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/k8sutil"
-	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/updateengine"
-	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/version"
+	"github.com/flatcar/flatcar-linux-update-operator/pkg/agent"
+	"github.com/flatcar/flatcar-linux-update-operator/pkg/dbus"
+	"github.com/flatcar/flatcar-linux-update-operator/pkg/k8sutil"
+	"github.com/flatcar/flatcar-linux-update-operator/pkg/updateengine"
+	"github.com/flatcar/flatcar-linux-update-operator/pkg/version"
 )
 
 const defaultGracePeriodSeconds = 600

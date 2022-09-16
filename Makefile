@@ -4,11 +4,11 @@ VERSION=$(shell ./build/git-version.sh)
 RELEASE_VERSION=$(shell cat VERSION)
 COMMIT=$(shell git rev-parse HEAD)
 
-REPO=github.com/flatcar-linux/flatcar-linux-update-operator
+REPO=github.com/flatcar/flatcar-linux-update-operator
 LD_FLAGS="-w -X $(REPO)/pkg/version.Version=$(RELEASE_VERSION) -X $(REPO)/pkg/version.Commit=$(COMMIT)"
 
 DOCKER_CMD ?= docker
-IMAGE_REPO?=ghcr.io/flatcar-linux/flatcar-linux-update-operator
+IMAGE_REPO?=ghcr.io/flatcar/flatcar-linux-update-operator
 
 GOLANGCI_LINT_CONFIG_FILE ?= .golangci.yml
 

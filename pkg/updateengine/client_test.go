@@ -10,8 +10,8 @@ import (
 	godbus "github.com/godbus/dbus/v5"
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/dbus"
-	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/updateengine"
+	"github.com/flatcar/flatcar-linux-update-operator/pkg/dbus"
+	"github.com/flatcar/flatcar-linux-update-operator/pkg/updateengine"
 )
 
 //nolint:funlen,cyclop // Just many test cases.

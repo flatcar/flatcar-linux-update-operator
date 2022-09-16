@@ -8,7 +8,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/flatcar-linux/flatcar-linux-update-operator/pkg/dbus"
+	"github.com/flatcar/flatcar-linux-update-operator/pkg/dbus"
 )
 
 const (

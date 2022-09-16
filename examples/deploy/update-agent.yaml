@@ -19,7 +19,7 @@ spec:
       serviceAccountName: flatcar-linux-update-agent
       containers:
       - name: update-agent
-        image: ghcr.io/flatcar-linux/flatcar-linux-update-operator:v0.8.0
+        image: ghcr.io/flatcar/flatcar-linux-update-operator:v0.8.0
         command:
         - "/bin/update-agent"
         volumeMounts:
