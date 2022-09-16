@@ -102,13 +102,13 @@ linters:
     # This linter has been deprecated.
     - golint
   enable:
+    - asasalint
     - asciicheck
     - bidichk
     - bodyclose
     - containedctx
     - contextcheck
     - cyclop
-    - deadcode
     - decorder
     - depguard
     - dogsled
@@ -139,10 +139,11 @@ linters:
     - gomodguard
     - goprintffuncname
     - grouper
-    - ifshort
     - importas
     - ineffassign
+    - interfacebloat
     - lll
+    - logrlint
     - maintidx
     - makezero
     - misspell
@@ -159,10 +160,10 @@ linters:
     - prealloc
     - predeclared
     - promlinter
+    - reassign
     - revive
     - rowserrcheck
     - sqlclosecheck
-    - structcheck
     - stylecheck
     - tagliatelle
     - tenv
@@ -172,7 +173,7 @@ linters:
     - typecheck
     - unconvert
     - unparam
-    - varcheck
+    - usestdlibvars
     - varnamelen
     - wastedassign
     - whitespace

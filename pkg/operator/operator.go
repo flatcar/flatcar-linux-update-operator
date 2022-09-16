@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/flatcar-linux/locksmith/pkg/timeutil"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -115,7 +114,7 @@ type Kontroller struct {
 	namespace string
 
 	// Reboot window.
-	rebootWindow *timeutil.Periodic
+	rebootWindow *Periodic
 
 	maxRebootingNodes int
 
@@ -137,10 +136,10 @@ func New(config Config) (*Kontroller, error) {
 		return nil, fmt.Errorf("creating new resource lock: %w", err)
 	}
 
-	var rebootWindow *timeutil.Periodic
+	var rebootWindow *Periodic
 
 	if config.RebootWindowStart != "" && config.RebootWindowLength != "" {
-		rw, err := timeutil.ParsePeriodic(config.RebootWindowStart, config.RebootWindowLength)
+		rw, err := ParsePeriodic(config.RebootWindowStart, config.RebootWindowLength)
 		if err != nil {
 			return nil, fmt.Errorf("parsing reboot window: %w", err)
 		}

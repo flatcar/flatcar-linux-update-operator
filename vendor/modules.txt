@@ -39,9 +39,6 @@ github.com/evanphx/json-patch
 # github.com/exponent-io/jsonpath v0.0.0-20151013193312-d6023ce2651d
 ## explicit
 github.com/exponent-io/jsonpath
-# github.com/flatcar-linux/locksmith v0.6.2
-## explicit
-github.com/flatcar-linux/locksmith/pkg/timeutil
 # github.com/go-errors/errors v1.0.1
 ## explicit
 github.com/go-errors/errors
