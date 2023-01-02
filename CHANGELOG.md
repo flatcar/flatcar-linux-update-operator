@@ -5,9 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.9.0] - 2023-01-02
+### Added
+- Example manifests use new `node-role.kubernetes.io/control-plane` tolerations in addition to legacy `node-role.kubernetes.io/master`.
+- Added release pipeline which will be building release container images from now on.
+- Added compatibility with Kubernetes versions v1.24+.
+- `kustomization.yaml` file has been added to example manifests to enable using them with `kustomize`.
+
 ### Changed
 - Moved from `github.com/flatcar-linux/flatcar-linux-update-operator` to `github.com/flatcar/flatcar-linux-update-operator`. This also means that the docker images will be now available at `ghcr.io/flatcar/flatcar-linux-update-operator`. The `0.8.0` image is still available at the old location, but no new images will be pushed there.
+- Everything is now built using Go 1.19.
+- Updated all Go dependencies.
+- Dropped dependency on `github.com/flatcar-linux/locksmith`.
+- In example manifests use Role resource instead of ClusterRole where possible to limit scope of permissions.
+- Limited operator access to config maps only to one used for leader election in example manifests.
+- Improved agent responsiveness to context cancellation.
+- Agent code is now covered with tests and some initial refactorings has been performed.
+- Container images now use Alpine Linux version v3.15 as a base image.
+- Draining pods is now done using Eviction API when possible.
+- Capitalization of log messages and formatting of produced errors is now more consistent.
+
+### Fixed
+- Publishing leader election events by operator.
+- Agent main loop leaking goroutine when agent is stopped.
+- Used service account by agent in example manifests.
+
+### Removed
+- Unused RBAC permissions from agent and operator example manifest.
+- Unreachable agent code.
+- Deprecated `--auto-label-flatcar-linux` flag has been removed from operator.
 
 ## [0.8.0] - 2021-09-24
 ### Added
@@ -61,5 +87,6 @@ is able to trigger a reboot on the host.
 - Made operator code compatible with Kubernetes 1.17.
 - Fixed publishing leader acquired event by the operator.
 
+[0.9.0]: https://github.com/flatcar/flatcar-linux-update-operator/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/flatcar/flatcar-linux-update-operator/compare/v0.7.3...v0.8.0
 [0.7.3]: https://github.com/flatcar/flatcar-linux-update-operator/compare/v0.7.2...v0.7.3
