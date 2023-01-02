@@ -61,5 +61,5 @@ is able to trigger a reboot on the host.
 - Made operator code compatible with Kubernetes 1.17.
 - Fixed publishing leader acquired event by the operator.
 
-[0.8.0]: https://github.com/flatcar-linux/flatcar-linux-update-operator/compare/v0.7.3...v0.8.0
-[0.7.3]: https://github.com/flatcar-linux/flatcar-linux-update-operator/compare/v0.7.2...v0.7.3
+[0.8.0]: https://github.com/flatcar/flatcar-linux-update-operator/compare/v0.7.3...v0.8.0
+[0.7.3]: https://github.com/flatcar/flatcar-linux-update-operator/compare/v0.7.2...v0.7.3
