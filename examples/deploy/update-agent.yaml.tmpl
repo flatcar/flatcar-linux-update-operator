@@ -16,7 +16,7 @@ spec:
       labels:
         app: flatcar-linux-update-agent
     spec:
-      serviceAccountName: flatcar-linux-update-operator-sa
+      serviceAccountName: flatcar-linux-update-agent
       containers:
       - name: update-agent
         image: ghcr.io/flatcar/flatcar-linux-update-operator:v${VERSION}
