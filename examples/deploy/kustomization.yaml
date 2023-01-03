@@ -4,7 +4,6 @@ kind: Kustomization
 resources:
 - ./rbac/
 - 00-namespace.yaml
-- podsecuritypolicy.yaml
 - update-agent-sa.yaml
 - update-agent.yaml
 - update-operator-sa.yaml
