@@ -21,6 +21,7 @@ jobs:
       uses: docker/metadata-action@v3
       with:
         images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        flavor: latest=false
 
     - name: Checkout repository
       uses: actions/checkout@v2
