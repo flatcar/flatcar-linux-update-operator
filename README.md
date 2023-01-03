@@ -47,7 +47,7 @@ systemd:
 Create the `update-operator` deployment and `update-agent` daemonset.
 
 ```
-kubectl apply -f examples/deploy -R
+kubectl kustomize examples/deploy | kubectl apply -f-
 ```
 
 ## Test
