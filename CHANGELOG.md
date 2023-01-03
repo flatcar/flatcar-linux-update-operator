@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.9.0] - 2023-01-02
+## [0.9.0] - 2023-01-03
 ### Added
 - Example manifests use new `node-role.kubernetes.io/control-plane` tolerations in addition to legacy `node-role.kubernetes.io/master`.
 - Added release pipeline which will be building release container images from now on.
@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Container images now use Alpine Linux version v3.15 as a base image.
 - Draining pods is now done using Eviction API when possible.
 - Capitalization of log messages and formatting of produced errors is now more consistent.
+- `latest` tag for container images will no longer be used. Users are recommended to use specific versions.
 
 ### Fixed
 - Publishing leader election events by operator.
@@ -34,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unused RBAC permissions from agent and operator example manifest.
 - Unreachable agent code.
 - Deprecated `--auto-label-flatcar-linux` flag has been removed from operator.
+- Pod Security Policies has been removed from example manifests, as their support has been removed in Kubernetes 1.25.
 
 ## [0.8.0] - 2021-09-24
 ### Added
