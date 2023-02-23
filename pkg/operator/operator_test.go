@@ -309,11 +309,11 @@ func stealLeaderElection(ctx context.Context, t *testing.T, config operator.Conf
 	}
 
 	leaderLease := &struct {
-		HolderIdentity       string
-		LeaseDurationSeconds int
-		AcquireTime          time.Time
-		RenewTime            time.Time
-		LeaderTransitions    int
+		HolderIdentity       string    `json:"holderIdentity"`
+		LeaseDurationSeconds int       `json:"leaseDurationSeconds"`
+		AcquireTime          time.Time `json:"acquireTime"`
+		RenewTime            time.Time `json:"renewTime"`
+		LeaderTransitions    int       `json:"leaderTransitions"`
 	}{}
 
 	if err := json.Unmarshal([]byte(leader), leaderLease); err != nil {
