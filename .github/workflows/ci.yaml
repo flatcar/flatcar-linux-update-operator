@@ -17,7 +17,7 @@ jobs:
         id: go
 
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Run CI checks
         run: make ci
@@ -29,7 +29,7 @@ jobs:
     timeout-minutes: 10
     steps:
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Run lint
         run: |
           # Required to avoid error 'fatal: detected dubious ownership in repository at' while calling
@@ -44,7 +44,7 @@ jobs:
     timeout-minutes: 5
     steps:
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Codespell test
         uses: codespell-project/actions-codespell@master
         with:
@@ -60,7 +60,7 @@ jobs:
     steps:
 
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Test building Docker image
         run: make image
@@ -72,7 +72,7 @@ jobs:
     steps:
 
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Set up Go
         uses: actions/setup-go@v2
@@ -91,7 +91,7 @@ jobs:
     steps:
 
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Test rendering manifests using kustomize
         run: make build-kustomize
@@ -101,7 +101,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       # Use dedicated action for nice integration with GitHub.
       - uses: returntocorp/semgrep-action@v1
