@@ -2041,7 +2041,7 @@ func testPodControllerReference() []metav1.OwnerReference {
 	return []metav1.OwnerReference{
 		{
 			Name:       "fake-owner",
-			Controller: pointer.BoolPtr(true),
+			Controller: pointer.Bool(true),
 		},
 	}
 }
