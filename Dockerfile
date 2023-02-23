@@ -8,7 +8,7 @@ COPY . .
 
 RUN make bin/update-agent bin/update-operator
 
-FROM alpine:3.15
+FROM alpine:3.17
 
 MAINTAINER Flatcar Maintainers
 
