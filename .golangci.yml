@@ -113,6 +113,7 @@ linters:
     - depguard
     - dogsled
     - dupl
+    - dupword
     - durationcheck
     - errcheck
     - errchkjson
@@ -124,6 +125,7 @@ linters:
     - forbidigo
     - forcetypeassert
     - funlen
+    - gocheckcompilerdirectives
     - gochecknoinits
     - gocognit
     - goconst
@@ -143,10 +145,10 @@ linters:
     - ineffassign
     - interfacebloat
     - lll
-    - logrlint
     - maintidx
     - makezero
     - misspell
+    - musttag
     - nakedret
     - nestif
     - nilerr
@@ -167,6 +169,7 @@ linters:
     - stylecheck
     - tagliatelle
     - tenv
+    - testableexamples
     - testpackage
     - thelper
     - tparallel
