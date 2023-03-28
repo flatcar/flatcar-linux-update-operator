@@ -4,8 +4,8 @@ Pre-reboot checks are prevented from running as well.
 
 ## Configuring update-operator
 
-The reboot window is configured through the the flags `--reboot-window-start` 
-and `--reboot-window-length`, or through the environment variables 
+The reboot window is configured through the the flags `--reboot-window-start`
+and `--reboot-window-length`, or through the environment variables
 `UPDATE_OPERATOR_REBOOT_WINDOW_START` and `UPDATE_OPERATOR_REBOOT_WINDOW_LENGTH`.
 
 Here is an example configuration:

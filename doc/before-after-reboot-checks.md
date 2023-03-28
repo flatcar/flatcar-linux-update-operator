@@ -1,7 +1,7 @@
 # Before and After Reboot Checks
 
 FLUO can require custom node annotations before a node is allowed to reboot or
-before a node is allowed to become schedulable after a reboot. 
+before a node is allowed to become schedulable after a reboot.
 
 ## Configuring `update-operator`
 
@@ -35,7 +35,7 @@ intervene.
 
 It is recommended that custom checks be implemented by a container image and
 deployed using a [DaemonSet][1] with a [node selector][2] on the before-reboot
-or after-reboot labels. 
+or after-reboot labels.
 
 ```
 spec:
