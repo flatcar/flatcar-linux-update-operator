@@ -34,6 +34,7 @@ import (
 type Config struct {
 	NodeName                string
 	PodDeletionGracePeriod  time.Duration
+	ForceNodeDrain          bool
 	Clientset               kubernetes.Interface
 	StatusReceiver          StatusReceiver
 	Rebooter                Rebooter
@@ -65,6 +66,7 @@ type klocksmith struct {
 	ue                      StatusReceiver
 	lc                      Rebooter
 	reapTimeout             time.Duration
+	forceNodeDrain          bool
 	hostFilesPrefix         string
 	pollInterval            time.Duration
 	maxOperatorResponseTime time.Duration
@@ -114,6 +116,7 @@ func New(config *Config) (Klocksmith, error) {
 		ue:                      config.StatusReceiver,
 		lc:                      config.Rebooter,
 		reapTimeout:             config.PodDeletionGracePeriod,
+		forceNodeDrain:          config.ForceNodeDrain,
 		hostFilesPrefix:         config.HostFilesPrefix,
 		pollInterval:            pollInterval,
 		maxOperatorResponseTime: maxOperatorResponseTime,
@@ -269,7 +272,7 @@ func (k *klocksmith) process(ctx context.Context) error {
 		klog.Info("Node already marked as unschedulable")
 	}
 
-	drainer := newDrainer(ctx, k.clientset, k.reapTimeout)
+	drainer := newDrainer(ctx, k.clientset, k.reapTimeout, k.forceNodeDrain)
 
 	klog.Info("Getting pod list for deletion")
 
@@ -461,11 +464,11 @@ type drainer interface {
 	DeleteOrEvictPods([]corev1.Pod) error
 }
 
-func newDrainer(ctx context.Context, cs kubernetes.Interface, timeout time.Duration) drainer {
+func newDrainer(ctx context.Context, cs kubernetes.Interface, timeout time.Duration, forceNodeDrain bool) drainer {
 	return &drain.Helper{
 		Ctx:                ctx,
 		Client:             cs,
-		Force:              false,
+		Force:              forceNodeDrain,
 		GracePeriodSeconds: -1,
 		Timeout:            timeout,
 		// Explicitly don't terminate self? we'll probably just be a

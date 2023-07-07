@@ -27,6 +27,7 @@ var (
 
 	reapTimeout = flag.Int("grace-period", defaultGracePeriodSeconds,
 		"Period of time in seconds given to a pod to terminate when rebooting for an update")
+	forceNodeDrain = flag.Bool("force-drain", false, "Force removal of pods with custom or no owners while draining node")
 )
 
 func main() {
@@ -74,6 +75,7 @@ func main() {
 		Clientset:              clientset,
 		StatusReceiver:         updateEngineClient,
 		Rebooter:               rebooter,
+		ForceNodeDrain:         *forceNodeDrain,
 	}
 
 	agent, err := agent.New(config)
