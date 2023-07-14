@@ -931,6 +931,52 @@ func Test_Running_agent(t *testing.T) {
 		})
 	})
 
+	t.Run("removes_pod_without_owner_when_force_drain_is_configured", func(t *testing.T) {
+		t.Parallel()
+
+		rebootTriggerred := make(chan bool)
+
+		podsToCreate := []*corev1.Pod{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "default",
+				},
+				Spec: corev1.PodSpec{
+					NodeName: testNode().Name,
+				},
+			},
+		}
+
+		fakeClient := fake.NewSimpleClientset(podsToCreate[0], testNode())
+		addEvictionSupport(t, fakeClient)
+
+		testConfig, node, _ := validTestConfig(t, testNode())
+		testConfig.ForceNodeDrain = true
+		testConfig.Clientset = fakeClient
+		testConfig.Rebooter = &mockRebooter{
+			rebootF: func(auth bool) {
+				rebootTriggerred <- auth
+			},
+		}
+
+		ctx := contextWithTimeout(t, agentRunTimeLimit)
+
+		assertNodeProperty(ctx, t, &assertNodePropertyContext{
+			done:   runAgent(ctx, t, testConfig),
+			config: testConfig,
+			testF:  assertNodeAnnotationValue(constants.AnnotationRebootNeeded, constants.True),
+		})
+
+		okToReboot(ctx, t, testConfig.Clientset.CoreV1().Nodes(), node.Name)
+
+		select {
+		case <-ctx.Done():
+			t.Fatal("Timed out waiting for reboot to be triggered")
+		case <-rebootTriggerred:
+		}
+	})
+
 	t.Run("after_draining_node", func(t *testing.T) {
 		t.Parallel()
 
