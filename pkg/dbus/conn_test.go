@@ -170,13 +170,13 @@ func (m *mockConnection) Hello() error {
 	return m.helloF()
 }
 
-func (m *mockConnection) AddMatchSignal(matchOptions ...godbus.MatchOption) error {
+func (m *mockConnection) AddMatchSignal(_ ...godbus.MatchOption) error {
 	return nil
 }
 
-func (m *mockConnection) Signal(ch chan<- *godbus.Signal) {}
+func (m *mockConnection) Signal(_ chan<- *godbus.Signal) {}
 
-func (m *mockConnection) Object(dest string, path godbus.ObjectPath) godbus.BusObject {
+func (m *mockConnection) Object(_ string, _ godbus.ObjectPath) godbus.BusObject {
 	return nil
 }
 

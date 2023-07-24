@@ -1,4 +1,4 @@
-FROM golang:1.20-alpine3.17 as builder
+FROM golang:1.20-alpine3.18 as builder
 
 RUN apk add -U make git
 
@@ -8,7 +8,7 @@ COPY . .
 
 RUN make bin/update-agent bin/update-operator
 
-FROM alpine:3.17
+FROM alpine:3.18
 
 MAINTAINER Flatcar Maintainers
 

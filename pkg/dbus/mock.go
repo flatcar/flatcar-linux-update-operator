@@ -101,35 +101,35 @@ func (m *MockObject) Call(method string, flags godbus.Flags, args ...interface{}
 }
 
 // Go ...
-func (m *MockObject) Go(method string, flags godbus.Flags, ch chan *godbus.Call, args ...interface{}) *godbus.Call {
+func (m *MockObject) Go(_ string, _ godbus.Flags, _ chan *godbus.Call, _ ...interface{}) *godbus.Call {
 	return &godbus.Call{}
 }
 
 // GoWithContext ...
 func (m *MockObject) GoWithContext(
-	ctx context.Context, method string, flags godbus.Flags, ch chan *godbus.Call, args ...interface{},
+	_ context.Context, _ string, _ godbus.Flags, _ chan *godbus.Call, _ ...interface{},
 ) *godbus.Call {
 	return &godbus.Call{}
 }
 
 // AddMatchSignal ...
-func (m *MockObject) AddMatchSignal(iface, member string, options ...godbus.MatchOption) *godbus.Call {
+func (m *MockObject) AddMatchSignal(_, _ string, _ ...godbus.MatchOption) *godbus.Call {
 	return &godbus.Call{}
 }
 
 // RemoveMatchSignal ...
-func (m *MockObject) RemoveMatchSignal(iface, member string, options ...godbus.MatchOption) *godbus.Call {
+func (m *MockObject) RemoveMatchSignal(_, _ string, _ ...godbus.MatchOption) *godbus.Call {
 	return &godbus.Call{}
 }
 
 // GetProperty ...
-func (m *MockObject) GetProperty(p string) (godbus.Variant, error) { return godbus.Variant{}, nil }
+func (m *MockObject) GetProperty(_ string) (godbus.Variant, error) { return godbus.Variant{}, nil }
 
 // StoreProperty ...
-func (m *MockObject) StoreProperty(p string, value interface{}) error { return nil }
+func (m *MockObject) StoreProperty(_ string, _ interface{}) error { return nil }
 
 // SetProperty ...
-func (m *MockObject) SetProperty(p string, v interface{}) error { return nil }
+func (m *MockObject) SetProperty(_ string, _ interface{}) error { return nil }
 
 // Destination ...
 func (m *MockObject) Destination() string { return "" }
