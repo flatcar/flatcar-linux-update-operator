@@ -325,6 +325,7 @@ func (k *klocksmith) updateStatusCallback(ctx context.Context, status updateengi
 		labels[constants.LabelRebootNeeded] = constants.True
 	}
 
+	//nolint:staticcheck // New equivalent is buggy: https://github.com/kubernetes/kubernetes/issues/119533.
 	err := wait.PollImmediateUntil(k.pollInterval, func() (bool, error) {
 		if err := k8sutil.SetNodeAnnotationsLabels(ctx, k.nc, k.nodeName, anno, labels); err != nil {
 			klog.Errorf("Failed to set annotation %q: %v", constants.AnnotationStatus, err)
