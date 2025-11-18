@@ -85,12 +85,12 @@ codespell: ## Runs spell checking.
 	$(CODESPELL_BIN) --skip $(CODESPELL_SKIP) --ignore-words .codespell.ignorewords --check-filenames --check-hidden
 
 .PHONY: test-up
-test-up: ## Starts testing D-Bus instance in Docker container using docker-compose.
-	env UID=$$(id -u) docker-compose -f test/docker-compose.yml up -d
+test-up: ## Starts testing D-Bus instance in Docker container using docker compose.
+	env UID=$$(id -u) docker compose -f test/docker-compose.yml up -d
 
 .PHONY: test-down
 test-down: ## Tears down testing D-Bus instance created by 'test-up'.
-	env UID=$$(id -u) docker-compose -f test/docker-compose.yml down
+	env UID=$$(id -u) docker compose -f test/docker-compose.yml down
 
 .PHONY: test-integration
 test-integration: test-up
