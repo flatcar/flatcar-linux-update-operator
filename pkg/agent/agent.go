@@ -518,7 +518,9 @@ func splitNewlineEnv(envVars map[string]string, envs string) {
 			continue
 		}
 
-		envVars[spl[0]] = spl[1]
+		// Let's clear the value in case of quoting to get only the value
+		// e.g FOO="BAR" becomes 'FOO: BAR' (and not FOO: "BAR")
+		envVars[spl[0]] = strings.Trim(spl[1], "\"'")
 	}
 }
 

@@ -10,6 +10,20 @@ import (
 func Test_splitNewlineEnv(t *testing.T) {
 	t.Parallel()
 
+	t.Run("handle_quoted_variables", func(t *testing.T) {
+		t.Parallel()
+
+		expected := map[string]string{"foo": "bar"}
+
+		input := map[string]string{}
+
+		splitNewlineEnv(input, `foo="bar"`)
+
+		if !reflect.DeepEqual(expected, input) {
+			t.Fatalf("Should handle quoted variables")
+		}
+	})
+
 	t.Run("retain_map_values_when_given_empty_input", func(t *testing.T) {
 		t.Parallel()
 
