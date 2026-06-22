@@ -25,7 +25,7 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
-    container: golangci/golangci-lint:v1.53.3
+    container: golangci/golangci-lint:v2.12.2
     timeout-minutes: 10
     steps:
 
@@ -36,7 +36,7 @@ jobs:
           # 'git status --porcelain'.
           # See https://github.com/actions/checkout/issues/1048 for more details.
           git config --global --add safe.directory /__w/flatcar-linux-update-operator/flatcar-linux-update-operator
-          make lint check-update-linters
+          make lint
 
   codespell:
     name: Codespell

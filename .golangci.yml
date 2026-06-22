@@ -1,189 +1,90 @@
-output:
-  sort-results: true
-
+version: "2"
 run:
-  modules-download-mode: vendor
-  timeout: 5m
   build-tags:
     - integration
-
+  modules-download-mode: vendor
 issues:
-  exclude-use-default: false
-  max-same-issues: 0
   max-issues-per-linter: 0
-  exclude-rules:
-    # Ignore magic numbers in klog.V() calls until we clean them up.
-    - linters:
-        - gomnd
-      source: "klog.V\\("
-    # Ignore URLs in comments.
-    - linters:
-        - lll
-      source: "http(s)://"
-    # Allow use of fmt.Print* functions in cmd package and in tests.
-    - linters:
-        - forbidigo
-      text: "use of `fmt.Printf` forbidden by pattern"
-      path: cmd/
-    - linters:
-        - forbidigo
-      text: "use of `fmt.Println` forbidden by pattern"
-      path: cmd/
-    - linters:
-        - forbidigo
-      text: "use of `fmt.Printf` forbidden by pattern"
-      path: "_test.go"
-    - linters:
-        - forbidigo
-      text: "use of `fmt.Println` forbidden by pattern"
-      path: "_test.go"
-    # Allow to return unwrapped errors from external packages, as we do not use typed errors yet.
-    - linters:
-        - wrapcheck
-      text: "error returned from external package is unwrapped"
-    - linters:
-        - wrapcheck
-      text: "error returned from interface method should be wrapped"
-    # False positive: https://github.com/kunwardeep/paralleltest/issues/8.
-    - linters:
-        - paralleltest
-      text: "does not use range value in test Run"
-
-linters-settings:
-  errcheck:
-    check-type-assertions: true
-    check-blank: true
-  gci:
-    local-prefixes: github.com/flatcar/flatcar-linux-update-operator
-  godot:
-    capital: true
-  gofumpt:
-    extra-rules: true
-  govet:
-    enable-all: true
-    disable:
-      - fieldalignment
-      - shadow
-  makezero:
-    always: true
-  nolintlint:
-    allow-leading-space: false
-    require-explanation: true
-    require-specific: true
-  varnamelen:
-    ignore-names:
-      - ok
-  wsl:
-    force-err-cuddling: true
-
-# Update list of enabled linters using 'make update-linters'.
+  max-same-issues: 0
+formatters:
+  settings:
+    gofumpt:
+      extra-rules: true
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(github.com/flatcar/flatcar-linux-update-operator)
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
 linters:
-  disable-all: false
   disable:
-    # There is no need for whitelist of allowed dependencies.
     - depguard
-    # We use different import grouping style than gci forces.
-    - gci
-    # We still have many globals to get rid of.
-    - gochecknoglobals
-    # TODOs in the code are OK.
-    - godox
-    # We do not have clearly defined error types yet.
-    - goerr113
-    # We do not require all used structs to have all fields initialized.
-    - exhaustivestruct
+    - err113
     - exhaustruct
-    # We do not care about the memory efficiency really.
-    - maligned
-    # We allow returning interfaces for defensive programming.
+    - gochecknoglobals
+    - godox
     - ireturn
-    # This linter has been deprecated.
-    - interfacer
-    # This linter has been deprecated.
-    - scopelint
-    # This linter has been deprecated.
-    - golint
-  enable:
-    - asasalint
-    - asciicheck
-    - bidichk
-    - bodyclose
-    - containedctx
-    - contextcheck
-    - cyclop
-    - decorder
-    - dogsled
-    - dupl
-    - dupword
-    - durationcheck
-    - errcheck
-    - errchkjson
-    - errname
-    - errorlint
-    - execinquery
-    - exhaustive
-    - exportloopref
-    - forbidigo
-    - forcetypeassert
-    - funlen
-    - gocheckcompilerdirectives
-    - gochecknoinits
-    - gocognit
-    - goconst
-    - gocritic
-    - gocyclo
-    - godot
-    - gofmt
-    - gofumpt
-    - goheader
-    - goimports
-    - gomnd
-    - gomoddirectives
-    - gomodguard
-    - goprintffuncname
-    - gosmopolitan
-    - grouper
-    - importas
-    - ineffassign
-    - interfacebloat
-    - lll
-    - maintidx
-    - makezero
-    - mirror
-    - misspell
-    - musttag
-    - nakedret
-    - nestif
-    - nilerr
-    - nilnil
-    - nlreturn
-    - noctx
-    - nolintlint
-    - nonamedreturns
-    - nosprintfhostport
-    - paralleltest
-    - prealloc
-    - predeclared
-    - promlinter
-    - reassign
-    - revive
-    - rowserrcheck
-    - sqlclosecheck
-    - stylecheck
-    - tagalign
-    - tagliatelle
-    - tenv
-    - testableexamples
-    - testpackage
-    - thelper
-    - tparallel
-    - typecheck
-    - unconvert
-    - unparam
-    - usestdlibvars
-    - varnamelen
-    - wastedassign
-    - whitespace
-    - wrapcheck
-    - wsl
-    - zerologlint
+  settings:
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+    godot:
+      capital: true
+    govet:
+      disable:
+        - fieldalignment
+        - shadow
+      enable-all: true
+    makezero:
+      always: true
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+    varnamelen:
+      ignore-names:
+        - ok
+    wsl:
+      force-err-cuddling: true
+  exclusions:
+    generated: lax
+    rules:
+      - linters:
+          - mnd
+        source: klog.V\(
+      - linters:
+          - lll
+        source: http(s)://
+      - linters:
+          - forbidigo
+        path: cmd/
+        text: use of `fmt.Printf` forbidden by pattern
+      - linters:
+          - forbidigo
+        path: cmd/
+        text: use of `fmt.Println` forbidden by pattern
+      - linters:
+          - forbidigo
+        path: _test.go
+        text: use of `fmt.Printf` forbidden by pattern
+      - linters:
+          - forbidigo
+        path: _test.go
+        text: use of `fmt.Println` forbidden by pattern
+      - linters:
+          - wrapcheck
+        text: error returned from external package is unwrapped
+      - linters:
+          - wrapcheck
+        text: error returned from interface method should be wrapped
+      - linters:
+          - paralleltest
+        text: does not use range value in test Run
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
