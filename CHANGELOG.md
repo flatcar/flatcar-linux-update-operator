@@ -10,8 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Agent now supports `-force-drain` flag, which allows removal of pods with custom or no controller when draining nodes [#197](https://github.com/flatcar/flatcar-linux-update-operator/pull/197).
 
 ### Changed
-- Everything is now built using Go 1.20.
-- Container images now use Alpine Linux version v3.18 as a base image.
+- Everything is now built using Go 1.26.
+- Container images now use Alpine Linux version v3.24 as a base image.
 
 ### Fixed
 - Quotes are now correctly handled following Flatcar os-release syntax update ([#213](https://github.com/flatcar/flatcar-linux-update-operator/pull/213))

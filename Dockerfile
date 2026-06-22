@@ -1,4 +1,4 @@
-FROM golang:1.20-alpine3.18 as builder
+FROM docker.io/golang:1.26.4-alpine3.24 as builder
 
 RUN apk add -U make git
 
@@ -8,7 +8,7 @@ COPY . .
 
 RUN make bin/update-agent bin/update-operator
 
-FROM alpine:3.18
+FROM docker.io/alpine:3.24
 
 MAINTAINER Flatcar Maintainers
 
