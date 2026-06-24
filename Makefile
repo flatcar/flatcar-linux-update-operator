@@ -62,17 +62,6 @@ check-tidy: check-working-tree-clean ## Checks if Go module files are clean.
 	go mod tidy
 	@test -z "$$(git status --porcelain)" || (echo "Please run 'go mod tidy' and commit generated changes."; git status; exit 1)
 
-.PHONY: check-update-linters
-check-update-linters: check-working-tree-clean update-linters ## Checks if list of enabled golangci-lint linters is up to date.
-	@test -z "$$(git status --porcelain)" || (echo "Linter configuration outdated. Run 'make update-linters' and commit generated changes to fix."; exit 1)
-
-.PHONY: update-linters
-update-linters: ## Updates list of enabled golangci-lint linters.
-	# Remove all enabled linters.
-	sed -i '/^  enable:/q0' $(GOLANGCI_LINT_CONFIG_FILE)
-	# Then add all possible linters to config.
-	golangci-lint linters | grep -E '^\S+:' | cut -d: -f1 | sort | sed 's/^/    - /g' | grep -v -E "($$(sed -e '1,/^  disable:$$/d' .golangci.yml  | grep -E '    - \S+$$' | awk '{print $$2}' | tr \\n '|' | sed 's/|$$//g'))" >> $(GOLANGCI_LINT_CONFIG_FILE)
-
 .PHONY: lint
 lint: build build-test ## Runs golangci-lint.
 	golangci-lint run ./...

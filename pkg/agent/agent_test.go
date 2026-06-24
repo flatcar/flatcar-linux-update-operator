@@ -77,7 +77,7 @@ func Test_Creating_new_agent(t *testing.T) {
 				}
 				firstCallMutex.Unlock()
 
-				return true, nil, fmt.Errorf(t.Name())
+				return true, nil, fmt.Errorf("%s", t.Name())
 			}
 
 			return false, nil, nil
@@ -530,7 +530,7 @@ func Test_Running_agent(t *testing.T) {
 				if firstCall {
 					firstCall = false
 
-					return true, nil, fmt.Errorf(t.Name())
+					return true, nil, fmt.Errorf("%s", t.Name())
 				}
 			}
 
@@ -1050,7 +1050,7 @@ func Test_Running_agent(t *testing.T) {
 
 				testConfig, _, fakeClient := validTestConfig(t, testNode())
 
-				errorReached, failOnSettingNodeAnnotations := failOnNthCall(4, fmt.Errorf(t.Name()))
+				errorReached, failOnSettingNodeAnnotations := failOnNthCall(4, fmt.Errorf("%s", t.Name()))
 				// 1. Updating info labels. TODO: Could be done with patch instead.
 				// 2. Checking made unschedulable.
 				// 3. Updating annotations and labels.
@@ -1097,7 +1097,7 @@ func Test_Running_agent(t *testing.T) {
 					// TODO: This should not be needed once we implement backoff.
 					time.Sleep(errorResponseThrottle)
 
-					return true, nil, fmt.Errorf(t.Name())
+					return true, nil, fmt.Errorf("%s", t.Name())
 				}
 
 				fakeClient.PrependWatchReactor("*", failOnWatchCreation)
@@ -1188,7 +1188,7 @@ func Test_Running_agent(t *testing.T) {
 				}
 
 				fakeClient.PrependReactor("get", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
-					return true, nil, fmt.Errorf(t.Name())
+					return true, nil, fmt.Errorf("%s", t.Name())
 				})
 
 				ctx := contextWithTimeout(t, time.Second)

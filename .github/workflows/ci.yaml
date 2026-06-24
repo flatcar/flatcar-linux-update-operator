@@ -10,14 +10,14 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     steps:
-      - name: Set up Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: '1.20'
-        id: go
-
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: './go.mod'
+        id: go
 
       - name: Run CI checks
         run: make ci
@@ -25,18 +25,18 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
-    container: golangci/golangci-lint:v1.53.3
+    container: golangci/golangci-lint:v2.12.2
     timeout-minutes: 10
     steps:
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
       - name: Run lint
         run: |
           # Required to avoid error 'fatal: detected dubious ownership in repository at' while calling
           # 'git status --porcelain'.
           # See https://github.com/actions/checkout/issues/1048 for more details.
           git config --global --add safe.directory /__w/flatcar-linux-update-operator/flatcar-linux-update-operator
-          make lint check-update-linters
+          make lint
 
   codespell:
     name: Codespell
@@ -44,7 +44,7 @@ jobs:
     timeout-minutes: 5
     steps:
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
       - name: Codespell test
         uses: codespell-project/actions-codespell@master
         with:
@@ -60,7 +60,7 @@ jobs:
     steps:
 
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
 
       - name: Test building Docker image
         run: make image
@@ -72,12 +72,12 @@ jobs:
     steps:
 
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
 
       - name: Set up Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v6
         with:
-          go-version: '1.20'
+          go-version-file: './go.mod'
 
       - name: Install required binaries
         run: GOBIN=/usr/local/bin make install-changelog
@@ -91,7 +91,7 @@ jobs:
     steps:
 
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
 
       - name: Test rendering manifests using kustomize
         run: make build-kustomize
@@ -101,7 +101,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
 
       # Use dedicated action for nice integration with GitHub.
       - uses: returntocorp/semgrep-action@v1

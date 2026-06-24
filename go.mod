@@ -1,6 +1,6 @@
 module github.com/flatcar/flatcar-linux-update-operator
 
-go 1.17
+go 1.26
 
 require (
 	github.com/blang/semver/v4 v4.0.0

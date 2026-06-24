@@ -1207,7 +1207,7 @@ func Test_Operator_stops_current_reconciliation_when(t *testing.T) {
 					t.Parallel()
 
 					config, fakeClient := testConfig(testCase.node)
-					requestFailed, failRequest := failOnNthCall(subTestCase.failingCall, fmt.Errorf(t.Name()))
+					requestFailed, failRequest := failOnNthCall(subTestCase.failingCall, fmt.Errorf("%s", t.Name()))
 					fakeClient.PrependReactor(subTestCase.verb, "nodes", failRequest)
 
 					ctx, cancel := context.WithTimeout(contextWithDeadline(t), 5*time.Second)

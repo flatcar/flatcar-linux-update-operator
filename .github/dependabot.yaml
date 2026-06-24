@@ -1,0 +1,13 @@
+---
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      # run once a week, by default on Monday
+      interval: weekly
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      # run once a week, by default on Monday
+      interval: weekly
