@@ -14,8 +14,8 @@ github.com/chai2010/gettext-go
 github.com/chai2010/gettext-go/mo
 github.com/chai2010/gettext-go/plural
 github.com/chai2010/gettext-go/po
-# github.com/coreos/go-systemd/v22 v22.5.0
-## explicit; go 1.12
+# github.com/coreos/go-systemd/v22 v22.7.0
+## explicit; go 1.23
 github.com/coreos/go-systemd/v22/login1
 # github.com/coreos/pkg v0.0.0-20230601102743-20bbbf26f4d8
 ## explicit
